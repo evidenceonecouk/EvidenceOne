@@ -1,29 +1,11 @@
 import type { PlaceholderSpec } from './ScreenPlaceholder'
 
 export const placeholderSpecs = {
-  acspQueue: {
-    eyebrow: 'Evidence One Compliance',
-    title: 'Review queue',
-    summary: 'Cases waiting for an ACSP reviewer, with SLA countdowns and AI flags.',
-    planned: ['36-hour SLA countdown on each case', 'Route, risk flags and allocation', 'B2C cases allocated to this ACSP'],
-  },
-  acspCase: {
-    eyebrow: 'Evidence One Compliance',
-    title: 'Case review',
-    summary: 'Evidence, identity checks, PEP and sanctions, AI observations and the reviewer decision.',
-    planned: ['Register comparison with any mismatch highlighted', 'Approve, Request info or Decline with reason codes', 'Register mismatch opens a Route B correction'],
-  },
   acspSubmit: {
     eyebrow: 'Evidence One Compliance',
     title: 'Submit to Companies House',
     summary: 'A submission-ready pack, the handoff to GOV.UK One Login and recording the personal code.',
     planned: ['Every field ready to copy', 'Continue to GOV.UK One Login', 'Record the outcome and personal code'],
-  },
-  acspFilings: {
-    eyebrow: 'Evidence One Compliance',
-    title: 'Filings',
-    summary: 'Route B tasks, including ACSP04 register corrections that unblock paused verifications.',
-    planned: ['Open ACSP04 correction tasks', 'Mark the register as updated to resume Route A'],
   },
   record: {
     eyebrow: 'Evidence One File',

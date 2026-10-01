@@ -2,7 +2,7 @@ import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import type { AuditInput } from '@/lib/audit'
 import { formatMoney, fullName } from '@/lib/format'
 import { compareToRegister } from '@/lib/register'
-import type { AiObservation, DemoData, EvidenceItem, IdDocument, IdDocumentType, Invite, JourneyState, Payment, PaymentMethod, Person, VerificationCase } from '@/types/domain'
+import type { AiObservation, CorrectionTask, DecisionOutcome, DemoData, EvidenceItem, IdDocument, IdDocumentType, Invite, JourneyState, Payment, PaymentMethod, Person, VerificationCase } from '@/types/domain'
 
 /*
   Pure state transitions. Each returns the next data and the audit events to
@@ -283,6 +283,102 @@ export function createB2cCase(data: DemoData, personId: string, companyNumber: s
     audit: [
       { at: now, actor: personName(data, personId), actorType: 'person', action: 'b2c.started', caseId, detail: 'Started a verification directly on Evidence One.' },
       { at: now, actor: 'Evidence One', actorType: 'system', action: 'b2c.allocated', caseId, detail: `Allocated to ${acsp?.name} by the allocation rota.` },
+    ],
+  }
+}
+
+/* ACSP review */
+
+function reviewerName(data: DemoData, reviewerId: string) {
+  for (const a of data.acsps) {
+    const r = a.reviewers.find((x) => x.id === reviewerId)
+    if (r) return `${r.name}, ${a.name.replace(' Solicitors LLP', '')}`
+  }
+  return 'ACSP reviewer'
+}
+
+export function decideCase(data: DemoData, caseId: string, outcome: DecisionOutcome, reasonCode: string, note: string, reviewerId: string): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  if (!vc) return { data, audit: [] }
+  const now = Date.now()
+  const iso = (o = 0) => new Date(now + o).toISOString()
+  const status = outcome === 'approve' ? 'approved' : outcome === 'request_info' ? 'info_requested' : 'declined'
+  const actor = reviewerName(data, reviewerId)
+  const verb = { approve: 'Approved', request_info: 'More information requested', decline: 'Declined' }[outcome]
+  return {
+    data: patchCase(data, caseId, (c) => ({ ...c, status, reviewerId, decision: { outcome, reasonCode, note: note || undefined, decidedAt: iso(1000), reviewerId } })),
+    audit: [
+      { at: iso(), actor, actorType: 'person', action: 'auth.stepup.succeeded', caseId, detail: 'Second factor confirmed before the decision.' },
+      { at: iso(1000), actor, actorType: 'person', action: `case.decision.${outcome}`, caseId, detail: `${verb}. Reason ${reasonCode}.${outcome === 'approve' ? ' Retention period of 7 years starts.' : outcome === 'decline' ? ' Record retained for 7 years.' : ''}` },
+    ],
+  }
+}
+
+export function haltForMismatch(data: DemoData, caseId: string, reviewerId: string): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  const row = vc?.comparison.find((r) => r.result === 'mismatch')
+  if (!vc || !row) return { data, audit: [] }
+  const now = new Date().toISOString()
+  const taskId = nextRef(data.corrections.map((t) => t.id), 'FL-2026-', 0)
+  const task: CorrectionTask = {
+    id: taskId,
+    route: 'B',
+    form: 'ACSP04',
+    caseId,
+    companyNumber: vc.companyNumber,
+    personId: vc.personId,
+    field: row.field,
+    registerValue: row.register,
+    correctValue: row.document,
+    status: 'open',
+    createdAt: now,
+  }
+  return {
+    data: { ...patchCase(data, caseId, (c) => ({ ...c, status: 'halted_register_mismatch', reviewerId, correctionTaskId: taskId })), corrections: [...data.corrections, task] },
+    audit: [{ at: now, actor: reviewerName(data, reviewerId), actorType: 'person', action: 'route_a.halted', caseId, detail: `Route A paused. Route B correction task ${taskId} (ACSP04) created.` }],
+  }
+}
+
+export function fileCorrection(data: DemoData, taskId: string, reviewerId: string): ActionResult {
+  const task = data.corrections.find((t) => t.id === taskId)
+  if (!task) return { data, audit: [] }
+  const now = new Date().toISOString()
+  return {
+    data: { ...data, corrections: data.corrections.map((t) => (t.id === taskId ? { ...t, status: 'filed', filedAt: now } : t)) },
+    audit: [{ at: now, actor: reviewerName(data, reviewerId), actorType: 'person', action: 'route_b.acsp04.filed', caseId: task.caseId, detail: `ACSP04 correction filed with Companies House: ${task.field.toLowerCase()} ${task.registerValue} to ${task.correctValue}.` }],
+  }
+}
+
+/** Once Companies House updates the register, the paused verification resumes. */
+export function registerUpdated(data: DemoData, taskId: string): ActionResult {
+  const task = data.corrections.find((t) => t.id === taskId)
+  if (!task) return { data, audit: [] }
+  const now = Date.now()
+  const iso = (o = 0) => new Date(now + o).toISOString()
+  const entry = data.register.find((r) => r.personId === task.personId && r.companyNumber === task.companyNumber)
+  const person = data.people.find((p) => p.id === task.personId)
+  const register =
+    entry && person && task.field === 'Full name'
+      ? data.register.map((r) => (r === entry ? { ...r, registerName: `${person.familyName.toUpperCase()}, ${person.givenNames}` } : r))
+      : entry && task.field === 'First name'
+        ? data.register.map((r) => (r === entry ? { ...r, registerName: r.registerName.replace(task.registerValue, task.correctValue) } : r))
+        : data.register
+  const next = patchCase({ ...data, register }, task.caseId, (c) => ({
+    ...c,
+    status: 'in_review',
+    submittedForReviewAt: iso(1000),
+    slaDueAt: iso(1000 + 36 * 3600000),
+    comparison: c.comparison.map((r) => (r.result === 'mismatch' ? { ...r, register: register.find((x) => x.personId === task.personId && x.companyNumber === task.companyNumber)?.registerName ?? r.register, result: 'match', note: 'Corrected on the register by ACSP04.' } : r)),
+    observations: [
+      { id: `o-${c.id}-fix`, severity: 'info', title: 'Register corrected, details now match', detail: `Companies House updated the register after ACSP04 correction ${task.id}. Name and date of birth now match the identity document.`, source: 'Companies House officer record' },
+      ...c.observations.filter((o) => o.severity !== 'mismatch'),
+    ],
+  }))
+  return {
+    data: { ...next, corrections: next.corrections.map((t) => (t.id === taskId ? { ...t, status: 'register_updated', updatedAt: iso() } : t)) },
+    audit: [
+      { at: iso(), actor: 'Companies House register', actorType: 'system', action: 'register.updated', caseId: task.caseId, detail: `Register updated: ${task.field.toLowerCase()} now ${task.correctValue}.` },
+      { at: iso(1000), actor: 'Evidence One', actorType: 'system', action: 'route_a.resumed', caseId: task.caseId, detail: 'Register now matches. Route A resumed and returned to the review queue with a new 36-hour SLA.' },
     ],
   }
 }

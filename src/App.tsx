@@ -17,6 +17,9 @@ const CompanyLookup = lazy(() => import('@/features/agent/CompanyLookup').then((
 const CompanyProfile = lazy(() => import('@/features/agent/CompanyProfile').then((m) => ({ default: m.CompanyProfile })))
 const IndividualJourney = lazy(() => import('@/features/individual/IndividualJourney').then((m) => ({ default: m.IndividualJourney })))
 const VerifyStart = lazy(() => import('@/features/b2c/VerifyStart').then((m) => ({ default: m.VerifyStart })))
+const ReviewQueue = lazy(() => import('@/features/acsp/ReviewQueue').then((m) => ({ default: m.ReviewQueue })))
+const CaseReview = lazy(() => import('@/features/acsp/CaseReview').then((m) => ({ default: m.CaseReview })))
+const Filings = lazy(() => import('@/features/acsp/Filings').then((m) => ({ default: m.Filings })))
 const InviteLog = lazy(() => import('@/features/agent/InviteLog').then((m) => ({ default: m.InviteLog })))
 
 export default function App() {
@@ -47,10 +50,10 @@ export default function App() {
 
                 {/* ACSP reviewer */}
                 <Route path="acsp">
-                  <Route path="queue" element={<ScreenPlaceholder spec={s.acspQueue} />} />
-                  <Route path="cases/:caseId" element={<ScreenPlaceholder spec={s.acspCase} />} />
+                  <Route path="queue" element={<ReviewQueue />} />
+                  <Route path="cases/:caseId" element={<CaseReview />} />
                   <Route path="cases/:caseId/submit" element={<ScreenPlaceholder spec={s.acspSubmit} />} />
-                  <Route path="filings" element={<ScreenPlaceholder spec={s.acspFilings} />} />
+                  <Route path="filings" element={<Filings />} />
                 </Route>
                 <Route path="records/:caseId" element={<ScreenPlaceholder spec={s.record} />} />
 
