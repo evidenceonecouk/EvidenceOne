@@ -47,7 +47,7 @@ export function VerifyStart() {
     if (!company || !personId) return
     const caseId = nextCaseId(data)
     apply((d) => createB2cCase(d, personId, company.number, nextB2cAcsp(d).id, caseId))
-    navigate(`/app/${caseId}/details`)
+    navigate(`/app/${caseId}/contact`)
   }
 
   return (

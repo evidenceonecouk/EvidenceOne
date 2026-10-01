@@ -7,6 +7,8 @@ import type { AcspFirm, AgentOrg } from '@/types/domain'
 */
 
 export const PRIMARY_ACSP_ID = 'acsp-harcourt'
+/** The signed-in ACSP reviewer in the demo. */
+export const PRIMARY_REVIEWER_ID = 'rev-marsh'
 
 export const acsps: AcspFirm[] = [
   {
@@ -16,8 +18,14 @@ export const acsps: AcspFirm[] = [
     supervisor: 'Solicitors Regulation Authority',
     acspNumber: 'ACSP-0046-2187',
     reviewers: [
-      { id: 'rev-marsh', name: 'Eleanor Marsh', role: 'Partner, ACSP reviewer' },
+      {
+        id: 'rev-marsh',
+        name: 'Eleanor Marsh',
+        role: 'Partner, ACSP reviewer',
+        attestation: { course: 'Person checks under Option 2', completedOn: '2026-07-14', expiresOn: '2027-07-13', reference: 'TA-2026-0187' },
+      },
       { id: 'rev-okoro', name: 'James Okoro', role: 'Senior associate, ACSP reviewer' },
+      { id: 'rev-hartley', name: 'Philippa Hartley', role: 'Senior partner, ACSP reviewer', senior: true },
     ],
     b2cAllocationShare: 50,
     b2cAllocatedThisMonth: 9,
@@ -56,7 +64,7 @@ export const agents: AgentOrg[] = [
     kind: 'Accountancy firm',
     hasAcspStatus: true,
     contactName: 'Rachel Fenwick',
-    paymentCode: 'APC-FS-7Q4K',
+    paymentCode: 'APC-FS',
   },
   {
     id: 'agent-belgrave',
@@ -64,6 +72,6 @@ export const agents: AgentOrg[] = [
     kind: 'Family office',
     hasAcspStatus: false,
     contactName: 'Oliver Grant',
-    paymentCode: 'APC-BF-3M8T',
+    paymentCode: 'APC-BF',
   },
 ]

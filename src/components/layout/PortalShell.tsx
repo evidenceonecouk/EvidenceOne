@@ -1,4 +1,4 @@
-import { Archive, ChevronsUpDown, Gauge, Inbox, LayoutDashboard, Menu, Search, Send, ShieldCheck, Waypoints, X, type LucideIcon } from 'lucide-react'
+import { Archive, ChevronsUpDown, Gauge, Inbox, LayoutDashboard, ListChecks, Menu, Search, Send, ShieldCheck, Waypoints, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { Logo } from '@/components/brand/Logo'
@@ -40,10 +40,19 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
         { to: '/acsp/queue', label: 'Review queue', icon: Inbox, count: awaiting },
         { to: '/acsp/filings', label: 'Filings', icon: Waypoints, count: tasks },
         { to: '/records', label: 'Records', icon: Archive },
+        { to: '/rules', label: 'Rules', icon: ListChecks },
       ],
     }
   }
-  return { section: 'Administration', items: [{ to: '/admin', label: 'Operations', icon: Gauge }] }
+  const pendingApproval = data.ruleSets.filter((v) => v.status === 'pending_approval').length
+  if (persona === 'admin2') return { section: 'Approvals', items: [{ to: '/rules', label: 'Rules', icon: ListChecks, count: pendingApproval }] }
+  return {
+    section: 'Administration',
+    items: [
+      { to: '/admin', label: 'Operations', icon: Gauge },
+      { to: '/rules', label: 'Rules', icon: ListChecks, count: data.ruleSets.filter((v) => v.status === 'draft').length },
+    ],
+  }
 }
 
 function OrgSwitcher({ persona }: { persona: PersonaId }) {
@@ -76,11 +85,12 @@ function OrgSwitcher({ persona }: { persona: PersonaId }) {
     )
   }
   const acsp = getAcsp(data, PRIMARY_ACSP_ID)!
-  const name = persona === 'admin' ? 'Evidence One' : acsp.name
-  const sub = persona === 'admin' ? 'Platform administration' : `ACSP · ${acsp.acspNumber}`
+  const admin = persona === 'admin' || persona === 'admin2'
+  const name = admin ? 'Evidence One' : acsp.name
+  const sub = persona === 'admin2' ? 'Second approver' : admin ? 'Platform administration' : `ACSP · ${acsp.acspNumber}`
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-line bg-white p-2.5">
-      <CompanyMark name={persona === 'admin' ? 'Evidence One' : acsp.name} size={38} />
+      <CompanyMark name={admin ? 'Evidence One' : acsp.name} size={38} />
       <span className="min-w-0">
         <span className="block truncate text-[0.9375rem] font-medium text-ink">{name}</span>
         <span className="block truncate text-[0.8125rem] text-slate">{sub}</span>
@@ -96,7 +106,9 @@ function Sidebar({ persona, onNavigate }: { persona: PersonaId; onNavigate?: () 
       ? { seed: 'agent-contact', name: 'Rachel Fenwick', role: 'Partner' }
       : persona === 'reviewer'
         ? { seed: 'rev-marsh', name: 'Eleanor Marsh', role: 'ACSP reviewer' }
-        : { seed: 'admin-1', name: 'Platform administrator', role: 'Evidence One' }
+        : persona === 'admin2'
+          ? { seed: 'admin-2', name: 'Daniel Achebe', role: 'Compliance Administrator, second approver' }
+          : { seed: 'admin-1', name: 'Helen Carver', role: 'Super Administrator' }
   const { data, state } = useDemoStore()
   const userName = persona === 'agent' ? getAgent(data, state.agentId)?.contactName ?? user.name : user.name
 
@@ -143,7 +155,7 @@ function Sidebar({ persona, onNavigate }: { persona: PersonaId; onNavigate?: () 
         <div className="rounded-2xl bg-[linear-gradient(140deg,#16181b,#2b2f36)] p-4 text-paper">
           <ShieldCheck className="size-5 text-highlight" aria-hidden="true" />
           <p className="mt-2 text-[0.9375rem] font-medium">Human decisions only</p>
-          <p className="mt-1 text-[0.8125rem] leading-snug text-paper/70">AI flags and compares. Only an ACSP reviewer can approve or decline.</p>
+          <p className="mt-1 text-[0.8125rem] leading-snug text-paper/70">Rules are deterministic and AI is advisory. Only an ACSP reviewer can approve or decline.</p>
         </div>
         <div className="flex items-center gap-3 rounded-2xl px-2 py-1.5">
           <Avatar seed={user.seed} name={userName} size={36} />

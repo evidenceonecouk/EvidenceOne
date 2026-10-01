@@ -1,4 +1,4 @@
-import { Briefcase, Building2, ScanFace, Settings2, UserRound, type LucideIcon } from 'lucide-react'
+import { Briefcase, Building2, ScanFace, Settings2, UserCheck, UserRound, type LucideIcon } from 'lucide-react'
 import type { PersonaId } from '@/types/domain'
 
 export interface Persona {
@@ -53,12 +53,25 @@ export const personas: Persona[] = [
     id: 'admin',
     label: 'Admin',
     shortLabel: 'Admin',
-    description: 'Platform administration: ACSPs, B2C allocation and remuneration.',
+    description: 'Platform administration: ACSPs, B2C allocation, remuneration, and proposing rule changes.',
     home: '/admin',
     areas: ['/admin'],
     icon: Settings2,
   },
+  {
+    id: 'admin2',
+    label: 'Admin (second approver)',
+    shortLabel: 'Approver',
+    description: 'A second administrator who reviews a proposed rule set version and publishes it. Nobody approves their own change.',
+    home: '/rules',
+    areas: [],
+    icon: UserCheck,
+  },
 ]
+
+/** Screens every professional persona can open, such as the Rules page. They keep the current persona. */
+export const sharedAreas = ['/rules']
+export const isSharedPath = (pathname: string) => sharedAreas.some((a) => pathname === a || pathname.startsWith(`${a}/`))
 
 export const personaById = (id: PersonaId) => personas.find((p) => p.id === id)!
 

@@ -6,7 +6,7 @@ const standards = [
   ['Screening', 'PEP and sanctions', 'Every person screened, every result shown to the reviewer.'],
   ['Register', 'Exact match', 'Name and date of birth compared with Companies House.'],
   ['Route B', 'ACSP04 corrections', 'Mismatches corrected on the register, never resubmitted.'],
-  ['Submission', 'One Login handoff', 'A ready-to-copy pack, then the personal code recorded.'],
+  ['Submission', 'One Login handoff', 'A ready-to-copy pack, then the verification reference recorded.'],
   ['Retention', 'Seven years', 'Counted from the decision. Failed attempts kept too.'],
   ['Access', 'WCAG 2.2 AA', 'Large type, strong contrast and full keyboard use.'],
 ] as const

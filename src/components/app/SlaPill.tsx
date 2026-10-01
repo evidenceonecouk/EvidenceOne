@@ -3,7 +3,7 @@ import { useNow } from '@/hooks/useNow'
 import { timeRemaining } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-/** Live countdown against the 36-hour review SLA. Colour and wording both carry the urgency. */
+/** Live countdown against the review target (36 hours, shown to reviewers only). Colour and wording both carry the urgency. */
 export function SlaPill({ due, className }: { due: string; className?: string }) {
   const now = useNow(1000)
   const t = timeRemaining(due, now)

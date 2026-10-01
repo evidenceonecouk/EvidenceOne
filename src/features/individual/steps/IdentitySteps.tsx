@@ -1,4 +1,4 @@
-import { BookUser, Car, ChevronRight, CreditCard, IdCard, Loader2, ScanFace, UserRoundCheck } from 'lucide-react'
+import { BookUser, Car, ChevronRight, CreditCard, IdCard, Loader2, MonitorSmartphone, ScanFace, SmartphoneNfc, UserRoundCheck } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,54 @@ const documents: { type: IdDocumentType; label: string; note: string; icon: type
 export function DocumentStep({ vc, person, next, go }: StepProps) {
   const { apply } = useDemoStore()
   const [type, setType] = useState<IdDocumentType>(vc.journey?.documentType ?? person.document?.type ?? 'passport')
+  const [noChip, setNoChip] = useState(false)
+
+  if (noChip) {
+    return (
+      <Screen
+        footer={
+          <>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => {
+                apply((d) => updateJourney(d, vc.id, { documentType: 'driving_licence', noChipPhone: true }, { action: 'document.no_chip_phone', detail: 'Phone cannot read the passport chip. UK photocard driving licence offered in the browser.' }))
+                next()
+              }}
+            >
+              <MonitorSmartphone aria-hidden="true" />
+              Use my driving licence instead
+            </Button>
+            <Button
+              className="w-full"
+              variant="ghost"
+              onClick={() => {
+                apply((d) => requestOption2(d, vc.id, 'no_chip_phone'))
+                go('status')
+              }}
+            >
+              I don’t have a photocard driving licence
+            </Button>
+          </>
+        }
+      >
+        <ScreenTitle kicker="Passport chip">Your phone can’t read the chip</ScreenTitle>
+        <Lead>You can use a UK photocard driving licence instead. It is checked in your browser, without a chip read.</Lead>
+        <div className="mt-5 rounded-2xl border border-line bg-white p-4">
+          <p className="flex items-center gap-2 text-base font-medium text-ink">
+            <Car className="size-5" aria-hidden="true" />
+            UK photocard driving licence
+          </p>
+          <p className="mt-1 text-[0.9375rem] text-slate">Full or provisional, in date. If the address on it is your current address, you will not need anything else.</p>
+        </div>
+        <p className="mt-4 text-[0.9375rem] text-graphite">If you do not have one, a trained person at your ACSP can check your identity instead (Option 2). That needs the reviewer’s agreement first.</p>
+        <Button variant="link" className="mt-2 px-0" onClick={() => setNoChip(false)}>
+          Back to document choice
+        </Button>
+      </Screen>
+    )
+  }
+
   return (
     <Screen
       footer={
@@ -29,7 +77,7 @@ export function DocumentStep({ vc, person, next, go }: StepProps) {
             className="w-full"
             size="lg"
             onClick={() => {
-              apply((d) => updateJourney(d, vc.id, { documentType: type }))
+              apply((d) => updateJourney(d, vc.id, { documentType: type, noChipPhone: false }))
               next()
             }}
           >
@@ -42,7 +90,7 @@ export function DocumentStep({ vc, person, next, go }: StepProps) {
       }
     >
       <ScreenTitle kicker="Identity document">Verify with just one document</ScreenTitle>
-      <Lead>Choose the photo ID you have with you. A passport is quickest.</Lead>
+      <Lead>Choose one photo ID. You upload it once and it goes straight to the checks.</Lead>
       <fieldset className="mt-5 space-y-2.5">
         <legend className="sr-only">Identity document</legend>
         {documents.map((d) => (
@@ -67,6 +115,12 @@ export function DocumentStep({ vc, person, next, go }: StepProps) {
           </label>
         ))}
       </fieldset>
+      {type === 'passport' && (
+        <button type="button" onClick={() => setNoChip(true)} className="mt-4 flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-silver bg-paper px-4 py-3 text-left text-[0.9375rem] text-ink hover:bg-mist">
+          <SmartphoneNfc className="size-5 shrink-0" aria-hidden="true" />
+          My phone can’t read the chip
+        </button>
+      )}
     </Screen>
   )
 }
@@ -276,7 +330,7 @@ const checks = [
   { label: 'You are a live person', by: 'Certified identity provider' },
   { label: 'Your face matches the document', by: 'Certified identity provider' },
   { label: 'PEP and sanctions screening', by: 'Certified identity provider' },
-  { label: 'Details compared with the register', by: 'Evidence One Intelligence, advisory' },
+  { label: 'Details compared with the register', by: 'Evidence One rules, the same way every time' },
 ]
 
 export function ChecksStep({ vc, next }: StepProps) {
@@ -342,12 +396,12 @@ export function OptionTwoStep({ vc, go }: StepProps) {
             className="w-full"
             size="lg"
             onClick={() => {
-              apply((d) => requestOption2(d, vc.id))
+              apply((d) => requestOption2(d, vc.id, 'unsupported_document'))
               go('status')
             }}
           >
             <UserRoundCheck aria-hidden="true" />
-            Ask for a human check
+            Ask for a person check
           </Button>
           <Button className="w-full" variant="ghost" onClick={() => go('document')}>
             Back to document choice
@@ -355,14 +409,12 @@ export function OptionTwoStep({ vc, go }: StepProps) {
         </>
       }
     >
-      <ScreenTitle kicker="Option 2 · Fallback">Your document cannot be checked digitally</ScreenTitle>
-      <Lead>
-        If none of the listed documents will work for you, a trained person at {acsp} can check your identity instead. They will contact you to arrange it.
-      </Lead>
+      <ScreenTitle kicker="Option 2 · Fallback only">Your document can’t be checked digitally</ScreenTitle>
+      <Lead>The digital checks (Option 1) cannot support your document. A trained person at {acsp} can check your identity instead. They will contact you to arrange it.</Lead>
       <ul className="mt-5 space-y-2.5 text-[0.9375rem] text-graphite">
-        <li className="rounded-2xl border border-line bg-white px-4 py-3">You may be asked for more than one document.</li>
-        <li className="rounded-2xl border border-line bg-white px-4 py-3">The check is recorded in your case like any other.</li>
-        <li className="rounded-2xl border border-line bg-white px-4 py-3">The decision is still made by the ACSP.</li>
+        <li className="rounded-2xl border border-line bg-white px-4 py-3">You will need two documents: two from Group A, or one from Group A and one from Group B.</li>
+        <li className="rounded-2xl border border-line bg-white px-4 py-3">The person who checks them holds a current training attestation.</li>
+        <li className="rounded-2xl border border-line bg-white px-4 py-3">The decision is still made by the ACSP, and recorded in your case like any other.</li>
       </ul>
     </Screen>
   )

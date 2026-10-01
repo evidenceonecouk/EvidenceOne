@@ -1,5 +1,5 @@
 import { Analytics } from '@vercel/analytics/react'
-import { lazy } from 'react'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ToastProvider } from '@/components/app/Toaster'
@@ -18,6 +18,10 @@ const VerifyStart = lazy(() => import('@/features/b2c/VerifyStart').then((m) => 
 const ReviewQueue = lazy(() => import('@/features/acsp/ReviewQueue').then((m) => ({ default: m.ReviewQueue })))
 const CaseReview = lazy(() => import('@/features/acsp/CaseReview').then((m) => ({ default: m.CaseReview })))
 const Filings = lazy(() => import('@/features/acsp/Filings').then((m) => ({ default: m.Filings })))
+const Correction = lazy(() => import('@/features/acsp/Correction').then((m) => ({ default: m.Correction })))
+const HandoffPage = lazy(() => import('@/features/acsp/Handoff').then((m) => ({ default: m.HandoffPage })))
+const RulesPage = lazy(() => import('@/features/rules/RulesPage').then((m) => ({ default: m.RulesPage })))
+const SignIn = lazy(() => import('@/features/signin/SignIn').then((m) => ({ default: m.SignIn })))
 const Submission = lazy(() => import('@/features/acsp/Submission').then((m) => ({ default: m.Submission })))
 const RecordsIndex = lazy(() => import('@/features/records/RecordsIndex').then((m) => ({ default: m.RecordsIndex })))
 const VerificationRecord = lazy(() => import('@/features/records/VerificationRecord').then((m) => ({ default: m.VerificationRecord })))
@@ -31,11 +35,21 @@ export default function App() {
         <TooltipProvider delayDuration={200}>
           <BrowserRouter>
             <Routes>
+              {/* Opens in its own window: the Evidence One interstitial before GOV.UK One Login */}
+              <Route
+                path="handoff/:caseId"
+                element={
+                  <Suspense fallback={null}>
+                    <HandoffPage />
+                  </Suspense>
+                }
+              />
               <Route element={<AppShell />}>
                 <Route index element={<LandingPage />} />
 
                 {/* B2C client */}
                 <Route path="verify" element={<VerifyStart />} />
+                <Route path="signin" element={<SignIn />} />
 
                 {/* Agent */}
                 <Route path="agent">
@@ -55,6 +69,7 @@ export default function App() {
                   <Route path="queue" element={<ReviewQueue />} />
                   <Route path="cases/:caseId" element={<CaseReview />} />
                   <Route path="cases/:caseId/submit" element={<Submission />} />
+                  <Route path="cases/:caseId/correct" element={<Correction />} />
                   <Route path="filings" element={<Filings />} />
                 </Route>
                 <Route path="records" element={<RecordsIndex />} />
@@ -62,6 +77,7 @@ export default function App() {
 
                 {/* Admin */}
                 <Route path="admin" element={<AdminConsole />} />
+                <Route path="rules" element={<RulesPage />} />
 
                 <Route path="*" element={<NotFound />} />
               </Route>

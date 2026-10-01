@@ -6,13 +6,14 @@ import { nextStep, pathFor, prevStep, stepById, type StepId } from './journey'
 import { AppBar, Lead, Screen, ScreenTitle, JourneyShell } from './JourneyShell'
 import { EvidenceStep, PaymentStep, ReviewStep, StatusStep } from './steps/FinishSteps'
 import { ChecksStep, ChipStep, DocumentStep, OptionTwoStep, ScanStep, SelfieStep } from './steps/IdentitySteps'
-import { AddressStep, DetailsStep, InviteStep } from './steps/IntroSteps'
+import { ContactStep, DetailsStep, InviteStep, PersonalStep } from './steps/IntroSteps'
 import type { StepProps } from './steps/types'
 
 const screens: Record<StepId, (p: StepProps) => React.ReactNode> = {
   invite: InviteStep,
+  contact: ContactStep,
   details: DetailsStep,
-  address: AddressStep,
+  personal: PersonalStep,
   document: DocumentStep,
   scan: ScanStep,
   chip: ChipStep,

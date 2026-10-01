@@ -8,7 +8,7 @@ import { container } from '../parts'
 
 const steps: { n: string; icon: LucideIcon; label: string; title: string; body: string; to: string; persona: PersonaId }[] = [
   { n: '01', icon: UserRound, label: 'Verify', title: 'Verify your client', body: 'Identity verification with one document and a complete audit trail.', to: '/app/EO-2026-000135/invite', persona: 'individual' },
-  { n: '02', icon: FileText, label: 'Submit', title: 'Submit to Companies House', body: 'A ready-to-copy pack for GOV.UK One Login, then the personal code recorded.', to: '/acsp/queue', persona: 'reviewer' },
+  { n: '02', icon: FileText, label: 'Submit', title: 'Submit to Companies House', body: 'A ready-to-copy pack for GOV.UK One Login, then the Companies House verification reference recorded.', to: '/acsp/queue', persona: 'reviewer' },
   { n: '03', icon: Building2, label: 'File', title: 'File for your client', body: 'Register corrections and Companies House filings, in the same place.', to: '/acsp/filings', persona: 'reviewer' },
 ]
 

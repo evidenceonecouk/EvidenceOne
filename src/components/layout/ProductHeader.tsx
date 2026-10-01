@@ -29,6 +29,7 @@ const navByPersona: Record<PersonaId, NavItem[]> = {
   individual: [],
   b2c: [],
   admin: [{ to: '/admin', label: 'ACSPs and allocation' }],
+  admin2: [{ to: '/rules', label: 'Rules' }],
 }
 
 const publicLinks = [
@@ -45,6 +46,7 @@ const suffixByPersona: Record<PersonaId, string | undefined> = {
   individual: 'Verify',
   b2c: 'Verify',
   admin: 'Admin',
+  admin2: 'Admin',
 }
 
 function OrgBadge({ persona }: { persona: PersonaId }) {
@@ -59,8 +61,8 @@ function OrgBadge({ persona }: { persona: PersonaId }) {
     const acsp = getAcsp(data, PRIMARY_ACSP_ID)
     primary = acsp?.reviewers[0].name
     secondary = acsp?.name
-  } else if (persona === 'admin') {
-    primary = 'Platform administrator'
+  } else if (persona === 'admin' || persona === 'admin2') {
+    primary = persona === 'admin2' ? 'Daniel Achebe' : 'Helen Carver'
     secondary = 'Evidence One'
   }
   if (!primary) return null
@@ -109,7 +111,7 @@ export function ProductHeader({ persona, publicNav = false, className }: { perso
                   </a>
                 ))}
               </nav>
-              <Link to="/acsp/queue" className="hidden rounded-lg px-3 py-2 text-base text-ink hover:bg-ink/[0.05] sm:inline-block">
+              <Link to="/signin" className="hidden rounded-lg px-3 py-2 text-base text-ink hover:bg-ink/[0.05] sm:inline-block">
                 Log in
               </Link>
               <Button asChild size="sm" className="rounded-full px-5">

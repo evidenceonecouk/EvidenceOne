@@ -1,15 +1,14 @@
-import { ArrowRight, BadgeCheck, Building2, CircleDot, Link2, Plus, RefreshCw, Send, ShieldCheck, Sparkles, Users, Waypoints } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Building2, CircleDot, Hourglass, Info, Link2, Plus, RefreshCw, Send, ShieldCheck, Users, Waypoints } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Checkbox, HeroBanner, Page, Panel, PanelHeader, StatTile } from '@/components/app/Page'
 import { PersonStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
-import { AiTag } from '@/components/visual/AiTag'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { formatShortDate, shortHash, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
-import { aiFlagsForAgent, companiesForAgent, getAgent, peopleForCompany, roleLabel, type AiFlag } from '@/store/selectors'
+import { attentionForAgent, companiesForAgent, getAgent, peopleForCompany, roleLabel, type AttentionItem } from '@/store/selectors'
 import type { Company, PersonStatus } from '@/types/domain'
 
 /* One column template shared by the header row and every person row, so all companies line up. */
@@ -18,8 +17,10 @@ const ROW = 'grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 px-6 sm:
 const segment: Record<PersonStatus, string> = {
   verified: 'bg-approve',
   in_progress: 'bg-ink',
+  with_acsp: 'bg-graphite-soft',
+  awaiting_info: 'bg-info',
   not_started: 'bg-line',
-  expired: 'bg-decline',
+  not_completed: 'bg-decline',
   reverification_due: 'bg-info',
 }
 
@@ -28,7 +29,7 @@ export function AgentDashboard() {
   const agent = getAgent(data, state.agentId)!
   const companies = companiesForAgent(data, agent.id)
   const rows = companies.flatMap((c) => peopleForCompany(data, c.number))
-  const flags = aiFlagsForAgent(data, agent.id)
+  const flags = attentionForAgent(data, agent.id)
   const count = (s: PersonStatus) => rows.filter((r) => r.status === s).length
   const needAction = rows.filter((r) => r.invitable).length
 
@@ -70,8 +71,8 @@ export function AgentDashboard() {
         <StatTile label="Companies" value={companies.length} icon={Building2} />
         <StatTile label="Directors and PSCs" value={rows.length} icon={Users} />
         <StatTile label="Verified" value={count('verified')} icon={BadgeCheck} />
-        <StatTile label="In progress" value={count('in_progress')} icon={CircleDot} />
-        <StatTile label="Need an invite" value={needAction} icon={RefreshCw} detail={needAction ? 'Not started, expired or due again' : 'Everyone is covered'} />
+        <StatTile label="In progress or with the ACSP" value={count('in_progress') + count('with_acsp') + count('awaiting_info')} icon={CircleDot} />
+        <StatTile label="Need an invite" value={needAction} icon={RefreshCw} detail={needAction ? 'Not started, not completed or due again' : 'Everyone is covered'} />
       </dl>
 
       <section aria-labelledby="companies-title" className="mb-8">
@@ -198,6 +199,7 @@ function CompanyBlock({ company }: { company: Company }) {
               </span>
               <span role="cell" className="hidden min-w-0 sm:block">
                 <span className="line-clamp-2 text-[0.9375rem] text-graphite">{r.detail}</span>
+                {r.registerVerified && !r.latestCase && <span className="mt-0.5 block font-mono text-[0.8125rem] text-slate">REG-04 · shown before payment</span>}
                 {r.latestCase && <span className="mt-0.5 block font-mono text-[0.8125rem] text-slate">{r.latestCase.id}</span>}
               </span>
             </div>
@@ -208,44 +210,42 @@ function CompanyBlock({ company }: { company: Company }) {
   )
 }
 
-const flagLabel: Record<AiFlag['kind'], string> = {
-  observation: 'AI observation',
-  unverified: 'Not verified',
-  expired: 'Expired',
-  reverification: 'Reverification due',
+const attentionIcon: Record<AttentionItem['status'], typeof Info> = {
+  register_verified: Info,
+  not_started: Send,
+  not_completed: RefreshCw,
+  awaiting_info: Hourglass,
+  reverification_due: RefreshCw,
+  in_progress: CircleDot,
+  with_acsp: Building2,
+  verified: BadgeCheck,
 }
 
-function FlagsPanel({ flags }: { flags: AiFlag[] }) {
+/** Follow-ups from status alone. Agents never see documents, check results or evidence. */
+function FlagsPanel({ flags }: { flags: AttentionItem[] }) {
   return (
     <Panel aria-labelledby="flags-title" className="overflow-hidden">
-      <PanelHeader
-        id="flags-title"
-        title="Needs your attention"
-        actions={
-          <>
-            <AiTag label="Advisory" />
-            <span className="flex size-7 items-center justify-center rounded-full bg-ink text-[0.8125rem] font-medium text-paper tabular">{flags.length}</span>
-          </>
-        }
-      />
+      <PanelHeader id="flags-title" title="Needs your attention" actions={<span className="flex size-7 items-center justify-center rounded-full bg-ink text-[0.8125rem] font-medium text-paper tabular">{flags.length}</span>} />
       <ul className="divide-y divide-line/70">
-        {flags.map((f) => (
-          <li key={f.id} className="flex items-start gap-3.5 px-6 py-4">
-            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-mist text-graphite">
-              {f.kind === 'observation' ? <Sparkles className="size-4" aria-hidden="true" /> : <RefreshCw className="size-4" aria-hidden="true" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[0.9375rem] font-medium text-ink">{f.title}</p>
-              <p className="mt-0.5 truncate text-[0.875rem] text-slate">
-                {f.personName} · {f.companyName}
-              </p>
-            </div>
-            <span className="shrink-0 text-[0.8125rem] text-slate">{flagLabel[f.kind]}</span>
-          </li>
-        ))}
+        {flags.map((f) => {
+          const Icon = attentionIcon[f.status]
+          return (
+            <li key={f.id} className="flex items-start gap-3.5 px-6 py-4">
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-mist text-graphite">
+                <Icon className="size-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.9375rem] font-medium text-ink">{f.title}</p>
+                <p className="mt-0.5 truncate text-[0.875rem] text-slate">
+                  {f.personName} · {f.companyName}
+                </p>
+              </div>
+            </li>
+          )
+        })}
         {flags.length === 0 && <li className="px-6 py-6 text-base text-slate">Nothing needs your attention.</li>}
       </ul>
-      <p className="border-t border-line/70 px-6 py-3.5 text-[0.875rem] text-slate">Flags help you follow up. Decisions are always made by an ACSP.</p>
+      <p className="border-t border-line/70 px-6 py-3.5 text-[0.875rem] text-slate">You see each person’s status only. Documents and evidence stay with the ACSP, who makes every decision.</p>
     </Panel>
   )
 }
@@ -254,10 +254,28 @@ function ActivityPanel() {
   const { data, state } = useDemoStore()
   const caseIds = new Set(data.cases.filter((c) => c.agentId === state.agentId).map((c) => c.id))
   const companyNames = companiesForAgent(data, state.agentId).map((c) => c.name)
+  // Status-level events only, reworded, so nothing about documents or evidence reaches the Agent.
+  const name = (caseId?: string) => {
+    const vc = data.cases.find((c) => c.id === caseId)
+    const p = vc && data.people.find((x) => x.id === vc.personId)
+    return p ? `${p.givenNames.split(' ')[0]} ${p.familyName}` : 'Someone'
+  }
+  const safe: Record<string, (caseId?: string) => string> = {
+    'invite.sent': (id) => `Invite sent to ${name(id)}`,
+    'invite.opened': (id) => `${name(id)} opened their invite`,
+    'payment.completed': (id) => `${name(id)}: fee paid`,
+    'case.submitted': (id) => `${name(id)}: with the ACSP for review`,
+    'case.decision.request_info': (id) => `${name(id)}: the ACSP asked for information`,
+    'case.decision.approve': (id) => `${name(id)}: approved by the ACSP`,
+    'case.decision.decline': (id) => `${name(id)}: not completed`,
+    'submission.confirmed': (id) => `${name(id)}: verified with Companies House`,
+    'route_a.resumed': (id) => `${name(id)}: back with the ACSP after a register correction`,
+  }
   const events = data.audit
-    .filter((e) => (e.caseId && caseIds.has(e.caseId)) || (e.action === 'company.connected' && companyNames.some((n) => e.detail.startsWith(n))))
+    .filter((e) => (e.caseId && caseIds.has(e.caseId) && safe[e.action]) || (e.action === 'company.connected' && companyNames.some((n) => e.detail.startsWith(n))))
     .slice(-6)
     .reverse()
+    .map((e) => ({ ...e, detail: e.action === 'company.connected' ? e.detail : safe[e.action](e.caseId) }))
 
   return (
     <Panel aria-labelledby="activity-title" className="overflow-hidden">

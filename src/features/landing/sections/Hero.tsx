@@ -37,7 +37,7 @@ export function Hero() {
   const inReview = data.cases.filter(
     (c) => c.acspId === PRIMARY_ACSP_ID && c.status === "in_review",
   ).length;
-  const verified = data.cases.filter((c) => c.status === "submitted").length;
+  const verified = data.cases.filter((c) => c.status === "submitted" || c.status === "confirmed").length;
 
   return (
     <section
@@ -55,19 +55,6 @@ export function Hero() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f4f4f3] to-transparent lg:hidden"
         />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute top-6 right-8 hidden text-[0.75rem] leading-[1.85] font-medium tracking-[0.34em] text-white uppercase [text-shadow:0_1px_10px_rgb(0_0_0/0.45)] xl:block"
-        >
-          <p>Clearer</p>
-          <p>practice.</p>
-          <p>Stronger</p>
-          <p>businesses.</p>
-          <span className="my-5 block h-px w-12 bg-white/70" />
-          <p>A more</p>
-          <p>transparent</p>
-          <p>tomorrow.</p>
-        </div>
       </div>
 
       <div
@@ -160,10 +147,10 @@ export function Hero() {
             <span aria-hidden="true" className="h-4 w-px bg-line" />
             <span>
               <span className="font-medium text-ink tabular">{verified}</span>{" "}
-              personal codes issued
+              submitted to Companies House
             </span>
             <span aria-hidden="true" className="h-4 w-px bg-line" />
-            <span>36-hour decisions</span>
+            <span>36-hour review target</span>
           </div>
         </div>
       </div>

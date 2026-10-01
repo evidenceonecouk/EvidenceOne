@@ -12,8 +12,8 @@ import { getCompany, getPerson } from '@/store/selectors'
 export function RecordsIndex() {
   const { data } = useDemoStore()
   const records = data.cases
-    .filter((c) => ['submitted', 'declined', 'abandoned', 'approved'].includes(c.status))
-    .map((c) => ({ c, decided: c.decision?.decidedAt ?? c.closedAt }))
+    .filter((c) => ['submitted', 'confirmed', 'declined', 'abandoned', 'approved', 'submission_started'].includes(c.status))
+    .map((c) => ({ c, decided: (c.decision?.outcome !== 'request_info' ? c.decision?.decidedAt : undefined) ?? c.closedAt }))
     .sort((a, b) => (b.decided ?? '').localeCompare(a.decided ?? ''))
   const chainOk = verifyChain(data.audit)
 

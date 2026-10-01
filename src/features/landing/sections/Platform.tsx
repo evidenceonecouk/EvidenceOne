@@ -177,8 +177,8 @@ function CompliancePanel() {
 
 function IntelligencePanel() {
   const observations = [
-    { title: 'Supporting evidence is older than 3 months', detail: 'The council tax bill is dated about five months ago. Current-address evidence must be dated within the last 3 months.', source: 'Council tax bill, issue date' },
-    { title: 'Possible PEP name match was discounted', detail: 'One possible match by name. The provider discounted it on date of birth and nationality. Shown so the reviewer can confirm.', source: 'PEP and sanctions screening result' },
+    { title: 'Council tax bill appears older than 3 months', detail: 'The issue date read from the bill is about five months before upload. Rule ADDL-11 asks for a more recent supporting document.', source: 'Council tax bill, issue date (AI extraction) · explains ADDL-11' },
+    { title: 'First name spelt differently on the register', detail: 'The passport chip reads AIDAN and the register holds AIDEN. Normalisation does not remove a spelling difference, so REG-11 halts the case.', source: 'Register comparison result · explains REG-11' },
   ]
   return (
     <Glass>
@@ -187,7 +187,7 @@ function IntelligencePanel() {
           <div key={o.title} className="rounded-2xl bg-paper p-5 text-ink">
             <p className="flex items-center gap-1.5 font-mono text-[0.75rem] tracking-[0.12em] text-slate uppercase">
               <Sparkles className="size-3.5" aria-hidden="true" />
-              AI observation · Advisory only
+              AI observation. Advisory only.
             </p>
             <p className="mt-3 text-lg font-medium">{o.title}</p>
             <p className="mt-1.5 text-base leading-relaxed text-graphite">{o.detail}</p>

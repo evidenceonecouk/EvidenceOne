@@ -28,7 +28,7 @@ export function InviteLog() {
       <PageHeader
         kicker="Agent portal"
         title="Invites"
-        description="Every invite you have sent, with its payment, who reviews it and its entry in the audit trail."
+        description="Every invite you have sent, with its single-use payment code, who reviews it and its entry in the audit trail. You see status only, never documents or evidence."
         actions={
           <Button asChild variant="outline">
             <Link to="/agent">Back to companies</Link>
@@ -77,6 +77,7 @@ export function InviteLog() {
                         <>
                           Agent Payment Code
                           <span className="block font-mono text-slate">{inv.paymentCode}</span>
+                          <span className="block text-[0.875rem] text-slate">Single use, this invite only · {inv.paymentCodeUsedAt ? 'Used' : 'Not used yet'}</span>
                         </>
                       ) : (
                         'Individual pays by card'

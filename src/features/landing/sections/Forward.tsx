@@ -9,7 +9,7 @@ import { RuleKicker } from './Hero'
 
 const activity = [
   ['Client verification completed', 'Today, 10:24'],
-  ['Personal code recorded', 'Today, 09:41'],
+  ['Verification reference recorded', 'Today, 09:41'],
   ['Register correction filed', 'Yesterday, 16:03'],
   ['Director invited from the register', 'Yesterday, 14:18'],
 ]

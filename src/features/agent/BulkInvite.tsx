@@ -105,6 +105,11 @@ export function BulkInvite() {
                       <Field label="Email on file" value={person.email} />
                     </dl>
                     {!r.invitable && <p className="mt-2 text-[0.9375rem] text-slate">{r.detail}. No invite needed.</p>}
+                    {r.invitable && r.registerVerified && (
+                      <p className="mt-2 rounded-xl bg-mist px-3.5 py-2.5 text-[0.9375rem] text-graphite">
+                        <span className="font-mono text-[0.8125rem] text-slate">REG-04</span> Companies House already shows this person’s identity as verified. They may not need to verify. They will be told before payment.
+                      </p>
+                    )}
                   </div>
                 </li>
               )
@@ -135,7 +140,7 @@ export function BulkInvite() {
                 onChange={() => setPayment('agent_payment_code')}
                 icon={<Ticket className="size-5" aria-hidden="true" />}
                 title="Agent Payment Code"
-                body={agent.paymentCode ? `${agent.name} pays. Code ${agent.paymentCode} is attached to each invite, so nobody pays separately.` : 'No payment code on this account.'}
+                body={agent.paymentCode ? `${agent.name} pays. A single-use Agent Payment Code is generated for each invite and works for that invite only.` : 'No payment code on this account.'}
               />
               <RadioCard
                 name="payment"

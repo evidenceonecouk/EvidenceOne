@@ -1,40 +1,30 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  BadgeCheck,
-  CircleCheck,
-  CirclePause,
-  CircleX,
-  FileCheck2,
-  FileText,
-  FileWarning,
-  Home,
-  Lock,
-  MessageSquareMore,
-  Send,
-  ShieldCheck,
-  Waypoints,
-} from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { ArrowLeft, ArrowRight, BadgeCheck, CircleCheck, CirclePause, CircleX, FileCheck2, FileText, Lock, MessageSquareMore, Send, ShieldCheck, Sparkles, UserRoundCog, Waypoints } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
 import { SlaPill } from '@/components/app/SlaPill'
+import { StepUpDialog } from '@/components/app/StepUpDialog'
 import { useToast } from '@/components/app/Toaster'
 import { CompletionTick } from '@/components/brand/CompletionTick'
-import { CaseStatusChip } from '@/components/StatusChip'
+import { CaseStatusChip, OutcomeChip, RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
-import { AiTag } from '@/components/visual/AiTag'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
+import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
 import { DECLINE_MESSAGE } from '@/data/reasonCodes'
-import { formatAddress, formatDate, formatDateTime, formatMoney, formatShortDate, fullName, shortHash, timeAgo } from '@/lib/format'
+import { highlightCite } from '@/lib/cite'
+import { formatDate, formatDateTime, formatMoney, fullName, shortHash, timeAgo } from '@/lib/format'
+import { currentRuleSet, evaluateCase, outstandingFor, ruleSetFor, type Outstanding } from '@/lib/rules'
 import { cn } from '@/lib/utils'
-import { decideCase, haltForMismatch } from '@/store/actions'
+import { decideCase, escalateCase, reviewerName } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
-import { auditForCase, getAgent, getCase, getCompany, getPerson, roleLabel } from '@/store/selectors'
-import type { CheckResult, DecisionOutcome, EvidenceItem, VerificationCase } from '@/types/domain'
+import { auditForCase, getAgent, getCase, getCompany, getEntry, getPerson, isSubmitted, roleLabel } from '@/store/selectors'
+import type { DecisionOutcome, VerificationCase } from '@/types/domain'
+import { CopilotPanel } from '@/features/copilot/CopilotPanel'
+import { DocumentSection, EvidenceSection, IdvtSection, Option2Section, PersonalSection, RegisterSection, ScreeningSection, type SectionProps } from './CaseSections'
 import { DecisionDialog } from './DecisionDialog'
 
-const REVIEWER = 'rev-marsh'
+const REVIEWER = PRIMARY_REVIEWER_ID
 
 export function CaseReview() {
   const { caseId = '' } = useParams()
@@ -42,10 +32,13 @@ export function CaseReview() {
   const toast = useToast()
   const navigate = useNavigate()
   const [outcome, setOutcome] = useState<DecisionOutcome | null>(null)
+  const [pending, setPending] = useState<{ outcome: DecisionOutcome; reason: string; note: string } | null>(null)
+  const [copilot, setCopilot] = useState(false)
   const vc = getCase(data, caseId)
   const person = vc && getPerson(data, vc.personId)
   const company = vc && getCompany(data, vc.companyNumber)
-  const entry = vc && data.register.find((r) => r.personId === vc.personId && r.companyNumber === vc.companyNumber)
+  const entry = vc && getEntry(data, vc)
+  const results = useMemo(() => (vc ? evaluateCase(data, vc) : []), [data, vc])
 
   if (!vc || !person || !company || !entry) {
     return (
@@ -57,297 +50,134 @@ export function CaseReview() {
 
   const name = fullName(person)
   const agent = vc.agentId ? getAgent(data, vc.agentId) : undefined
-  const mismatch = vc.comparison.some((r) => r.result === 'mismatch')
   const decidable = vc.status === 'in_review' || vc.status === 'info_requested'
+  const outstanding = outstandingFor(results)
+  const reviewer = data.acsps.flatMap((a) => a.reviewers).find((r) => r.id === (vc.reviewerId ?? REVIEWER))
+  const props: SectionProps = { vc, person, entry, results, reviewerId: REVIEWER, decidable }
+  const requestNote = outstanding
+    .filter((o) => o.reason === 'request')
+    .map((o) => o.title)
+    .join(' ')
+
+  const commit = (o: DecisionOutcome, reason: string, note: string, stepUpRef?: string) => {
+    apply((d) => decideCase(d, vc.id, o, reason, note, REVIEWER, stepUpRef))
+    toast({
+      title: o === 'approve' ? 'Verification approved' : o === 'decline' ? 'Verification declined' : 'Information requested',
+      description: o === 'approve' ? 'Next, prepare the Companies House submission.' : 'Recorded in the audit trail.',
+    })
+    if (o === 'approve') navigate(`/acsp/cases/${vc.id}/submit`)
+  }
 
   const confirm = (reason: string, note: string) => {
     if (!outcome) return
-    apply((d) => decideCase(d, vc.id, outcome, reason, note, REVIEWER))
-    toast({
-      title: outcome === 'approve' ? 'Verification approved' : outcome === 'decline' ? 'Verification declined' : 'Information requested',
-      description: outcome === 'approve' ? 'Next, prepare the Companies House submission.' : 'Recorded in the audit trail.',
-    })
+    if (outcome === 'request_info') commit(outcome, reason, note)
+    else setPending({ outcome, reason, note })
     setOutcome(null)
-    if (outcome === 'approve') navigate(`/acsp/cases/${vc.id}/submit`)
   }
 
   return (
-    <Page>
-      <Link to="/acsp/queue" className="mb-6 inline-flex items-center gap-1.5 text-base text-slate underline-offset-4 hover:text-ink hover:underline">
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        Review queue
-      </Link>
+    <div className={cn('transition-[padding] duration-300 ease-out', copilot && 'xl:pr-[27rem]')}>
+      <Page>
+        <Link to="/acsp/queue" className="mb-6 inline-flex items-center gap-1.5 text-base text-slate underline-offset-4 hover:text-ink hover:underline">
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Review queue
+        </Link>
 
-      <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-5">
-          <Avatar seed={vc.personId} name={name} size={72} />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[2.25rem] leading-tight font-normal tracking-[-0.035em] text-ink">{name}</h1>
-              <CaseStatusChip status={vc.status} />
-            </div>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[0.9375rem] text-slate">
-              <span>{roleLabel[entry.role]}</span>
-              <span>·</span>
-              <span className="inline-flex items-center gap-1.5">
-                <CompanyMark name={company.name} size={20} className="rounded-[6px]" />
-                {company.name}
-              </span>
-              <span>·</span>
-              <span className="font-mono">{vc.id}</span>
-              <span>·</span>
-              <span>{vc.origin === 'b2c' ? 'Direct client' : `Referred by ${agent?.name}`}</span>
-            </p>
-          </div>
-        </div>
-        {vc.status === 'in_review' && vc.slaDueAt && (
-          <div className="text-right">
-            <MonoLabel>Review SLA</MonoLabel>
-            <div className="mt-2">
-              <SlaPill due={vc.slaDueAt} className="text-base" />
-            </div>
-          </div>
-        )}
-      </header>
-
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_25rem]">
-        <div className="min-w-0 space-y-6">
-          <ComparisonPanel vc={vc} />
-          <ObservationsPanel vc={vc} />
-          <EvidencePanel vc={vc} name={name} />
-          <Panel aria-labelledby="addr-title" className="overflow-hidden">
-            <PanelHeader id="addr-title" title="Address history" description="Last 12 months, as given by the individual" />
-            <ul className="divide-y divide-line/70">
-              {person.addressHistory.slice(0, 3).map((a, i) => (
-                <li key={i} className="flex items-start gap-3 px-5 py-4 sm:px-6">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-wash text-teal">
-                    <Home className="size-[1.125rem]" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="text-base text-ink">{formatAddress(a.address)}</p>
-                    <p className="text-[0.9375rem] text-slate">
-                      {a.to ? 'Previous' : 'Current'} · from {formatShortDate(a.from)}
-                      {a.to && ` to ${formatShortDate(a.to)}`}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-          <TimelinePanel caseId={vc.id} />
-        </div>
-
-        <div className="space-y-6 xl:sticky xl:top-24">
-          <DecisionPanel vc={vc} mismatch={mismatch} decidable={decidable} onDecide={setOutcome} />
-          <ChecksPanel vc={vc} />
-          {vc.payment && (
-            <Panel className="p-5 sm:p-6">
-              <MonoLabel>Payment</MonoLabel>
-              <p className="mt-3 text-base text-ink">
-                {formatMoney(vc.payment.amount)} · {vc.payment.method === 'agent_payment_code' ? `Agent Payment Code ${vc.payment.code}` : 'Paid by card'}
+        <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-5">
+            <Avatar seed={vc.personId} name={name} size={72} />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-[2.25rem] leading-tight font-normal tracking-[-0.035em] text-ink">{name}</h1>
+                <CaseStatusChip status={vc.status} />
+              </div>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[0.9375rem] text-slate">
+                <span>{roleLabel[entry.role]}</span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <CompanyMark name={company.name} size={20} className="rounded-[6px]" />
+                  {company.name}
+                </span>
+                <span>·</span>
+                <span className="font-mono">{vc.id}</span>
+                <span>·</span>
+                <span>{vc.origin === 'b2c' ? 'Direct client, allocated by rota' : `Referred by ${agent?.name}`}</span>
+                <span>·</span>
+                <span>Route A rule set {ruleSetFor(data, vc).version}</span>
               </p>
-              <p className="font-mono text-[0.875rem] text-slate">{vc.payment.reference}</p>
-            </Panel>
-          )}
-        </div>
-      </div>
-
-      <DecisionDialog outcome={outcome} personName={name} onClose={() => setOutcome(null)} onConfirm={confirm} />
-    </Page>
-  )
-}
-
-function ComparisonPanel({ vc }: { vc: VerificationCase }) {
-  return (
-    <Panel aria-labelledby="cmp-title" className="overflow-hidden">
-      <PanelHeader
-        id="cmp-title"
-        title="Register comparison"
-        description="What the person told us, what the document holds and what Companies House holds. They must match exactly."
-        actions={<AiTag label="Compared by AI · advisory" />}
-      />
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[44rem] text-left">
-          <thead className="bg-mist/50 text-[0.875rem] text-slate">
-            <tr>
-              {['Field', 'Stated by the person', 'Identity document', 'Companies House', 'Result'].map((h, i) => (
-                <th key={h} scope="col" className={cn('py-2.5 pr-4 font-normal', i === 0 && 'pl-5 sm:pl-6')}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {vc.comparison.map((r) => (
-              <tr key={r.field} className={cn('border-t border-line/70 align-top', r.result === 'mismatch' && 'bg-info-wash/60')}>
-                <td className="py-4 pr-4 pl-5 text-[0.9375rem] font-medium text-ink sm:pl-6">{r.field}</td>
-                <td className="py-4 pr-4 text-[0.9375rem] text-ink">{r.stated}</td>
-                <td className="py-4 pr-4 font-mono text-[0.875rem] text-ink">{r.document}</td>
-                <td className="py-4 pr-4 font-mono text-[0.875rem] text-ink">
-                  {r.register}
-                  {r.note && <span className="mt-1 block font-sans text-[0.875rem] text-slate">{r.note}</span>}
-                </td>
-                <td className="py-4 pr-6">
-                  {r.result === 'mismatch' ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-info px-2.5 py-1 text-sm font-medium text-white">
-                      <FileWarning className="size-4" aria-hidden="true" />
-                      Mismatch
-                    </span>
-                  ) : r.result === 'match' ? (
-                    <span className="inline-flex items-center gap-1.5 text-[0.9375rem] font-medium text-approve">
-                      <CircleCheck className="size-4" aria-hidden="true" />
-                      Match
-                    </span>
-                  ) : (
-                    <span className="text-[0.9375rem] text-slate">Not compared</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {vc.comparison.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-5 text-base text-slate">
-                  No comparison recorded for this case.
-                </td>
-              </tr>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            {vc.status === 'in_review' && vc.slaDueAt && (
+              <div>
+                <MonoLabel>Review target</MonoLabel>
+                <div className="mt-1.5">
+                  <SlaPill due={vc.slaDueAt} className="text-base" />
+                </div>
+              </div>
             )}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  )
-}
+            <Button variant={copilot ? 'default' : 'outline'} onClick={() => setCopilot((o) => !o)} aria-expanded={copilot} aria-controls="copilot-panel">
+              <Sparkles aria-hidden="true" />
+              Ask the Copilot
+            </Button>
+          </div>
+        </header>
 
-const severityStyle = {
-  info: 'border-line bg-white',
-  attention: 'border-info/30 bg-info-wash/40',
-  mismatch: 'border-info/40 bg-info-wash/70',
-}
+        <div className="grid items-start gap-6 xl:grid-cols-[1fr_24rem]">
+          <div className="min-w-0 space-y-6">
+            <RegisterSection {...props} />
+            <Option2Section {...props} reviewer={reviewer} />
+            <DocumentSection {...props} />
+            {vc.option === 1 && <IdvtSection {...props} />}
+            <ScreeningSection {...props} />
+            <EvidenceSection {...props} />
+            <PersonalSection {...props} />
+            <TimelinePanel caseId={vc.id} />
+          </div>
 
-function ObservationsPanel({ vc }: { vc: VerificationCase }) {
-  return (
-    <Panel aria-labelledby="obs-title" className="overflow-hidden">
-      <PanelHeader
-        id="obs-title"
-        title="AI observations"
-        description="Evidence One Intelligence checks documents and compares details. It never approves or declines."
-        actions={<AiTag />}
-      />
-      <ul className="space-y-3 p-5 sm:p-6">
-        {vc.observations.map((o) => (
-          <li key={o.id} className={cn('rounded-2xl border p-4', severityStyle[o.severity])}>
-            <p className="text-base font-medium text-ink">{o.title}</p>
-            <p className="mt-1 text-[0.9375rem] leading-relaxed text-graphite">{o.detail}</p>
-            <p className="mt-2 text-[0.875rem] text-slate">Source: {o.source}</p>
-          </li>
-        ))}
-        {vc.observations.length === 0 && <li className="text-base text-slate">No observations.</li>}
-      </ul>
-    </Panel>
-  )
-}
-
-function EvidenceThumb({ item, name }: { item: EvidenceItem; name: string }) {
-  if (item.kind === 'identity_document')
-    return (
-      <div className="flex h-28 items-center justify-center rounded-xl bg-ink">
-        <div className="flex h-20 w-14 flex-col justify-between rounded-md border border-white/15 bg-white/[0.06] p-1.5">
-          <span className="h-0.5 w-5 rounded bg-white/30" />
-          <span className="mx-auto grid size-5 grid-cols-2 gap-px rounded-[3px] border border-highlight/70 p-[2px]">
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-          </span>
-          <span className="h-0.5 w-8 rounded bg-white/25" />
+          <div className="space-y-6 xl:sticky xl:top-24">
+            <DecisionPanel vc={vc} outstanding={outstanding} decidable={decidable} onDecide={setOutcome} />
+            {vc.payment && (
+              <Panel className="p-5 sm:p-6">
+                <MonoLabel>Payment</MonoLabel>
+                <p className="mt-3 text-base text-ink">
+                  {formatMoney(vc.payment.amount)} · {vc.payment.method === 'agent_payment_code' ? `Paid by ${vc.payment.payerName ?? 'the Agent'}` : 'Paid by card'}
+                </p>
+                <p className="font-mono text-[0.875rem] text-slate">{vc.payment.code ? `Single-use code ${vc.payment.code}` : vc.payment.reference}</p>
+              </Panel>
+            )}
+          </div>
         </div>
-      </div>
-    )
-  if (item.kind === 'selfie')
-    return (
-      <div className="flex h-28 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#dcd3fb,#cfe0fd)]">
-        <Avatar seed={name} name={name} size={64} />
-      </div>
-    )
-  return (
-    <div className="flex h-28 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#cdeee8,#e9f0fd)]">
-      <div className="h-20 w-16 space-y-1.5 rounded-md bg-white p-2 shadow-sm">
-        <span className="block h-1.5 w-8 rounded bg-teal/60" />
-        <span className="block h-1 w-full rounded bg-line" />
-        <span className="block h-1 w-10 rounded bg-line" />
-        <span className="block h-1 w-full rounded bg-line" />
-        <span className="block h-1 w-9 rounded bg-line" />
-      </div>
+
+        <DecisionDialog outcome={outcome} personName={name} defaultNote={requestNote} onClose={() => setOutcome(null)} onConfirm={confirm} />
+        <StepUpDialog
+          open={!!pending}
+          action={pending?.outcome === 'approve' ? 'approve this verification' : 'decline this verification'}
+          onClose={() => setPending(null)}
+          onConfirmed={(ref) => {
+            if (pending) commit(pending.outcome, pending.reason, pending.note, ref)
+            setPending(null)
+          }}
+        />
+      </Page>
+      <CopilotPanel open={copilot} onClose={() => setCopilot(false)} scope={{ kind: 'case', caseId: vc.id }} />
     </div>
   )
 }
 
-function EvidencePanel({ vc, name }: { vc: VerificationCase; name: string }) {
-  return (
-    <Panel aria-labelledby="ev-title" className="overflow-hidden">
-      <PanelHeader id="ev-title" title="Evidence" description="Synthetic placeholders. Full images are held in separate encrypted storage." />
-      <ul className="grid gap-4 p-5 sm:grid-cols-3 sm:p-6">
-        {vc.evidence.map((e) => (
-          <li key={e.id} className="rounded-2xl border border-line bg-white p-3">
-            <EvidenceThumb item={e} name={name} />
-            <p className="mt-3 text-[0.9375rem] font-medium text-ink">{e.label}</p>
-            <p className="text-[0.875rem] text-slate">
-              Uploaded {formatShortDate(e.uploadedAt)}
-              {e.documentDate && ` · dated ${formatShortDate(e.documentDate)}`}
-            </p>
-            {e.aiNote && (
-              <p className={cn('mt-2 rounded-lg px-2.5 py-1.5 text-[0.8125rem] leading-snug', e.aiCheck === 'flagged' ? 'bg-info-wash text-info' : 'bg-ai-wash text-ai')}>
-                {e.aiCheck === 'flagged' ? 'Flagged: ' : 'AI check: '}
-                {e.aiNote}
-              </p>
-            )}
-          </li>
-        ))}
-        {vc.evidence.length === 0 && <li className="text-base text-slate">No evidence uploaded yet.</li>}
-      </ul>
-    </Panel>
-  )
+const outstandingLabel: Record<Outstanding['reason'], string> = {
+  block: 'Blocks approval',
+  halt: 'Case halted',
+  request: 'Waiting on a request',
+  mandatory_open: 'Record your decision',
+  not_satisfied: 'You recorded not satisfied',
 }
 
-const checkLabel: Record<CheckResult, string> = { pass: 'Passed', fail: 'Failed', refer: 'Refer', pending: 'Pending', not_applicable: 'Not applicable' }
-
-function ChecksPanel({ vc }: { vc: VerificationCase }) {
-  const i = vc.idvt
-  const rows: [string, CheckResult, string?][] = [
-    ['Passport chip read', i.nfcChipRead, i.nfcChipRead === 'pass' ? 'Signature valid' : undefined],
-    ['Document authenticity', i.documentAuthenticity],
-    ['Liveness', i.liveness],
-    ['Face match', i.faceMatch, i.faceMatchScore ? `${i.faceMatchScore}%` : undefined],
-    ['PEP and sanctions', i.pepSanctions],
-  ]
-  return (
-    <Panel aria-labelledby="idvt-title" className="overflow-hidden">
-      <PanelHeader id="idvt-title" title="Identity checks" description={`Certified identity provider · Option ${vc.option}`} />
-      <ul className="space-y-3 px-5 py-4 sm:px-6">
-        {rows.map(([label, result, extra]) => (
-          <li key={label} className="flex items-center gap-3">
-            {result === 'pass' ? (
-              <CompletionTick className="size-5" label="Passed" />
-            ) : result === 'fail' ? (
-              <CircleX className="size-5 text-decline" aria-label="Failed" />
-            ) : (
-              <span className="size-5 rounded-full border-[1.5px] border-line" aria-hidden="true" />
-            )}
-            <span className="flex-1 text-[0.9375rem] text-ink">{label}</span>
-            <span className="text-[0.9375rem] text-slate">{extra ?? checkLabel[result]}</span>
-          </li>
-        ))}
-      </ul>
-      {i.pepSanctionsDetail && <p className="border-t border-line/70 px-5 py-3.5 text-[0.875rem] leading-snug text-slate sm:px-6">{i.pepSanctionsDetail}</p>}
-      {i.providerReference && <p className="border-t border-line/70 px-5 py-3 font-mono text-[0.8125rem] text-slate sm:px-6">Ref {i.providerReference}</p>}
-    </Panel>
-  )
-}
-
-function DecisionPanel({ vc, mismatch, decidable, onDecide }: { vc: VerificationCase; mismatch: boolean; decidable: boolean; onDecide: (o: DecisionOutcome) => void }) {
-  const { data, apply } = useDemoStore()
-  const toast = useToast()
+function DecisionPanel({ vc, outstanding, decidable, onDecide }: { vc: VerificationCase; outstanding: Outstanding[]; decidable: boolean; onDecide: (o: DecisionOutcome) => void }) {
+  const { data } = useDemoStore()
+  const [escalating, setEscalating] = useState(false)
   const task = vc.correctionTaskId ? data.corrections.find((t) => t.id === vc.correctionTaskId) : undefined
+  const escalate = currentRuleSet(data).settings.escalate_enabled
 
   let body: ReactNode
   if (vc.status === 'halted_register_mismatch') {
@@ -355,12 +185,12 @@ function DecisionPanel({ vc, mismatch, decidable, onDecide }: { vc: Verification
       <div className="space-y-4 p-5 sm:p-6">
         <p className="flex gap-2.5 text-[0.9375rem] leading-relaxed text-graphite">
           <CirclePause className="mt-0.5 size-5 shrink-0 text-info" aria-hidden="true" />
-          Route A is paused until the register matches the identity document. This is a correction, never a resubmission.
+          Route A is halted under REG-11 until the register matches the identity document. The correction runs in Route B as form ACSP04, never a resubmission. The case resumes automatically once the register is updated.
         </p>
         {task && (
           <div className="rounded-2xl border border-line bg-mist/50 p-4">
             <p className="font-mono text-[0.8125rem] text-slate">
-              {task.id} · {task.form}
+              {task.id} · {task.form} · {task.status === 'open' ? 'Open' : 'Filed, waiting for the register'}
             </p>
             <p className="mt-1 text-base text-ink">
               {task.field}: <span className="font-mono">{task.registerValue}</span> to <span className="font-mono">{task.correctValue}</span>
@@ -375,40 +205,57 @@ function DecisionPanel({ vc, mismatch, decidable, onDecide }: { vc: Verification
         </Button>
       </div>
     )
-  } else if (vc.status === 'approved') {
+  } else if (vc.status === 'approved' || vc.status === 'submission_started') {
     body = (
       <div className="space-y-4 p-5 sm:p-6">
         <p className="flex gap-2.5 text-[0.9375rem] text-graphite">
           <BadgeCheck className="mt-0.5 size-5 shrink-0 text-approve" aria-hidden="true" />
-          Approved {vc.decision && formatDateTime(vc.decision.decidedAt)}. Next, submit to Companies House.
+          Approved {vc.decision && formatDateTime(vc.decision.decidedAt)}. {vc.status === 'submission_started' ? 'Submission in progress.' : 'Next, submit to Companies House.'}
         </p>
         <Button asChild className="w-full">
           <Link to={`/acsp/cases/${vc.id}/submit`}>
             <Send aria-hidden="true" />
-            Prepare the submission
+            {vc.status === 'submission_started' ? 'Continue the submission' : 'Open the submission workspace'}
           </Link>
         </Button>
       </div>
     )
-  } else if (vc.status === 'submitted') {
+  } else if (isSubmitted(vc.status)) {
     body = (
       <div className="space-y-4 p-5 sm:p-6">
         <p className="flex gap-2.5 text-[0.9375rem] text-graphite">
           <CompletionTick className="size-5" label="Completed" />
-          Submitted to Companies House. Personal code <span className="font-mono text-ink">{vc.submission?.personalCode}</span>.
+          <span>
+            Submitted to Companies House.{' '}
+            {vc.submission?.verificationReference ? (
+              <>
+                Verification reference <span className="font-mono text-ink">{vc.submission.verificationReference}</span>.
+              </>
+            ) : (
+              'Verification reference not yet recorded.'
+            )}
+          </span>
         </p>
-        <Button asChild variant="outline" className="w-full">
-          <Link to={`/records/${vc.id}`}>
-            <FileCheck2 aria-hidden="true" />
-            Open the verification record
-          </Link>
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button asChild variant="outline" className="w-full">
+            <Link to={`/acsp/cases/${vc.id}/submit`}>
+              <Send aria-hidden="true" />
+              {vc.status === 'submitted' ? 'Record the verification reference' : 'Submission workspace'}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full">
+            <Link to={`/records/${vc.id}`}>
+              <FileCheck2 aria-hidden="true" />
+              Open the verification record
+            </Link>
+          </Button>
+        </div>
       </div>
     )
   } else if (vc.status === 'declined') {
     body = (
       <div className="space-y-3 p-5 sm:p-6">
-        <p className="text-[0.9375rem] text-graphite">Declined {vc.decision && formatDateTime(vc.decision.decidedAt)}. The individual was told:</p>
+        <p className="text-[0.9375rem] text-graphite">Declined {vc.decision && formatDateTime(vc.decision.decidedAt)}. The individual was shown:</p>
         <p className="rounded-xl bg-decline-wash px-3.5 py-3 text-[0.9375rem] leading-relaxed text-decline">{DECLINE_MESSAGE}</p>
         <Button asChild variant="outline" className="w-full">
           <Link to={`/records/${vc.id}`}>
@@ -419,32 +266,50 @@ function DecisionPanel({ vc, mismatch, decidable, onDecide }: { vc: Verification
       </div>
     )
   } else {
+    const blocked = outstanding.length > 0
     body = (
       <div className="space-y-2.5 p-5 sm:p-6">
-        {vc.status === 'info_requested' && vc.decision?.note && (
-          <p className="mb-2 rounded-xl bg-info-wash px-3.5 py-3 text-[0.9375rem] leading-relaxed text-info">Requested: {vc.decision.note}</p>
+        {vc.status === 'info_requested' && vc.decision?.note && <p className="mb-2 rounded-xl bg-info-wash px-3.5 py-3 text-[0.9375rem] leading-relaxed text-info">Requested: {vc.decision.note}</p>}
+        {vc.escalatedTo && (
+          <p className="mb-2 flex gap-2 rounded-xl bg-mist px-3.5 py-3 text-[0.9375rem] leading-relaxed text-graphite">
+            <UserRoundCog className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            Escalated to {reviewerName(data, vc.escalatedTo.reviewerId)} {timeAgo(vc.escalatedTo.at)}. Not decided.
+          </p>
         )}
-        {mismatch ? (
-          <>
-            <Button
-              className="w-full bg-info text-white hover:bg-info/90"
-              disabled={!decidable}
-              onClick={() => {
-                apply((d) => haltForMismatch(d, vc.id, REVIEWER))
-                toast({ title: 'Verification paused', description: 'A Route B ACSP04 correction task was created.' })
-              }}
-            >
-              <CirclePause aria-hidden="true" />
-              Pause and open a register correction
-            </Button>
-            <div className="flex items-center justify-between rounded-lg border border-line bg-mist px-4 py-2.5 text-[0.9375rem] text-slate">
-              <span className="inline-flex items-center gap-2">
-                <CircleCheck className="size-4" aria-hidden="true" />
-                Approve
-              </span>
-              <Lock className="size-4" aria-label="Locked until the register matches" />
-            </div>
-          </>
+        {blocked ? (
+          <div className="mb-3 rounded-2xl border border-line bg-mist/40 p-3.5">
+            <p className="text-[0.9375rem] font-medium text-ink">Before you can approve ({outstanding.length})</p>
+            <ul className="mt-2 space-y-1.5">
+              {outstanding.map((o) => (
+                <li key={o.ruleId + o.title}>
+                  <button type="button" onClick={() => highlightCite(`rule:${o.ruleId}`)} className="flex w-full cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-white">
+                    <RuleIdTag id={o.ruleId} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.875rem] font-medium text-ink">{outstandingLabel[o.reason]}</span>
+                      <span className="line-clamp-2 block text-[0.8125rem] leading-snug text-slate">{o.title}</span>
+                    </span>
+                    <OutcomeChip outcome={o.outcome} className="hidden 2xl:inline-flex" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          decidable && (
+            <p className="mb-2 flex items-center gap-2 rounded-xl bg-approve-wash px-3.5 py-2.5 text-[0.9375rem] text-approve">
+              <CircleCheck className="size-4" aria-hidden="true" />
+              No Block, Halt or open Mandatory decision
+            </p>
+          )
+        )}
+        {blocked ? (
+          <div className="flex items-center justify-between rounded-lg border border-line bg-mist px-4 py-2.5 text-[0.9375rem] text-slate" aria-disabled="true">
+            <span className="inline-flex items-center gap-2">
+              <CircleCheck className="size-4" aria-hidden="true" />
+              Approve
+            </span>
+            <Lock className="size-4" aria-label="Locked until the items above are cleared" />
+          </div>
         ) : (
           <Button className="w-full bg-approve text-white hover:bg-approve/90" disabled={!decidable} onClick={() => onDecide('approve')}>
             <CircleCheck aria-hidden="true" />
@@ -453,13 +318,19 @@ function DecisionPanel({ vc, mismatch, decidable, onDecide }: { vc: Verification
         )}
         <Button variant="outline" className="w-full border-info/40 text-info hover:bg-info-wash" disabled={!decidable} onClick={() => onDecide('request_info')}>
           <MessageSquareMore aria-hidden="true" />
-          Request info
+          Request information
         </Button>
         <Button variant="outline" className="w-full border-decline/35 text-decline hover:bg-decline-wash" disabled={!decidable} onClick={() => onDecide('decline')}>
           <CircleX aria-hidden="true" />
           Decline
         </Button>
-        <p className="pt-1 text-[0.875rem] leading-snug text-slate">Only an authorised reviewer can decide, with a fresh second factor. AI cannot.</p>
+        {escalate && (
+          <Button variant="outline" className="w-full" disabled={!decidable || !!vc.escalatedTo} onClick={() => setEscalating(true)}>
+            <UserRoundCog aria-hidden="true" />
+            Escalate
+          </Button>
+        )}
+        <p className="pt-1 text-[0.875rem] leading-snug text-slate">Only you can decide, with a step-up authentication. No rule and no AI ever approves or declines.</p>
       </div>
     )
   }
@@ -477,7 +348,59 @@ function DecisionPanel({ vc, mismatch, decidable, onDecide }: { vc: Verification
         description="Human decision only"
       />
       {body}
+      <EscalateDialog open={escalating} vc={vc} onClose={() => setEscalating(false)} />
     </Panel>
+  )
+}
+
+function EscalateDialog({ open, vc, onClose }: { open: boolean; vc: VerificationCase; onClose: () => void }) {
+  const { data, apply } = useDemoStore()
+  const toast = useToast()
+  const [note, setNote] = useState('')
+  const seniors = data.acsps.flatMap((a) => a.reviewers).filter((r) => r.senior)
+  const [to, setTo] = useState(seniors[0]?.id ?? '')
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md rounded-[24px]">
+        <DialogHeader className="text-left">
+          <DialogTitle className="text-xl font-medium">Escalate to a senior reviewer</DialogTitle>
+          <DialogDescription className="text-base text-slate">The case moves to a named senior reviewer. Escalating does not decide it.</DialogDescription>
+        </DialogHeader>
+        <fieldset className="space-y-2">
+          <legend className="text-[0.9375rem] font-medium text-ink">Senior reviewer</legend>
+          {seniors.map((r) => (
+            <label key={r.id} className={cn('flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3', to === r.id ? 'border-ink' : 'border-line')}>
+              <input type="radio" name="senior" checked={to === r.id} onChange={() => setTo(r.id)} className="sr-only" />
+              <Avatar seed={r.id} name={r.name} size={32} />
+              <span>
+                <span className="block text-base text-ink">{r.name}</span>
+                <span className="block text-sm text-slate">{r.role}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <label htmlFor="esc-note" className="text-[0.9375rem] font-medium text-ink">
+          Why are you escalating?
+        </label>
+        <textarea id="esc-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10" />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!note.trim() || !to}
+            onClick={() => {
+              apply((d) => escalateCase(d, vc.id, to, note.trim(), REVIEWER))
+              toast({ title: 'Case escalated', description: 'Recorded in the audit trail. No decision was made.' })
+              setNote('')
+              onClose()
+            }}
+          >
+            Escalate
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -501,13 +424,7 @@ function TimelinePanel({ caseId }: { caseId: string }) {
         <span aria-hidden="true" className="absolute top-7 bottom-7 left-[2.05rem] w-px bg-line sm:left-[2.3rem]" />
         {events.map((e) => (
           <li key={e.seq} className="relative flex gap-4 pb-5 last:pb-0">
-            <span
-              className={cn(
-                'relative z-10 mt-1 size-3 shrink-0 translate-x-[0.3rem] rounded-full ring-4 ring-white',
-                e.actorType === 'ai' ? 'bg-ai' : e.actorType === 'system' ? 'bg-teal' : 'bg-ink',
-              )}
-              aria-hidden="true"
-            />
+            <span className={cn('relative z-10 mt-1 size-3 shrink-0 translate-x-[0.3rem] rounded-full ring-4 ring-white', e.actorType === 'ai' ? 'bg-silver' : e.actorType === 'system' ? 'bg-slate' : 'bg-ink')} aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="text-[0.9375rem] leading-snug text-ink">{e.detail}</p>
               <p className="mt-1 flex flex-wrap gap-x-3 text-[0.8125rem] text-slate">

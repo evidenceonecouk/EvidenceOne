@@ -5,10 +5,17 @@ import type { CorrectionTask, IdvtResults, Invite, VerificationCase } from '@/ty
 /*
   Cases in mixed statuses. Timestamps are relative to the moment the demo is
   seeded, so SLA countdowns are always live when a presenter opens the demo.
+
+  The set covers: a clean passport case through the app (Priya), a driving
+  licence case in the browser (Lucy), a supporting evidence request (Thomas),
+  a possible PEP match needing a Mandatory decision (Grace), the Corrigan
+  register mismatch (Aidan), submitted cases with a verification reference
+  (Margaret, Marcus) and an Option 2 fallback (Sofia).
 */
 
 const HOUR = 3_600_000
 const DAY = 24 * HOUR
+const MIN = 60_000
 
 const passAll = (at: string, ref: string, score: number): IdvtResults => ({
   nfcChipRead: 'pass',
@@ -20,6 +27,7 @@ const passAll = (at: string, ref: string, score: number): IdvtResults => ({
   pepSanctionsDetail: 'No match on PEP, sanctions or adverse media lists.',
   completedAt: at,
   providerReference: ref,
+  attempts: 1,
 })
 
 const pending: IdvtResults = {
@@ -30,12 +38,17 @@ const pending: IdvtResults = {
   pepSanctions: 'pending',
 }
 
+const REVIEWER = 'Eleanor Marsh, Harcourt Lane'
+const PROVIDER = 'Certified identity provider'
+const AI = 'Evidence One Intelligence'
+const RULES = 'Evidence One rules'
+
 export function buildCases(now: number) {
   const at = (offsetMs: number) => new Date(now + offsetMs).toISOString()
   const fee = VERIFICATION_FEE
 
   const cases: VerificationCase[] = [
-    // Margaret Ashby: verified, submitted to Companies House, personal code recorded
+    // Margaret Ashby: approved, submitted and confirmed with a Companies House verification reference
     {
       id: 'EO-2026-000118',
       route: 'A',
@@ -46,29 +59,34 @@ export function buildCases(now: number) {
       acspId: 'acsp-harcourt',
       reviewerId: 'rev-marsh',
       option: 1,
-      status: 'submitted',
+      status: 'confirmed',
       createdAt: at(-41 * DAY),
       submittedForReviewAt: at(-40 * DAY),
       slaDueAt: at(-40 * DAY + SLA_HOURS * HOUR),
       idvt: passAll(at(-40 * DAY - 2 * HOUR), 'IDV-7F31-0A92', 97.8),
-      comparison: [
-        { field: 'Full name', stated: 'Margaret Ellen Ashby', document: 'MARGARET ELLEN ASHBY', register: 'ASHBY, Margaret Ellen', result: 'match' },
-        { field: 'Date of birth', stated: '22 May 1961', document: '22 May 1961', register: 'May 1961', result: 'match', note: 'The public register shows month and year only.' },
-        { field: 'Appointment', stated: 'Director and PSC', document: 'Not shown', register: 'Director and PSC since 6 April 2011', result: 'match' },
-      ],
       observations: [
-        { id: 'o-118-1', severity: 'info', title: 'All details match the register', detail: 'Name, date of birth and appointment agree across the application, the passport chip and the Companies House register.', source: 'Passport chip data, Companies House officer and PSC records' },
+        { id: 'o-118-1', step: 'register', ruleId: 'REG-11', severity: 'info', title: 'Name and date of birth agree with the register', detail: 'The comparison under REG-11 and REG-12 found no difference between the passport chip, the application and the Companies House officer record.', source: 'Register comparison result' },
       ],
       evidence: [
-        { id: 'ev-118-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-40 * DAY - 3 * HOUR), aiCheck: 'accepted', aiNote: 'Document in date. Chip signature validated by the certified identity provider.' },
-        { id: 'ev-118-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-40 * DAY - 3 * HOUR), aiCheck: 'accepted' },
+        { id: 'ev-118-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-40 * DAY - 3 * HOUR), note: 'Chip signature validated by the certified identity provider.' },
+        { id: 'ev-118-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-40 * DAY - 3 * HOUR), note: 'Raw sample deleted after completion.' },
       ],
-      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-7Q4K', paidAt: at(-40 * DAY - 4 * HOUR), reference: 'PAY-2026-004118' },
-      decision: { outcome: 'approve', reasonCode: 'APR-01', note: 'All checks passed. Identity verified to the required standard.', decidedAt: at(-39 * DAY), reviewerId: 'rev-marsh' },
-      submission: { handedOffAt: at(-39 * DAY + 2 * HOUR), submittedAt: at(-39 * DAY + 3 * HOUR), personalCode: 'K7Q2M9XR4LT' },
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-K2M8', payerName: 'Fenwick & Shaw Chartered Accountants', paidAt: at(-41 * DAY + 2 * HOUR), reference: 'PAY-2026-004118' },
+      decision: { outcome: 'approve', reasonCode: 'APR-01', note: 'All checks passed. Satisfied the person is who they claim to be.', decidedAt: at(-39 * DAY), reviewerId: 'rev-marsh', stepUpRef: 'SU-7Q2M-118A' },
+      submission: {
+        startedAt: at(-39 * DAY + HOUR),
+        stepUpRef: 'SU-7Q2M-118B',
+        fieldsDone: ['name', 'former', 'dob', 'email', 'doc', 'method', 'satisfied', 'acsp', 'statement'],
+        handedOffAt: at(-39 * DAY + 2 * HOUR),
+        submittedAt: at(-39 * DAY + 2 * HOUR + 20 * MIN),
+        confirmedAt: at(-39 * DAY + 3 * HOUR),
+        verificationReference: 'CHV-2026-7KQ2MX',
+        referenceSource: 'forwarded_email',
+      },
     },
 
-    // Thomas Ashby: AI asked for supporting address evidence; reviewer requested more information
+    // Thomas Ashby: driving licence shows his old address, so one supporting document was requested.
+    // The council tax bill he uploaded is too old, so the reviewer asked for a more recent one.
     {
       id: 'EO-2026-000129',
       route: 'A',
@@ -84,25 +102,20 @@ export function buildCases(now: number) {
       submittedForReviewAt: at(-4 * DAY),
       slaDueAt: at(-4 * DAY + SLA_HOURS * HOUR),
       idvt: { ...passAll(at(-4 * DAY - 3 * HOUR), 'IDV-7F31-1C04', 96.4), nfcChipRead: 'not_applicable' },
-      comparison: [
-        { field: 'Full name', stated: 'Thomas James Ashby', document: 'THOMAS JAMES ASHBY', register: 'ASHBY, Thomas James', result: 'match' },
-        { field: 'Date of birth', stated: '3 August 1989', document: '3 August 1989', register: 'August 1989', result: 'match' },
-        { field: 'Current address', stated: 'Flat 2, 9 Broad Street, Shrewsbury', document: 'The Old Granary, Ludlow', register: 'Not compared', result: 'not_compared', note: 'Moved four months ago. The licence shows the previous address.' },
-      ],
       observations: [
-        { id: 'o-129-1', severity: 'attention', title: 'Identity document does not confirm the 12-month address history', detail: 'The driving licence shows the previous Ludlow address. Supporting evidence of the current Shrewsbury address was requested automatically.', source: 'Driving licence, address panel' },
-        { id: 'o-129-2', severity: 'attention', title: 'Supporting evidence is older than 3 months', detail: 'The council tax bill uploaded is dated more than three months ago, so it may not meet the requirement for current-address evidence.', source: 'Council tax bill, issue date' },
+        { id: 'o-129-1', step: 'evidence', ruleId: 'ADDL-02', severity: 'attention', title: 'Why one supporting document was requested', detail: 'The driving licence shows the previous Ludlow address. Thomas declared a move to Shrewsbury four months ago, so the licence cannot confirm his current address.', source: 'Driving licence address panel, Step 1 address history' },
+        { id: 'o-129-2', step: 'evidence', ruleId: 'ADDL-11', severity: 'attention', title: 'Council tax bill appears to be older than 3 months', detail: 'The issue date read from the bill is about five months before upload. A more recent document is needed for the current address.', source: 'Council tax bill, issue date (AI extraction)' },
       ],
       evidence: [
-        { id: 'ev-129-1', kind: 'identity_document', label: 'UK photocard driving licence', uploadedAt: at(-4 * DAY - 4 * HOUR), aiCheck: 'accepted', aiNote: 'Document in date. Security features validated by the certified identity provider.' },
-        { id: 'ev-129-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-4 * DAY - 4 * HOUR), aiCheck: 'accepted' },
-        { id: 'ev-129-3', kind: 'address_evidence', label: 'Council tax bill', uploadedAt: at(-4 * DAY - 2 * HOUR), documentDate: at(-150 * DAY), aiCheck: 'flagged', aiNote: 'Dated about five months ago. Current-address evidence must be dated within the last 3 months.' },
+        { id: 'ev-129-1', kind: 'identity_document', label: 'UK photocard driving licence', uploadedAt: at(-4 * DAY - 4 * HOUR), note: 'Security features validated by the certified identity provider.' },
+        { id: 'ev-129-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-4 * DAY - 4 * HOUR), note: 'Raw sample held until completion, then deleted.' },
+        { id: 'ev-129-3', kind: 'address_evidence', supportingType: 'utility_bill', label: 'Council tax bill', uploadedAt: at(-4 * DAY - 2 * HOUR), documentDate: at(-154 * DAY), showsAddress: true, showsName: true },
       ],
-      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-7Q4K', paidAt: at(-4 * DAY - 5 * HOUR), reference: 'PAY-2026-004129' },
-      decision: { outcome: 'request_info', reasonCode: 'RFI-02', note: 'Please upload a bank statement or utility bill for the Shrewsbury address, dated within the last 3 months.', decidedAt: at(-2 * DAY), reviewerId: 'rev-marsh' },
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-R7T3', payerName: 'Fenwick & Shaw Chartered Accountants', paidAt: at(-6 * DAY + 3 * HOUR), reference: 'PAY-2026-004129' },
+      decision: { outcome: 'request_info', reasonCode: 'RFI-02', note: 'Please upload one supporting document for your Shrewsbury address, such as a bank statement or utility bill, dated within the last 3 months.', decidedAt: at(-2 * DAY), reviewerId: 'rev-marsh' },
     },
 
-    // Priya Raman: clean case waiting for review, about 22 hours left on the SLA
+    // Priya Raman: clean passport case through the app, about 22 hours left on the review target
     {
       id: 'EO-2026-000131',
       route: 'A',
@@ -116,24 +129,80 @@ export function buildCases(now: number) {
       createdAt: at(-2 * DAY),
       submittedForReviewAt: at(-14 * HOUR),
       slaDueAt: at(-14 * HOUR + SLA_HOURS * HOUR),
-      idvt: passAll(at(-14 * HOUR - 20 * 60000), 'IDV-7F31-2D17', 98.6),
-      comparison: [
-        { field: 'Full name', stated: 'Priya Lakshmi Raman', document: 'PRIYA LAKSHMI RAMAN', register: 'RAMAN, Priya Lakshmi', result: 'match' },
-        { field: 'Date of birth', stated: '9 February 1987', document: '9 February 1987', register: 'February 1987', result: 'match', note: 'The public register shows month and year only.' },
-        { field: 'Appointment', stated: 'Director and PSC', document: 'Not shown', register: 'Director and PSC since 17 September 2019', result: 'match' },
-      ],
+      idvt: passAll(at(-14 * HOUR - 20 * MIN), 'IDV-7F31-2D17', 98.6),
       observations: [
-        { id: 'o-131-1', severity: 'info', title: 'All details match the register', detail: 'Name and date of birth from the passport chip agree with the application and the Companies House register.', source: 'Passport chip data, Companies House officer and PSC records' },
-        { id: 'o-131-2', severity: 'info', title: 'One identity document was sufficient', detail: 'The passport chip was validated and the address history is consistent, so no supporting evidence was needed.', source: 'Application, passport chip data' },
+        { id: 'o-131-1', step: 'register', ruleId: 'REG-11', severity: 'info', title: 'Name and date of birth agree with the register', detail: 'The passport chip, the application and the Companies House officer and PSC records agree after normalisation. No correction is needed.', source: 'Register comparison result' },
+        { id: 'o-131-2', step: 'evidence', ruleId: 'ADDL-02', severity: 'info', title: 'One identity document was enough', detail: 'Priya has lived at the same address for over six years, so the case does not call for a supporting document under the current setting.', source: 'Step 1 address history' },
       ],
       evidence: [
-        { id: 'ev-131-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-14 * HOUR - 30 * 60000), aiCheck: 'accepted', aiNote: 'Document in date. Chip signature validated by the certified identity provider.' },
-        { id: 'ev-131-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-14 * HOUR - 30 * 60000), aiCheck: 'accepted' },
+        { id: 'ev-131-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-14 * HOUR - 30 * MIN), note: 'Chip signature validated by the certified identity provider.' },
+        { id: 'ev-131-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-14 * HOUR - 30 * MIN), note: 'Raw sample held until completion, then deleted.' },
       ],
-      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-7Q4K', paidAt: at(-14 * HOUR - 40 * 60000), reference: 'PAY-2026-004131' },
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-H5W9', payerName: 'Fenwick & Shaw Chartered Accountants', paidAt: at(-2 * DAY + 2 * HOUR), reference: 'PAY-2026-004131' },
     },
 
-    // Aidan Corrigan: register mismatch halts Route A and opens a Route B correction
+    // Lucy Ashby: her phone could not read the passport chip, so she used her driving licence in the browser
+    {
+      id: 'EO-2026-000133',
+      route: 'A',
+      personId: 'p-lucy',
+      companyNumber: '99418027',
+      origin: 'agent_invite',
+      agentId: 'agent-fenwick',
+      acspId: 'acsp-harcourt',
+      option: 1,
+      status: 'in_review',
+      browserCapture: true,
+      createdAt: at(-3 * DAY),
+      submittedForReviewAt: at(-26 * HOUR),
+      slaDueAt: at(-26 * HOUR + SLA_HOURS * HOUR),
+      idvt: { ...passAll(at(-26 * HOUR - 15 * MIN), 'IDV-7F31-2C55', 96.1), nfcChipRead: 'not_applicable' },
+      journey: { noChipPhone: true, documentType: 'driving_licence' },
+      observations: [
+        { id: 'o-133-1', step: 'register', ruleId: 'REG-11', severity: 'info', title: 'Name and date of birth agree with the register', detail: 'The licence, the application and the Companies House officer record agree after normalisation.', source: 'Register comparison result' },
+        { id: 'o-133-2', step: 'evidence', ruleId: 'ADDL-02', severity: 'info', title: 'The licence confirms the current address', detail: 'The address on the licence matches the current address Lucy declared, so no supporting document was needed.', source: 'Driving licence address panel, Step 1 address history' },
+      ],
+      evidence: [
+        { id: 'ev-133-1', kind: 'identity_document', label: 'UK photocard driving licence, captured in the browser', uploadedAt: at(-26 * HOUR - 25 * MIN), note: 'Security features validated by the certified identity provider. No chip on this document.' },
+        { id: 'ev-133-2', kind: 'selfie', label: 'Liveness capture, browser', uploadedAt: at(-26 * HOUR - 25 * MIN), note: 'Raw sample held until completion, then deleted.' },
+      ],
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-D8P2', payerName: 'Fenwick & Shaw Chartered Accountants', paidAt: at(-3 * DAY + 4 * HOUR), reference: 'PAY-2026-004133' },
+    },
+
+    // Sofia Lindqvist: three failed liveness attempts, so Option 1 could not support her. Option 2 person check.
+    {
+      id: 'EO-2026-000132',
+      route: 'A',
+      personId: 'p-sofia',
+      companyNumber: '99520316',
+      origin: 'agent_invite',
+      agentId: 'agent-fenwick',
+      acspId: 'acsp-harcourt',
+      option: 2,
+      status: 'in_review',
+      createdAt: at(-5 * DAY),
+      submittedForReviewAt: at(-30 * HOUR),
+      slaDueAt: at(-30 * HOUR + SLA_HOURS * HOUR),
+      idvt: { nfcChipRead: 'pass', documentAuthenticity: 'pass', liveness: 'fail', faceMatch: 'not_applicable', pepSanctions: 'pass', pepSanctionsDetail: 'No match on PEP, sanctions or adverse media lists.', completedAt: at(-4 * DAY), providerReference: 'IDV-7F31-2B91', attempts: 3 },
+      option2: {
+        reason: 'attempts_used',
+        requestedAt: at(-4 * DAY + 10 * MIN),
+        documents: [
+          { group: 'A', label: 'Swedish passport', expiresOn: '2029-03-04' },
+          { group: 'A', label: 'UK photocard driving licence', expiresOn: '2034-07-18' },
+        ],
+        checkedAt: at(-30 * HOUR - 40 * MIN),
+        checkedBy: 'rev-marsh',
+      },
+      observations: [],
+      evidence: [
+        { id: 'ev-132-1', kind: 'option2_document', label: 'Swedish passport, seen at the person check', uploadedAt: at(-30 * HOUR - 40 * MIN), note: 'Checked in person by a trained reviewer.' },
+        { id: 'ev-132-2', kind: 'option2_document', label: 'UK photocard driving licence, seen at the person check', uploadedAt: at(-30 * HOUR - 40 * MIN), note: 'Checked in person by a trained reviewer.' },
+      ],
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-Z6C4', payerName: 'Fenwick & Shaw Chartered Accountants', paidAt: at(-5 * DAY + 3 * HOUR), reference: 'PAY-2026-004132' },
+    },
+
+    // Aidan Corrigan: register spells his first name differently, so Route A is halted under REG-11
     {
       id: 'EO-2026-000127',
       route: 'A',
@@ -149,23 +218,18 @@ export function buildCases(now: number) {
       submittedForReviewAt: at(-5 * DAY),
       slaDueAt: at(-5 * DAY + SLA_HOURS * HOUR),
       idvt: passAll(at(-5 * DAY - 2 * HOUR), 'IDV-7F31-1F88', 97.1),
-      comparison: [
-        { field: 'Full name', stated: 'Aidan Patrick Corrigan', document: 'AIDAN PATRICK CORRIGAN', register: 'CORRIGAN, Aiden Patrick', result: 'mismatch', note: 'First name is spelt Aiden on the register and Aidan on the passport.' },
-        { field: 'Date of birth', stated: '14 March 1979', document: '14 March 1979', register: 'March 1979', result: 'match', note: 'The public register shows month and year only.' },
-        { field: 'Appointment', stated: 'Director', document: 'Not shown', register: 'Director since 29 February 2008', result: 'match' },
-      ],
       observations: [
-        { id: 'o-127-1', severity: 'mismatch', title: 'Name does not match the Companies House register', detail: 'The passport chip reads AIDAN. The register holds AIDEN. Identity details must match the register exactly, so this verification is paused until the register is corrected.', source: 'Passport chip data, Companies House officer record' },
+        { id: 'o-127-1', step: 'register', ruleId: 'REG-11', severity: 'mismatch', title: 'First name spelt differently on the register', detail: 'The passport chip reads AIDAN. The register holds AIDEN. This is a spelling difference, not a difference of case, spacing, hyphen or apostrophe, so normalisation does not remove it. The case is halted until the register is corrected.', source: 'Passport chip data, Companies House officer record' },
       ],
       evidence: [
-        { id: 'ev-127-1', kind: 'identity_document', label: 'Irish passport, chip read in app', uploadedAt: at(-5 * DAY - 3 * HOUR), aiCheck: 'accepted', aiNote: 'Document in date. Chip signature validated by the certified identity provider.' },
-        { id: 'ev-127-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-5 * DAY - 3 * HOUR), aiCheck: 'accepted' },
+        { id: 'ev-127-1', kind: 'identity_document', label: 'Irish passport, chip read in app', uploadedAt: at(-5 * DAY - 3 * HOUR), note: 'Chip signature validated by the certified identity provider.' },
+        { id: 'ev-127-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-5 * DAY - 3 * HOUR), note: 'Raw sample held until completion, then deleted.' },
       ],
-      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-BF-3M8T', paidAt: at(-5 * DAY - 4 * HOUR), reference: 'PAY-2026-004127' },
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-BF-3M8T', payerName: 'Belgrave Family Office', paidAt: at(-7 * DAY + 4 * HOUR), reference: 'PAY-2026-004127' },
       correctionTaskId: 'FL-2026-000042',
     },
 
-    // Grace Whitaker: B2C client allocated to Harcourt Lane, waiting for review
+    // Grace Whitaker: B2C client allocated to Harcourt Lane. Screening returned a possible PEP match.
     {
       id: 'EO-2026-000134',
       route: 'A',
@@ -179,22 +243,18 @@ export function buildCases(now: number) {
       submittedForReviewAt: at(-5 * HOUR),
       slaDueAt: at(-5 * HOUR + SLA_HOURS * HOUR),
       idvt: {
-        ...passAll(at(-5 * HOUR - 15 * 60000), 'IDV-7F31-2E40', 95.9),
-        pepSanctionsDetail: 'One possible name match was found and discounted by the certified identity provider (different date of birth and nationality).',
+        ...passAll(at(-5 * HOUR - 15 * MIN), 'IDV-7F31-2E40', 95.9),
+        pepPossibleMatch: true,
+        pepSanctionsDetail: 'One possible PEP match by name: a former local councillor named Grace E. Whitaker. The record gives a year of birth of 1968 and no nationality. The provider has not discounted it.',
       },
-      comparison: [
-        { field: 'Full name', stated: 'Grace Elizabeth Whitaker', document: 'GRACE ELIZABETH WHITAKER', register: 'WHITAKER, Grace Elizabeth', result: 'match' },
-        { field: 'Date of birth', stated: '8 June 1972', document: '8 June 1972', register: 'June 1972', result: 'match' },
-        { field: 'Appointment', stated: 'Director and PSC', document: 'Not shown', register: 'Director and PSC since 1 March 2021', result: 'match' },
-      ],
       observations: [
-        { id: 'o-134-1', severity: 'attention', title: 'Possible PEP name match was discounted', detail: 'The screening returned one possible match by name. The provider discounted it on date of birth and nationality. Shown so the reviewer can confirm.', source: 'PEP and sanctions screening result' },
+        { id: 'o-134-1', step: 'register', ruleId: 'REG-11', severity: 'info', title: 'Name and date of birth agree with the register', detail: 'The passport chip, the application and the Companies House officer and PSC records agree after normalisation.', source: 'Register comparison result' },
       ],
       evidence: [
-        { id: 'ev-134-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-5 * HOUR - 25 * 60000), aiCheck: 'accepted', aiNote: 'Document in date. Chip signature validated by the certified identity provider.' },
-        { id: 'ev-134-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-5 * HOUR - 25 * 60000), aiCheck: 'accepted' },
+        { id: 'ev-134-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-5 * HOUR - 25 * MIN), note: 'Chip signature validated by the certified identity provider.' },
+        { id: 'ev-134-2', kind: 'selfie', label: 'Liveness capture', uploadedAt: at(-5 * HOUR - 25 * MIN), note: 'Raw sample held until completion, then deleted.' },
       ],
-      payment: { method: 'pay_myself', amount: fee, paidAt: at(-5 * HOUR - 35 * 60000), reference: 'PAY-2026-004134' },
+      payment: { method: 'pay_myself', amount: fee, paidAt: at(-1 * DAY + 20 * MIN), reference: 'PAY-2026-004134' },
     },
 
     // Daniel Okafor: invite opened, journey not started. This is the live phone demo.
@@ -210,7 +270,6 @@ export function buildCases(now: number) {
       status: 'invited',
       createdAt: at(-1 * DAY),
       idvt: pending,
-      comparison: [],
       observations: [],
       evidence: [],
     },
@@ -226,17 +285,16 @@ export function buildCases(now: number) {
       acspId: 'acsp-harcourt',
       reviewerId: 'rev-okoro',
       option: 1,
-      status: 'submitted',
+      status: 'confirmed',
       createdAt: at(-352 * DAY),
       submittedForReviewAt: at(-351 * DAY),
       slaDueAt: at(-351 * DAY + SLA_HOURS * HOUR),
       idvt: passAll(at(-351 * DAY - HOUR), 'IDV-5B02-0E19', 96.9),
-      comparison: [],
       observations: [],
-      evidence: [{ id: 'ev-61-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-351 * DAY - 2 * HOUR), aiCheck: 'accepted' }],
-      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-7Q4K', paidAt: at(-351 * DAY - 3 * HOUR), reference: 'PAY-2025-002061' },
-      decision: { outcome: 'approve', reasonCode: 'APR-01', decidedAt: at(-350 * DAY), reviewerId: 'rev-okoro' },
-      submission: { handedOffAt: at(-350 * DAY + HOUR), submittedAt: at(-350 * DAY + 2 * HOUR), personalCode: 'P3V8T6N1QZD' },
+      evidence: [{ id: 'ev-61-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-351 * DAY - 2 * HOUR), note: 'Chip signature validated by the certified identity provider.' }],
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-FS-B3L7', payerName: 'Fenwick & Shaw Chartered Accountants', paidAt: at(-352 * DAY + 3 * HOUR), reference: 'PAY-2025-002061' },
+      decision: { outcome: 'approve', reasonCode: 'APR-01', decidedAt: at(-350 * DAY), reviewerId: 'rev-okoro', stepUpRef: 'SU-3V8T-061A' },
+      submission: { startedAt: at(-350 * DAY + HOUR), stepUpRef: 'SU-3V8T-061B', handedOffAt: at(-350 * DAY + HOUR), submittedAt: at(-350 * DAY + 2 * HOUR), confirmedAt: at(-350 * DAY + 3 * HOUR), verificationReference: 'CHV-2025-P3V8TN', referenceSource: 'entered' },
     },
 
     // Fiona Corrigan: started and abandoned. Kept for 7 years like any other record.
@@ -252,7 +310,6 @@ export function buildCases(now: number) {
       status: 'abandoned',
       createdAt: at(-76 * DAY),
       idvt: pending,
-      comparison: [],
       observations: [],
       evidence: [],
       closedAt: at(-46 * DAY),
@@ -274,13 +331,10 @@ export function buildCases(now: number) {
       submittedForReviewAt: at(-328 * DAY),
       slaDueAt: at(-328 * DAY + SLA_HOURS * HOUR),
       idvt: { ...passAll(at(-328 * DAY - HOUR), 'IDV-5B02-0F77', 94.2), documentAuthenticity: 'refer' },
-      comparison: [],
-      observations: [
-        { id: 'o-88-1', severity: 'attention', title: 'Identity document expired beyond the permitted period', detail: 'The passport expired more than 6 months before the check. No other qualifying document was provided.', source: 'Passport chip data, expiry date' },
-      ],
-      evidence: [{ id: 'ev-88-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-328 * DAY - 2 * HOUR), aiCheck: 'flagged', aiNote: 'Expired beyond the permitted period.' }],
-      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-BF-3M8T', paidAt: at(-328 * DAY - 3 * HOUR), reference: 'PAY-2025-002088' },
-      decision: { outcome: 'decline', reasonCode: 'DEC-01', note: 'No unexpired qualifying identity document provided.', decidedAt: at(-327 * DAY), reviewerId: 'rev-okoro' },
+      observations: [],
+      evidence: [{ id: 'ev-88-1', kind: 'identity_document', label: 'UK passport, chip read in app', uploadedAt: at(-328 * DAY - 2 * HOUR), note: 'Provider returned the authenticity check for review.' }],
+      payment: { method: 'agent_payment_code', amount: fee, code: 'APC-BF-W9N2', payerName: 'Belgrave Family Office', paidAt: at(-330 * DAY + 3 * HOUR), reference: 'PAY-2025-002088' },
+      decision: { outcome: 'decline', reasonCode: 'DCL-01', note: 'Passport expired beyond the permitted period and no other qualifying identity document was provided after the request.', decidedAt: at(-327 * DAY), reviewerId: 'rev-okoro', stepUpRef: 'SU-9F2D-088A' },
     },
   ]
 
@@ -301,44 +355,70 @@ export function buildCases(now: number) {
   ]
 
   const invites: Invite[] = [
-    { id: 'INV-2026-000301', personId: 'p-margaret', companyNumber: '99418027', agentId: 'agent-fenwick', sentAt: at(-42 * DAY), paymentCode: 'APC-FS-7Q4K', status: 'accepted', caseId: 'EO-2026-000118' },
-    { id: 'INV-2026-000302', personId: 'p-thomas', companyNumber: '99418027', agentId: 'agent-fenwick', sentAt: at(-7 * DAY), paymentCode: 'APC-FS-7Q4K', status: 'accepted', caseId: 'EO-2026-000129' },
-    { id: 'INV-2026-000317', personId: 'p-priya', companyNumber: '99520316', agentId: 'agent-fenwick', sentAt: at(-3 * DAY), paymentCode: 'APC-FS-7Q4K', status: 'accepted', caseId: 'EO-2026-000131' },
-    { id: 'INV-2026-000318', personId: 'p-daniel', companyNumber: '99520316', agentId: 'agent-fenwick', sentAt: at(-1 * DAY), paymentCode: 'APC-FS-7Q4K', status: 'opened', caseId: 'EO-2026-000135' },
-    { id: 'INV-2026-000288', personId: 'p-aidan', companyNumber: '99630741', agentId: 'agent-belgrave', sentAt: at(-8 * DAY), paymentCode: 'APC-BF-3M8T', status: 'accepted', caseId: 'EO-2026-000127' },
-    { id: 'INV-2026-000254', personId: 'p-fiona', companyNumber: '99630741', agentId: 'agent-belgrave', sentAt: at(-77 * DAY), paymentCode: 'APC-BF-3M8T', status: 'expired', caseId: 'EO-2026-000102' },
+    { id: 'INV-2026-000301', personId: 'p-margaret', companyNumber: '99418027', agentId: 'agent-fenwick', sentAt: at(-42 * DAY), paymentCode: 'APC-FS-K2M8', paymentCodeUsedAt: at(-41 * DAY + 2 * HOUR), status: 'accepted', caseId: 'EO-2026-000118' },
+    { id: 'INV-2026-000302', personId: 'p-thomas', companyNumber: '99418027', agentId: 'agent-fenwick', sentAt: at(-7 * DAY), paymentCode: 'APC-FS-R7T3', paymentCodeUsedAt: at(-6 * DAY + 3 * HOUR), status: 'accepted', caseId: 'EO-2026-000129' },
+    { id: 'INV-2026-000305', personId: 'p-lucy', companyNumber: '99418027', agentId: 'agent-fenwick', sentAt: at(-4 * DAY), paymentCode: 'APC-FS-D8P2', paymentCodeUsedAt: at(-3 * DAY + 4 * HOUR), status: 'accepted', caseId: 'EO-2026-000133' },
+    { id: 'INV-2026-000316', personId: 'p-sofia', companyNumber: '99520316', agentId: 'agent-fenwick', sentAt: at(-6 * DAY), paymentCode: 'APC-FS-Z6C4', paymentCodeUsedAt: at(-5 * DAY + 3 * HOUR), status: 'accepted', caseId: 'EO-2026-000132' },
+    { id: 'INV-2026-000317', personId: 'p-priya', companyNumber: '99520316', agentId: 'agent-fenwick', sentAt: at(-3 * DAY), paymentCode: 'APC-FS-H5W9', paymentCodeUsedAt: at(-2 * DAY + 2 * HOUR), status: 'accepted', caseId: 'EO-2026-000131' },
+    { id: 'INV-2026-000318', personId: 'p-daniel', companyNumber: '99520316', agentId: 'agent-fenwick', sentAt: at(-1 * DAY), paymentCode: 'APC-FS-N4X6', status: 'opened', caseId: 'EO-2026-000135' },
+    { id: 'INV-2026-000288', personId: 'p-aidan', companyNumber: '99630741', agentId: 'agent-belgrave', sentAt: at(-8 * DAY), paymentCode: 'APC-BF-3M8T', paymentCodeUsedAt: at(-7 * DAY + 4 * HOUR), status: 'accepted', caseId: 'EO-2026-000127' },
+    { id: 'INV-2026-000254', personId: 'p-fiona', companyNumber: '99630741', agentId: 'agent-belgrave', sentAt: at(-77 * DAY), paymentCode: 'APC-BF-V2J5', status: 'expired', caseId: 'EO-2026-000102' },
   ]
 
+  const ev = (offset: number, actor: string, actorType: AuditInput['actorType'], action: string, caseId: string, detail: string): AuditInput => ({ at: at(offset), actor, actorType, action, caseId, detail })
+
   const audit: AuditInput[] = [
-    { at: at(-77 * DAY), actor: 'Oliver Grant, Belgrave Family Office', actorType: 'person', action: 'invite.sent', caseId: 'EO-2026-000102', detail: 'Invite INV-2026-000254 sent to Fiona Corrigan with a pre-authorised Agent Payment Code.' },
-    { at: at(-46 * DAY), actor: 'Evidence One', actorType: 'system', action: 'case.abandoned', caseId: 'EO-2026-000102', detail: 'No activity for 30 days. Case closed as abandoned. Record retained for 7 years.' },
+    ev(-77 * DAY, 'Oliver Grant, Belgrave Family Office', 'person', 'invite.sent', 'EO-2026-000102', 'Invite INV-2026-000254 sent to Fiona Corrigan with single-use Agent Payment Code APC-BF-V2J5.'),
+    ev(-46 * DAY, 'Evidence One', 'system', 'case.abandoned', 'EO-2026-000102', 'No activity for 30 days. Case closed as abandoned. Record retained for 7 years from closure (RET-02).'),
 
-    { at: at(-42 * DAY), actor: 'Rachel Fenwick, Fenwick & Shaw', actorType: 'person', action: 'invite.sent', caseId: 'EO-2026-000118', detail: 'Invite INV-2026-000301 sent to Margaret Ashby, pre-filled from the register.' },
-    { at: at(-40 * DAY - 2 * HOUR), actor: 'Certified identity provider', actorType: 'system', action: 'idvt.result.received', caseId: 'EO-2026-000118', detail: 'Chip read, authenticity, liveness, face match 97.8%, PEP and sanctions: all passed.' },
-    { at: at(-40 * DAY - 2 * HOUR + 60000), actor: 'Evidence One Intelligence', actorType: 'ai', action: 'ai.observation.created', caseId: 'EO-2026-000118', detail: 'Register comparison complete. No mismatch. Advisory only.' },
-    { at: at(-39 * DAY), actor: 'Eleanor Marsh, Harcourt Lane', actorType: 'person', action: 'case.decision.approved', caseId: 'EO-2026-000118', detail: 'Approved. Reason APR-01. Retention period starts.' },
-    { at: at(-39 * DAY + 2 * HOUR), actor: 'Eleanor Marsh, Harcourt Lane', actorType: 'person', action: 'submission.handoff', caseId: 'EO-2026-000118', detail: 'Submission pack prepared. Handed off to GOV.UK One Login.' },
-    { at: at(-39 * DAY + 3 * HOUR), actor: 'Eleanor Marsh, Harcourt Lane', actorType: 'person', action: 'submission.recorded', caseId: 'EO-2026-000118', detail: 'Companies House personal code recorded.' },
+    ev(-42 * DAY, 'Rachel Fenwick, Fenwick & Shaw', 'person', 'invite.sent', 'EO-2026-000118', 'Invite INV-2026-000301 sent to Margaret Ashby, pre-filled from the register, with single-use Agent Payment Code APC-FS-K2M8.'),
+    ev(-41 * DAY + 2 * HOUR, 'Margaret Ashby', 'person', 'payment.completed', 'EO-2026-000118', 'Paid by Fenwick & Shaw Chartered Accountants with Agent Payment Code APC-FS-K2M8.'),
+    ev(-40 * DAY - 2 * HOUR, PROVIDER, 'system', 'idvt.result.received', 'EO-2026-000118', 'Chip read, authenticity, liveness, face match 97.8%, PEP and sanctions: all passed.'),
+    ev(-40 * DAY - 2 * HOUR + MIN, RULES, 'system', 'rules.evaluated', 'EO-2026-000118', 'Route A rules evaluated. No Block, Halt or Mandatory decision.'),
+    ev(-39 * DAY - MIN, REVIEWER, 'person', 'auth.stepup.succeeded', 'EO-2026-000118', 'Step-up SU-7Q2M-118A confirmed by passkey before the decision.'),
+    ev(-39 * DAY, REVIEWER, 'person', 'case.decision.approve', 'EO-2026-000118', 'Approved. Reason APR-01. Retention of 7 years starts from this decision.'),
+    ev(-39 * DAY + HOUR, REVIEWER, 'person', 'submission.started', 'EO-2026-000118', 'Submission workspace started. Step-up SU-7Q2M-118B confirmed by passkey.'),
+    ev(-39 * DAY + 2 * HOUR, REVIEWER, 'person', 'submission.handoff', 'EO-2026-000118', 'Continued to GOV.UK One Login with the submission pack.'),
+    ev(-39 * DAY + 2 * HOUR + 20 * MIN, REVIEWER, 'person', 'submission.submitted', 'EO-2026-000118', 'Returned from the Companies House service. Submission made.'),
+    ev(-39 * DAY + 3 * HOUR, REVIEWER, 'person', 'submission.confirmed', 'EO-2026-000118', 'Verification reference CHV-2026-7KQ2MX recorded from the forwarded confirmation email. Companies House emails the personal code to the individual.'),
 
-    { at: at(-8 * DAY), actor: 'Oliver Grant, Belgrave Family Office', actorType: 'person', action: 'invite.sent', caseId: 'EO-2026-000127', detail: 'Invite INV-2026-000288 sent to Aidan Corrigan, pre-filled from the register.' },
-    { at: at(-5 * DAY - 2 * HOUR), actor: 'Certified identity provider', actorType: 'system', action: 'idvt.result.received', caseId: 'EO-2026-000127', detail: 'Chip read, authenticity, liveness, face match 97.1%, PEP and sanctions: all passed.' },
-    { at: at(-5 * DAY - 2 * HOUR + 60000), actor: 'Evidence One Intelligence', actorType: 'ai', action: 'ai.flag.register_mismatch', caseId: 'EO-2026-000127', detail: 'First name differs from the register (Aidan on passport, Aiden on register). Advisory flag raised for the reviewer.' },
-    { at: at(-5 * DAY + 3 * HOUR), actor: 'Eleanor Marsh, Harcourt Lane', actorType: 'person', action: 'route_a.halted', caseId: 'EO-2026-000127', detail: 'Route A paused. Route B correction task FL-2026-000042 (ACSP04) created.' },
+    ev(-8 * DAY, 'Oliver Grant, Belgrave Family Office', 'person', 'invite.sent', 'EO-2026-000127', 'Invite INV-2026-000288 sent to Aidan Corrigan, pre-filled from the register, with single-use Agent Payment Code APC-BF-3M8T.'),
+    ev(-7 * DAY + 4 * HOUR, 'Aidan Corrigan', 'person', 'payment.completed', 'EO-2026-000127', 'Paid by Belgrave Family Office with Agent Payment Code APC-BF-3M8T.'),
+    ev(-5 * DAY - 2 * HOUR, PROVIDER, 'system', 'idvt.result.received', 'EO-2026-000127', 'Chip read, authenticity, liveness, face match 97.1%, PEP and sanctions: all passed.'),
+    ev(-5 * DAY - 2 * HOUR + MIN, RULES, 'system', 'rules.halted', 'EO-2026-000127', 'REG-11: name on the document differs from the register after normalisation (Aidan on the passport, Aiden on the register). Route A halted.'),
+    ev(-5 * DAY - 2 * HOUR + 2 * MIN, AI, 'ai', 'ai.observation.created', 'EO-2026-000127', 'AI observation on REG-11 explaining the spelling difference. Advisory only.'),
+    ev(-5 * DAY + 3 * HOUR, REVIEWER, 'person', 'route_b.task.created', 'EO-2026-000127', 'Route B correction task FL-2026-000042 (ACSP04) created. Route A resumes once the register matches.'),
 
-    { at: at(-7 * DAY), actor: 'Rachel Fenwick, Fenwick & Shaw', actorType: 'person', action: 'invite.sent', caseId: 'EO-2026-000129', detail: 'Invite INV-2026-000302 sent to Thomas Ashby, pre-filled from the register.' },
-    { at: at(-4 * DAY - 3 * HOUR), actor: 'Certified identity provider', actorType: 'system', action: 'idvt.result.received', caseId: 'EO-2026-000129', detail: 'Authenticity, liveness, face match 96.4%, PEP and sanctions: all passed.' },
-    { at: at(-4 * DAY - 2 * HOUR), actor: 'Evidence One Intelligence', actorType: 'ai', action: 'ai.flag.evidence_date', caseId: 'EO-2026-000129', detail: 'Address evidence appears older than 3 months. Advisory flag raised for the reviewer.' },
-    { at: at(-2 * DAY), actor: 'Eleanor Marsh, Harcourt Lane', actorType: 'person', action: 'case.decision.request_info', caseId: 'EO-2026-000129', detail: 'More information requested. Reason RFI-02.' },
+    ev(-7 * DAY, 'Rachel Fenwick, Fenwick & Shaw', 'person', 'invite.sent', 'EO-2026-000129', 'Invite INV-2026-000302 sent to Thomas Ashby, pre-filled from the register, with single-use Agent Payment Code APC-FS-R7T3.'),
+    ev(-6 * DAY + 3 * HOUR, 'Thomas Ashby', 'person', 'payment.completed', 'EO-2026-000129', 'Paid by Fenwick & Shaw Chartered Accountants with Agent Payment Code APC-FS-R7T3.'),
+    ev(-4 * DAY - 3 * HOUR, PROVIDER, 'system', 'idvt.result.received', 'EO-2026-000129', 'Authenticity, liveness, face match 96.4%, PEP and sanctions: all passed.'),
+    ev(-4 * DAY - 3 * HOUR + MIN, RULES, 'system', 'rules.request', 'EO-2026-000129', 'ADDL-02: the licence does not confirm the current address. One supporting document requested.'),
+    ev(-4 * DAY - 2 * HOUR, AI, 'ai', 'ai.observation.created', 'EO-2026-000129', 'AI observation on ADDL-11: the council tax bill appears to be older than 3 months. Advisory only.'),
+    ev(-2 * DAY, REVIEWER, 'person', 'case.decision.request_info', 'EO-2026-000129', 'More information requested. Reason RFI-02: one supporting document for the current address, dated within 3 months.'),
 
-    { at: at(-3 * DAY), actor: 'Rachel Fenwick, Fenwick & Shaw', actorType: 'person', action: 'invite.sent', caseId: 'EO-2026-000131', detail: 'Invite INV-2026-000317 sent to Priya Raman, pre-filled from the register.' },
-    { at: at(-14 * HOUR - 20 * 60000), actor: 'Certified identity provider', actorType: 'system', action: 'idvt.result.received', caseId: 'EO-2026-000131', detail: 'Chip read, authenticity, liveness, face match 98.6%, PEP and sanctions: all passed.' },
-    { at: at(-14 * HOUR), actor: 'Rachel Fenwick, Fenwick & Shaw', actorType: 'person', action: 'case.referred', caseId: 'EO-2026-000131', detail: 'Referred to Harcourt Lane Solicitors LLP for review through the Evidence One marketplace.' },
+    ev(-6 * DAY, 'Rachel Fenwick, Fenwick & Shaw', 'person', 'invite.sent', 'EO-2026-000132', 'Invite INV-2026-000316 sent to Sofia Lindqvist, pre-filled from the register, with single-use Agent Payment Code APC-FS-Z6C4.'),
+    ev(-5 * DAY + 3 * HOUR, 'Sofia Lindqvist', 'person', 'payment.completed', 'EO-2026-000132', 'Paid by Fenwick & Shaw Chartered Accountants with Agent Payment Code APC-FS-Z6C4.'),
+    ev(-4 * DAY, PROVIDER, 'system', 'idvt.result.received', 'EO-2026-000132', 'Liveness not passed on attempt 3 of 3. Chip read and authenticity passed.'),
+    ev(-4 * DAY + 10 * MIN, RULES, 'system', 'rules.option2', 'EO-2026-000132', 'IDVT-08: all attempts used. Option 2 offered under OPT-02.'),
+    ev(-30 * HOUR - 40 * MIN, REVIEWER, 'person', 'option2.check_recorded', 'EO-2026-000132', 'Person check recorded: Swedish passport and UK photocard driving licence (two from Group A). Training attestation TA-2026-0187.'),
 
-    { at: at(-1 * DAY), actor: 'Evidence One', actorType: 'system', action: 'b2c.allocated', caseId: 'EO-2026-000134', detail: 'Direct client allocated to Harcourt Lane Solicitors LLP by the allocation rota.' },
-    { at: at(-5 * HOUR - 15 * 60000), actor: 'Certified identity provider', actorType: 'system', action: 'idvt.result.received', caseId: 'EO-2026-000134', detail: 'Chip read, authenticity, liveness, face match 95.9%. One PEP name match discounted.' },
+    ev(-4 * DAY, 'Rachel Fenwick, Fenwick & Shaw', 'person', 'invite.sent', 'EO-2026-000133', 'Invite INV-2026-000305 sent to Lucy Ashby, pre-filled from the register, with single-use Agent Payment Code APC-FS-D8P2.'),
+    ev(-3 * DAY + 4 * HOUR, 'Lucy Ashby', 'person', 'payment.completed', 'EO-2026-000133', 'Paid by Fenwick & Shaw Chartered Accountants with Agent Payment Code APC-FS-D8P2.'),
+    ev(-26 * HOUR - 30 * MIN, 'Lucy Ashby', 'person', 'document.no_chip_phone', 'EO-2026-000133', 'Phone cannot read the passport chip. UK photocard driving licence offered in the browser.'),
+    ev(-26 * HOUR - 15 * MIN, PROVIDER, 'system', 'idvt.result.received', 'EO-2026-000133', 'Licence authenticity, liveness, face match 96.1%, PEP and sanctions: all passed.'),
 
-    { at: at(-1 * DAY), actor: 'Rachel Fenwick, Fenwick & Shaw', actorType: 'person', action: 'invite.sent', caseId: 'EO-2026-000135', detail: 'Invite INV-2026-000318 sent to Daniel Okafor with a pre-authorised Agent Payment Code.' },
-    { at: at(-20 * HOUR), actor: 'Daniel Okafor', actorType: 'person', action: 'invite.opened', caseId: 'EO-2026-000135', detail: 'Invite link opened in the Evidence One app.' },
+    ev(-3 * DAY, 'Rachel Fenwick, Fenwick & Shaw', 'person', 'invite.sent', 'EO-2026-000131', 'Invite INV-2026-000317 sent to Priya Raman, pre-filled from the register, with single-use Agent Payment Code APC-FS-H5W9.'),
+    ev(-2 * DAY + 2 * HOUR, 'Priya Raman', 'person', 'payment.completed', 'EO-2026-000131', 'Paid by Fenwick & Shaw Chartered Accountants with Agent Payment Code APC-FS-H5W9.'),
+    ev(-14 * HOUR - 20 * MIN, PROVIDER, 'system', 'idvt.result.received', 'EO-2026-000131', 'Chip read, authenticity, liveness, face match 98.6%, PEP and sanctions: all passed.'),
+    ev(-14 * HOUR, 'Rachel Fenwick, Fenwick & Shaw', 'person', 'case.referred', 'EO-2026-000131', 'Referred to Harcourt Lane Solicitors LLP for review through the Evidence One marketplace.'),
+
+    ev(-1 * DAY, 'Evidence One', 'system', 'b2c.allocated', 'EO-2026-000134', 'Direct client allocated to Harcourt Lane Solicitors LLP by the allocation rota.'),
+    ev(-1 * DAY + 20 * MIN, 'Grace Whitaker', 'person', 'payment.completed', 'EO-2026-000134', 'Paid £49 by card. Reference PAY-2026-004134.'),
+    ev(-5 * HOUR - 15 * MIN, PROVIDER, 'system', 'idvt.result.received', 'EO-2026-000134', 'Chip read, authenticity, liveness, face match 95.9%. Screening returned one possible PEP match.'),
+    ev(-5 * HOUR - 14 * MIN, RULES, 'system', 'rules.mandatory', 'EO-2026-000134', 'AML-02: possible PEP match. Mandatory decision for the reviewer.'),
+
+    ev(-1 * DAY, 'Rachel Fenwick, Fenwick & Shaw', 'person', 'invite.sent', 'EO-2026-000135', 'Invite INV-2026-000318 sent to Daniel Okafor with single-use Agent Payment Code APC-FS-N4X6.'),
+    ev(-20 * HOUR, 'Daniel Okafor', 'person', 'invite.opened', 'EO-2026-000135', 'Invite link opened in the Evidence One app.'),
   ]
 
   return { cases, corrections, invites, audit }

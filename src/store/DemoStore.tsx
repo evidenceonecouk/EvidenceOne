@@ -11,7 +11,7 @@ import type { ActionResult } from './actions'
 */
 
 const STORAGE_KEY = 'evidenceone.demo'
-const SCHEMA = 3
+const SCHEMA = 4
 /** A saved demo older than this is reseeded so SLA timers look live again. */
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000
 
@@ -26,6 +26,7 @@ export interface DemoState {
 
 type Action =
   | { type: 'reset' }
+  | { type: 'hydrate'; state: DemoState }
   | { type: 'setPersona'; persona: PersonaId }
   | { type: 'setAgent'; agentId: string }
   | { type: 'update'; recipe: (data: DemoData) => DemoData; audit?: AuditInput[] }
@@ -52,6 +53,8 @@ function reducer(state: DemoState, action: Action): DemoState {
   switch (action.type) {
     case 'reset':
       return freshState(state.persona)
+    case 'hydrate':
+      return action.state
     case 'setPersona':
       return { ...state, persona: action.persona }
     case 'setAgent':
@@ -95,6 +98,21 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       // Storage can be unavailable (private mode). The demo still works in memory.
     }
   }, [state])
+
+  // Another window (the GOV.UK One Login handoff) can change the demo; pick its changes up here.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || !e.newValue) return
+      try {
+        const next = JSON.parse(e.newValue) as DemoState
+        if (next.schema === SCHEMA) dispatch({ type: 'hydrate', state: next })
+      } catch {
+        // Ignore a malformed write from another window.
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   const setPersona = useCallback((persona: PersonaId) => dispatch({ type: 'setPersona', persona }), [])
   const setAgent = useCallback((agentId: string) => dispatch({ type: 'setAgent', agentId }), [])

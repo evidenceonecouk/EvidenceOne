@@ -5,19 +5,21 @@
 
 export type ISODate = string
 
-export type PersonaId = 'agent' | 'reviewer' | 'individual' | 'b2c' | 'admin'
+export type PersonaId = 'agent' | 'reviewer' | 'individual' | 'b2c' | 'admin' | 'admin2'
 
 /** Route A is identity verification; Route B is Companies House filings. */
 export type Route = 'A' | 'B'
 
 export type RegisterRole = 'director' | 'psc' | 'director_psc'
 
-/** Status shown on Agent dashboards per director or PSC. */
+/** Status shown to Agents per director or PSC. Agents see status only, never documents or evidence. */
 export type PersonStatus =
-  | 'verified'
-  | 'in_progress'
   | 'not_started'
-  | 'expired'
+  | 'in_progress'
+  | 'awaiting_info'
+  | 'with_acsp'
+  | 'verified'
+  | 'not_completed'
   | 'reverification_due'
 
 export type CaseStatus =
@@ -27,11 +29,19 @@ export type CaseStatus =
   | 'info_requested'
   | 'halted_register_mismatch'
   | 'approved'
+  | 'submission_started'
   | 'submitted'
+  | 'confirmed'
   | 'declined'
   | 'abandoned'
 
 export type DecisionOutcome = 'approve' | 'request_info' | 'decline'
+
+/** The six outcomes a rule can produce. No rule ever declines a case. */
+export type RuleOutcome = 'pass' | 'flag' | 'mandatory' | 'request' | 'halt' | 'block'
+
+/** The step of the journey a rule result or AI observation belongs to. */
+export type CaseStep = 'info' | 'register' | 'document' | 'idvt' | 'aml' | 'evidence' | 'option' | 'decision' | 'submission'
 
 export interface Address {
   line1: string
@@ -57,12 +67,21 @@ export type IdDocumentType =
 export interface IdDocument {
   type: IdDocumentType
   issuingCountry: string
-  /** Only the last two characters are ever shown. */
+  /** Only the last two characters are shown, except in the submission pack. */
   numberLastTwo: string
+  /** Full synthetic document number, shown only in the submission pack. */
+  number?: string
   expiresOn: ISODate
   nameOnDocument: string
   dobOnDocument: ISODate
+  nationalityOnDocument?: string
   hasChip: boolean
+  /** Address printed on a photocard driving licence, if any. */
+  addressOnDocument?: string
+  /** Name printed in a non-Latin script and transliterated by the issuer. */
+  nonLatinName?: boolean
+  cancelledOrReplaced?: boolean
+  damaged?: boolean
 }
 
 export interface Person {
@@ -91,7 +110,11 @@ export interface RegisterEntry {
   registerName: string
   /** The public register shows month and year only. */
   registerDobMonthYear: string
+  registerNationality: string
   natureOfControl?: string
+  /** The register already shows this person's identity as verified (rule REG-04). */
+  identityVerified?: boolean
+  activeAppointments?: number
 }
 
 export interface Company {
@@ -115,6 +138,7 @@ export interface AgentOrg {
   /** Agents with ACSP status can approve or decline; without, they can only refer. */
   hasAcspStatus: boolean
   contactName: string
+  /** Prefix for this Agent's single-use payment codes, one per invite. */
   paymentCode?: string
 }
 
@@ -136,6 +160,9 @@ export interface Reviewer {
   id: string
   name: string
   role: string
+  /** Training attestation for Option 2 person checks (rule OPT-03). */
+  attestation?: { course: string; completedOn: ISODate; expiresOn: ISODate; reference: string }
+  senior?: boolean
 }
 
 export type CheckResult = 'pass' | 'fail' | 'refer' | 'pending' | 'not_applicable'
@@ -148,8 +175,14 @@ export interface IdvtResults {
   faceMatchScore?: number
   pepSanctions: CheckResult
   pepSanctionsDetail?: string
+  /** Screening returned a possible PEP match (rule AML-02). */
+  pepPossibleMatch?: boolean
+  sanctionsPossibleMatch?: boolean
+  adverseMedia?: boolean
   completedAt?: ISODate
   providerReference?: string
+  /** Attempts at the checks so far (rule IDVT-07). */
+  attempts?: number
 }
 
 export type ObservationSeverity = 'info' | 'attention' | 'mismatch'
@@ -160,6 +193,9 @@ export interface AiObservation {
   title: string
   detail: string
   source: string
+  /** The step it relates to and the rule it explains. */
+  step: CaseStep
+  ruleId: string
 }
 
 export type ComparisonResult = 'match' | 'mismatch' | 'not_compared'
@@ -173,15 +209,21 @@ export interface RegisterComparisonRow {
   note?: string
 }
 
+export type SupportingEvidenceType = 'bank_statement' | 'utility_bill' | 'insurance' | 'passport_use'
+
 export interface EvidenceItem {
   id: string
-  kind: 'identity_document' | 'selfie' | 'address_evidence'
+  kind: 'identity_document' | 'selfie' | 'address_evidence' | 'option2_document'
   label: string
   uploadedAt: ISODate
-  /** For address evidence: the date printed on the document. */
+  /** For supporting evidence: the date printed on the document. */
   documentDate?: ISODate
-  aiCheck: 'accepted' | 'flagged' | 'pending'
-  aiNote?: string
+  supportingType?: SupportingEvidenceType
+  /** AI extraction results for supporting evidence (rules ADDL-12 and ADDL-13). */
+  showsAddress?: boolean
+  showsName?: boolean
+  /** Provider result for identity documents; AI is never applied to them. */
+  note?: string
 }
 
 export type PaymentMethod = 'pay_myself' | 'agent_payment_code'
@@ -190,6 +232,8 @@ export interface Payment {
   method: PaymentMethod
   amount: number
   code?: string
+  /** Who paid, for Agent Payment Codes. */
+  payerName?: string
   paidAt?: ISODate
   reference: string
 }
@@ -200,12 +244,52 @@ export interface Decision {
   note?: string
   decidedAt: ISODate
   reviewerId: string
+  stepUpRef?: string
 }
 
+/** A reviewer's recorded decision on a Mandatory decision rule result. */
+export interface RuleDecision {
+  decision: 'satisfied' | 'not_satisfied'
+  reason: string
+  at: ISODate
+  reviewerId: string
+}
+
+export interface SubmissionCorrection {
+  id: string
+  startedAt: ISODate
+  fields: { label: string; from: string; to: string }[]
+  handedOffAt?: ISODate
+  recordedAt?: ISODate
+  stepUpRef?: string
+}
+
+/**
+  The ACSP submits through the Companies House service. Companies House emails the
+  personal code to the individual; the platform never collects or keeps it.
+*/
 export interface Submission {
+  startedAt?: ISODate
+  stepUpRef?: string
+  fieldsDone?: string[]
   handedOffAt?: ISODate
   submittedAt?: ISODate
-  personalCode?: string
+  confirmedAt?: ISODate
+  verificationReference?: string
+  referenceSource?: 'entered' | 'forwarded_email'
+  corrections?: SubmissionCorrection[]
+}
+
+export type Option2Reason = 'attempts_used' | 'unsupported_document' | 'no_chip_phone'
+
+export interface Option2State {
+  reason: Option2Reason
+  requestedAt: ISODate
+  /** Needed when the person could not use the chip read (2.2). */
+  reviewerAgreedAt?: ISODate
+  documents?: { group: 'A' | 'B'; label: string; expiresOn?: ISODate }[]
+  checkedAt?: ISODate
+  checkedBy?: string
 }
 
 export interface VerificationCase {
@@ -224,7 +308,6 @@ export interface VerificationCase {
   submittedForReviewAt?: ISODate
   slaDueAt?: ISODate
   idvt: IdvtResults
-  comparison: RegisterComparisonRow[]
   observations: AiObservation[]
   evidence: EvidenceItem[]
   payment?: Payment
@@ -238,19 +321,35 @@ export interface VerificationCase {
   inHouse?: boolean
   /** Progress through the individual's app journey before submission. */
   journey?: JourneyState
+  /** Rule set version applied at the decision. Open cases use the version in force. */
+  ruleSetVersion?: string
+  ruleDecisions?: Record<string, RuleDecision>
+  option2?: Option2State
+  escalatedTo?: { reviewerId: string; at: ISODate; note: string }
+  /** The document was captured in a browser rather than the app (no chip read). */
+  browserCapture?: boolean
 }
 
 export interface JourneyState {
+  emailConfirmed?: boolean
+  mobileConfirmed?: boolean
+  passkeySet?: boolean
   detailsConfirmed?: boolean
   amendment?: { field: string; note: string; at: ISODate }
-  addressConfirmed?: boolean
+  personalConfirmed?: boolean
+  formerNames?: string[]
+  /** Saw the "already verified" notice (REG-04) and chose to continue. */
+  alreadyVerifiedAcknowledged?: boolean
   documentType?: IdDocumentType
+  /** Chose "My phone can't read the chip" (2.2). */
+  noChipPhone?: boolean
   photoPageDone?: boolean
   chipDone?: boolean
   selfieDone?: boolean
   checksDone?: boolean
   evidenceUploaded?: boolean
   paid?: boolean
+  payment?: Payment
 }
 
 export interface CorrectionTask {
@@ -275,7 +374,9 @@ export interface Invite {
   companyNumber: string
   agentId: string
   sentAt: ISODate
+  /** Single-use Agent Payment Code tied to this invite only. */
   paymentCode?: string
+  paymentCodeUsedAt?: ISODate
   status: 'sent' | 'opened' | 'accepted' | 'amendment_requested' | 'expired'
   caseId?: string
   /** Agents with ACSP status may review in-house; everyone else refers to an ACSP. */
@@ -296,6 +397,48 @@ export interface AuditEvent {
   hash: string
 }
 
+/* Rule set: parameters and decision settings are versioned; rule text is fixed. */
+
+export type ParamKey =
+  | 'address_history_months'
+  | 'supporting_evidence_months'
+  | 'passport_expiry_option1'
+  | 'passport_expiry_option2'
+  | 'brp_expiry'
+  | 'idvt_attempts'
+  | 'recent_appointment_days'
+  | 'many_appointments'
+  | 'biometric_deletion_days'
+  | 'retention_years'
+  | 'review_target_hours'
+
+export interface RuleSettings {
+  nationality_difference: 'halt' | 'mandatory'
+  passport_address_evidence: 'always' | 'when_needed'
+  non_latin_difference: 'halt' | 'mandatory'
+  escalate_enabled: boolean
+}
+
+export type SettingKey = keyof RuleSettings
+
+export type RuleSetStatus = 'current' | 'draft' | 'pending_approval' | 'superseded'
+
+export interface RuleSetVersion {
+  version: string
+  status: RuleSetStatus
+  params: Record<ParamKey, number>
+  settings: RuleSettings
+  createdAt: ISODate
+  createdBy: string
+  submittedAt?: ISODate
+  submittedBy?: string
+  approvedBy?: string
+  publishedBy?: string
+  publishedAt?: ISODate
+  effectiveFrom?: ISODate
+  supersededAt?: ISODate
+}
+
 export interface DemoData {
   acsps: AcspFirm[]
   agents: AgentOrg[]
@@ -305,5 +448,6 @@ export interface DemoData {
   cases: VerificationCase[]
   corrections: CorrectionTask[]
   invites: Invite[]
+  ruleSets: RuleSetVersion[]
   audit: AuditEvent[]
 }

@@ -276,3 +276,10 @@
 .reveal-line { display: block; overflow: hidden; padding-bottom: 0.06em; }
 .reveal-line > span { display: block; animation: reveal-up 900ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 @keyframes reveal-up { from { transform: translateY(105%); } to { transform: none; } }
+
+/* Copilot citation highlight: an outline that fades, so the eye finds the cited item */
+@keyframes cite-flash {
+  0%, 60% { box-shadow: 0 0 0 3px var(--highlight), 0 0 0 7px rgb(255 216 77 / 0.35); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.cite-flash { animation: cite-flash 2.2s ease-out both; border-radius: 12px; }

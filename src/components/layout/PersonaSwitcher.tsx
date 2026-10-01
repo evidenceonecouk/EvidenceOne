@@ -27,7 +27,7 @@ export function PersonaSwitcher() {
   return (
     <>
       {/* Wide screens: every persona visible at once */}
-      <div role="group" aria-label="View the demo as" className="hidden items-center gap-1 rounded-xl bg-white/[0.06] p-1 lg:flex">
+      <div role="group" aria-label="View the demo as" className="hidden items-center gap-1 rounded-xl bg-white/[0.06] p-1 xl:flex">
         {personas.map((p) => {
           const Icon = p.icon
           const active = p.id === state.persona
@@ -43,7 +43,8 @@ export function PersonaSwitcher() {
               )}
             >
               <Icon className="size-4" aria-hidden="true" />
-              {p.label}
+              <span className="2xl:hidden">{p.id === 'admin2' ? p.shortLabel : p.label}</span>
+              <span className="hidden 2xl:inline">{p.label}</span>
             </button>
           )
         })}
@@ -52,7 +53,7 @@ export function PersonaSwitcher() {
       {/* Narrow screens: a menu */}
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-white/[0.08] px-3.5 text-[0.9375rem] font-medium text-paper hover:bg-white/15 lg:hidden"
+          className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-white/[0.08] px-3.5 text-[0.9375rem] font-medium text-paper hover:bg-white/15 xl:hidden"
           aria-label={`Viewing as ${current.label}. Change persona`}
         >
           <current.icon className="size-4" aria-hidden="true" />

@@ -10,18 +10,19 @@ import { ReviewIllustration } from '@/components/visual/Illustrations'
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { useNow } from '@/hooks/useNow'
 import { formatShortDate, fullName, timeRemaining } from '@/lib/format'
+import { evaluateCase, outstandingFor } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import { getAcsp, getAgent, getCompany, getPerson } from '@/store/selectors'
 import type { CaseStatus, VerificationCase } from '@/types/domain'
 
 const filters: { id: string; label: string; statuses: CaseStatus[] }[] = [
-  { id: 'open', label: 'All open', statuses: ['in_review', 'info_requested', 'halted_register_mismatch', 'approved'] },
+  { id: 'open', label: 'All open', statuses: ['in_review', 'info_requested', 'halted_register_mismatch', 'approved', 'submission_started', 'submitted'] },
   { id: 'review', label: 'Awaiting review', statuses: ['in_review'] },
-  { id: 'paused', label: 'Paused', statuses: ['halted_register_mismatch'] },
+  { id: 'paused', label: 'Halted', statuses: ['halted_register_mismatch'] },
   { id: 'info', label: 'Information requested', statuses: ['info_requested'] },
-  { id: 'submit', label: 'Ready to submit', statuses: ['approved'] },
-  { id: 'closed', label: 'Decided', statuses: ['submitted', 'declined'] },
+  { id: 'submit', label: 'To submit', statuses: ['approved', 'submission_started', 'submitted'] },
+  { id: 'closed', label: 'Decided', statuses: ['confirmed', 'declined'] },
 ]
 
 export function ReviewQueue() {
@@ -44,7 +45,7 @@ export function ReviewQueue() {
       <HeroBanner
         kicker="Evidence One Compliance"
         title="Review queue"
-        description={`Cases waiting for a decision by ${acsp.name}. Every case carries a 36-hour SLA from submission.`}
+        description={`Cases waiting for a decision by ${acsp.name}. Every case carries a 36-hour review target from submission, shown to reviewers only.`}
         meta={
           <>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-[0.875rem] text-graphite">
@@ -70,8 +71,8 @@ export function ReviewQueue() {
       <dl className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Awaiting review" value={awaiting.length} icon={Inbox} tone="progress" />
         <StatTile label="Due within 12 hours" value={dueSoon} icon={Clock3} tone="info" />
-        <StatTile label="Paused for the register" value={mine.filter((c) => c.status === 'halted_register_mismatch').length} icon={CirclePause} tone="ai" />
-        <StatTile label="Decided" value={mine.filter((c) => ['submitted', 'declined', 'approved'].includes(c.status)).length} icon={Gavel} tone="approve" />
+        <StatTile label="Halted for the register" value={mine.filter((c) => c.status === 'halted_register_mismatch').length} icon={CirclePause} tone="ai" />
+        <StatTile label="Decided" value={mine.filter((c) => ['submitted', 'confirmed', 'declined', 'approved', 'submission_started'].includes(c.status)).length} icon={Gavel} tone="approve" />
       </dl>
 
       <div role="tablist" aria-label="Filter cases" className="mb-4 flex flex-wrap gap-2">
@@ -129,13 +130,15 @@ function QueueRow({ vc, onOpen }: { vc: VerificationCase; onOpen: () => void }) 
   const person = getPerson(data, vc.personId)!
   const company = getCompany(data, vc.companyNumber)!
   const agent = vc.agentId ? getAgent(data, vc.agentId) : undefined
-  const flags = vc.observations.filter((o) => o.severity !== 'info')
-  const mismatch = vc.comparison.some((r) => r.result === 'mismatch')
+  const results = evaluateCase(data, vc)
+  const outstanding = outstandingFor(results)
+  const mandatory = outstanding.filter((o) => o.reason === 'mandatory_open').length
+  const halted = results.find((r) => r.outcome === 'halt')
   const name = fullName(person)
 
   const origin = vc.origin === 'b2c' ? 'Direct client, allocated by rota' : `Referred by ${agent?.name}`
   const waiting =
-    vc.status === 'info_requested' ? 'Waiting on the individual' : vc.status === 'halted_register_mismatch' ? 'Waiting on the register' : vc.decision ? `Decided ${formatShortDate(vc.decision.decidedAt)}` : ''
+    vc.status === 'info_requested' ? 'Waiting on the individual' : vc.status === 'halted_register_mismatch' ? 'Waiting on the register' : vc.status === 'submitted' ? 'Reference to record' : vc.decision ? `Decided ${formatShortDate(vc.decision.decidedAt)}` : ''
 
   return (
     <li className={cn(QROW, 'group relative min-h-[5rem] py-4 transition-colors duration-150 hover:bg-[#fafaf9]')}>
@@ -158,21 +161,23 @@ function QueueRow({ vc, onOpen }: { vc: VerificationCase; onOpen: () => void }) 
       </div>
       <div className="flex min-w-0 flex-col items-start gap-1.5">
         <CaseStatusChip status={vc.status} />
-        {mismatch && vc.status === 'in_review' ? (
+        {halted ? (
           <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-info">
             <FileWarning className="size-3.5" aria-hidden="true" />
-            Register mismatch
+            {halted.ruleId} halt · register correction
           </span>
-        ) : flags.length > 0 ? (
+        ) : mandatory > 0 ? (
+          <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-info">
+            <CircleAlert className="size-3.5" aria-hidden="true" />
+            {mandatory} Mandatory decision{mandatory === 1 ? '' : 's'} · {outstanding.filter((o) => o.reason === 'mandatory_open').map((o) => o.ruleId).join(', ')}
+          </span>
+        ) : outstanding.length > 0 && vc.status === 'in_review' ? (
           <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-graphite">
             <Sparkles className="size-3.5" aria-hidden="true" />
-            {flags.length} AI flag{flags.length === 1 ? '' : 's'} · advisory
+            {outstanding.length} open rule result{outstanding.length === 1 ? '' : 's'}
           </span>
-        ) : vc.idvt.pepSanctionsDetail?.includes('possible') ? (
-          <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-graphite">
-            <CircleAlert className="size-3.5" aria-hidden="true" />
-            PEP name match discounted
-          </span>
+        ) : vc.option === 2 ? (
+          <span className="text-[0.8125rem] text-graphite">Option 2 person check</span>
         ) : null}
       </div>
       <div className="hidden sm:block">{vc.status === 'in_review' && vc.slaDueAt ? <SlaPill due={vc.slaDueAt} /> : <span className="text-[0.875rem] text-slate">{waiting}</span>}</div>

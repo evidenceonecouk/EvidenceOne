@@ -16,7 +16,7 @@ const audiences: { id: string; tab: string; title: string; body: string; cta: st
     id: 'individuals',
     tab: 'Directors and PSCs',
     title: 'Five minutes on your phone',
-    body: 'Open your invite, check the details we already hold from the register, scan your passport and take a short selfie video. You can follow every step until Companies House issues your personal code.',
+    body: 'Open your invite, check the details we already hold from the register, scan your passport and take a short selfie video. Pay, then use one identity document. You can follow every step until your ACSP submits to Companies House, which emails your personal code to you.',
     cta: 'Try the app journey',
     to: '/app/EO-2026-000135/invite',
     persona: 'individual',
@@ -34,7 +34,7 @@ const audiences: { id: string; tab: string; title: string; body: string; cta: st
     id: 'acsps',
     tab: 'ACSPs',
     title: 'Decide with the evidence in front of you',
-    body: 'A review queue with a 36-hour SLA on every case, the identity checks, the register comparison and AI observations side by side, then a submission pack ready for GOV.UK One Login.',
+    body: 'A review queue with a 36-hour review target, every rule result with its ID, Mandatory decisions you record, an ACSP Copilot that cites its sources, then a submission workspace ready for GOV.UK One Login.',
     cta: 'Open the review queue',
     to: '/acsp/queue',
     persona: 'reviewer',
@@ -100,7 +100,7 @@ function TrackerVisual() {
     ['Passport chip read', true],
     ['Liveness and face match', true],
     ['Review by Harcourt Lane Solicitors LLP', false],
-    ['Personal code issued by Companies House', false],
+    ['Submitted to Companies House by the ACSP', false],
   ] as const
   return (
     <VisualCard>
