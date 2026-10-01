@@ -1,12 +1,6 @@
 import type { PlaceholderSpec } from './ScreenPlaceholder'
 
 export const placeholderSpecs = {
-  b2c: {
-    eyebrow: 'Evidence One Verify',
-    title: 'Verify my identity',
-    summary: 'For directors and PSCs who come to Evidence One directly. Allocated to one of our ACSPs.',
-    planned: ['Find your company on the register', 'Allocation to an ACSP', 'Continue into the app journey'],
-  },
   acspQueue: {
     eyebrow: 'Evidence One Compliance',
     title: 'Review queue',

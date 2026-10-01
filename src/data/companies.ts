@@ -63,6 +63,16 @@ export const companies: Company[] = [
     sicCodes: ['71111'],
     sicDescription: 'Architectural activities',
   },
+  {
+    number: '99915372',
+    name: 'KESTREL BAY CATERING LTD',
+    type: 'ltd',
+    status: 'active',
+    incorporatedOn: '2023-05-22',
+    registeredOffice: { line1: '3 Harbour Parade', town: 'Whitby', postcode: 'YO21 3PR', country: 'United Kingdom' },
+    sicCodes: ['56210'],
+    sicDescription: 'Event catering activities',
+  },
 ]
 
 export const register: RegisterEntry[] = [
@@ -86,4 +96,7 @@ export const register: RegisterEntry[] = [
   // Holloway & Reid: not yet connected, used in the lookup and connect step
   { personId: 'p-imogen', companyNumber: '99804613', role: 'director_psc', appointedOn: '2016-11-14', registerName: 'REID, Imogen Clare', registerDobMonthYear: 'April 1983', natureOfControl: 'Ownership of shares: more than 25% but not more than 50%' },
   { personId: 'p-samuel', companyNumber: '99804613', role: 'director', appointedOn: '2016-11-14', registerName: 'HOLLOWAY, Samuel Peter', registerDobMonthYear: 'December 1980' },
+
+  // Kestrel Bay Catering: a member of the public who comes to Evidence One directly
+  { personId: 'p-hannah', companyNumber: '99915372', role: 'director_psc', appointedOn: '2023-05-22', registerName: 'PRYCE, Hannah Louise', registerDobMonthYear: 'October 1988', natureOfControl: 'Ownership of shares: 75% or more' },
 ]

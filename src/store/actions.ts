@@ -1,7 +1,8 @@
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import type { AuditInput } from '@/lib/audit'
-import { fullName } from '@/lib/format'
-import type { DemoData, Invite, PaymentMethod, VerificationCase } from '@/types/domain'
+import { formatMoney, fullName } from '@/lib/format'
+import { compareToRegister } from '@/lib/register'
+import type { AiObservation, DemoData, EvidenceItem, IdDocument, IdDocumentType, Invite, JourneyState, Payment, PaymentMethod, Person, VerificationCase } from '@/types/domain'
 
 /*
   Pure state transitions. Each returns the next data and the audit events to
@@ -111,5 +112,177 @@ export function sendInvites(data: DemoData, input: SendInvitesInput): ActionResu
     data: { ...data, invites: [...data.invites, ...invites], cases: [...data.cases, ...cases] },
     audit,
     inviteIds: invites.map((i) => i.id),
+  }
+}
+
+/* Individual journey */
+
+const personName = (data: DemoData, personId: string) => {
+  const p = data.people.find((x) => x.id === personId)
+  return p ? fullName(p) : 'The individual'
+}
+
+function patchCase(data: DemoData, caseId: string, patch: (c: VerificationCase) => VerificationCase): DemoData {
+  return { ...data, cases: data.cases.map((c) => (c.id === caseId ? patch(c) : c)) }
+}
+
+export function updateJourney(data: DemoData, caseId: string, patch: Partial<JourneyState>, event?: { action: string; detail: string; actorType?: 'person' | 'system' | 'ai' }): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  if (!vc) return { data, audit: [] }
+  const now = new Date().toISOString()
+  const next = patchCase(data, caseId, (c) => ({ ...c, status: c.status === 'invited' ? 'in_progress' : c.status, journey: { ...c.journey, ...patch } }))
+  const invites = next.invites.map((i) => (i.caseId === caseId && (i.status === 'sent' || i.status === 'opened') ? { ...i, status: 'accepted' as const } : i))
+  return {
+    data: { ...next, invites },
+    audit: event
+      ? [{ at: now, actor: event.actorType === 'ai' ? 'Evidence One Intelligence' : event.actorType === 'system' ? 'Certified identity provider' : personName(data, vc.personId), actorType: event.actorType ?? 'person', action: event.action, caseId, detail: event.detail }]
+      : [],
+  }
+}
+
+export function requestAmendment(data: DemoData, caseId: string, field: string, note: string): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  if (!vc) return { data, audit: [] }
+  const now = new Date().toISOString()
+  const next = patchCase(data, caseId, (c) => ({ ...c, journey: { ...c.journey, amendment: { field, note, at: now } } }))
+  return {
+    data: { ...next, invites: next.invites.map((i) => (i.caseId === caseId ? { ...i, status: 'amendment_requested' as const } : i)) },
+    audit: [{ at: now, actor: personName(data, vc.personId), actorType: 'person', action: 'invite.amendment_requested', caseId, detail: `Amendment requested to ${field.toLowerCase()}: ${note}` }],
+  }
+}
+
+export function requestOption2(data: DemoData, caseId: string): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  if (!vc) return { data, audit: [] }
+  const now = new Date().toISOString()
+  return {
+    data: patchCase(data, caseId, (c) => ({ ...c, option: 2, status: 'in_progress' })),
+    audit: [{ at: now, actor: personName(data, vc.personId), actorType: 'person', action: 'option2.requested', caseId, detail: 'Document cannot be checked digitally. Option 2 trained human check requested as a fallback.' }],
+  }
+}
+
+export interface SubmitInput {
+  caseId: string
+  documentType: IdDocumentType
+  payment: Payment
+  evidenceUploaded: boolean
+}
+
+export function submitForReview(data: DemoData, input: SubmitInput): ActionResult {
+  const vc = data.cases.find((c) => c.id === input.caseId)
+  const person = vc && data.people.find((p) => p.id === vc.personId)
+  const entry = vc && data.register.find((r) => r.personId === vc.personId && r.companyNumber === vc.companyNumber)
+  if (!vc || !person || !entry) return { data, audit: [] }
+  const now = Date.now()
+  const iso = (offset = 0) => new Date(now + offset).toISOString()
+  const document = person.document ?? syntheticDocument(person, input.documentType)
+  const comparison = compareToRegister(person, entry, document.nameOnDocument, document.dobOnDocument)
+  const mismatch = comparison.some((r) => r.result === 'mismatch')
+  const score = 95 + ((person.id.length * 7) % 40) / 10
+  const ref = `IDV-7F31-${String(now).slice(-4)}`
+  const observations: AiObservation[] = mismatch
+    ? [{ id: `o-${vc.id}-m`, severity: 'mismatch', title: 'Name does not match the Companies House register', detail: 'Identity details must match the register exactly. The reviewer can pause this verification and open a register correction.', source: 'Identity document, Companies House officer record' }]
+    : [{ id: `o-${vc.id}-1`, severity: 'info', title: 'All details match the register', detail: 'Name and date of birth from the identity document agree with the application and the Companies House register.', source: 'Identity document, Companies House officer record' }]
+  if (input.evidenceUploaded) {
+    observations.push({ id: `o-${vc.id}-2`, severity: 'info', title: 'Supporting evidence confirms the current address', detail: 'The address moved within the last 12 months. The bank statement uploaded is dated within 3 months and shows the current address.', source: 'Bank statement, issue date and address' })
+  } else {
+    observations.push({ id: `o-${vc.id}-3`, severity: 'info', title: 'One identity document was sufficient', detail: 'The document was validated and the address history is consistent, so no supporting evidence was needed.', source: 'Application, identity document' })
+  }
+  const evidence: EvidenceItem[] = [
+    { id: `ev-${vc.id}-1`, kind: 'identity_document', label: documentLabel[input.documentType], uploadedAt: iso(-6 * 60000), aiCheck: 'accepted', aiNote: 'Document in date. Security features validated by the certified identity provider.' },
+    { id: `ev-${vc.id}-2`, kind: 'selfie', label: 'Liveness capture', uploadedAt: iso(-4 * 60000), aiCheck: 'accepted' },
+  ]
+  if (input.evidenceUploaded) evidence.push({ id: `ev-${vc.id}-3`, kind: 'address_evidence', label: 'Bank statement', uploadedAt: iso(-2 * 60000), documentDate: iso(-18 * 24 * 3600000), aiCheck: 'accepted', aiNote: 'Dated within the last 3 months. Name and current address match.' })
+
+  const next = patchCase(data, vc.id, (c) => ({
+    ...c,
+    status: 'in_review',
+    submittedForReviewAt: iso(),
+    slaDueAt: iso(36 * 3600000),
+    idvt: {
+      nfcChipRead: input.documentType === 'passport' ? 'pass' : 'not_applicable',
+      documentAuthenticity: 'pass',
+      liveness: 'pass',
+      faceMatch: 'pass',
+      faceMatchScore: Math.round(score * 10) / 10,
+      pepSanctions: 'pass',
+      pepSanctionsDetail: 'No match on PEP, sanctions or adverse media lists.',
+      completedAt: iso(-3 * 60000),
+      providerReference: ref,
+    },
+    comparison,
+    observations,
+    evidence,
+    payment: input.payment,
+    journey: { ...c.journey, paid: true },
+  }))
+  const people = person.document ? next.people : next.people.map((p) => (p.id === person.id ? { ...p, document } : p))
+  const actor = fullName(person)
+  return {
+    data: { ...next, people },
+    audit: [
+      { at: iso(), actor: 'Certified identity provider', actorType: 'system', action: 'idvt.result.received', caseId: vc.id, detail: `${input.documentType === 'passport' ? 'Chip read, ' : ''}authenticity, liveness, face match ${Math.round(score * 10) / 10}%, PEP and sanctions: all passed.` },
+      { at: iso(1000), actor: 'Evidence One Intelligence', actorType: 'ai', action: mismatch ? 'ai.flag.register_mismatch' : 'ai.observation.created', caseId: vc.id, detail: mismatch ? 'Register comparison found a difference. Advisory flag raised for the reviewer.' : 'Register comparison complete. No mismatch. Advisory only.' },
+      { at: iso(2000), actor, actorType: 'person', action: 'payment.completed', caseId: vc.id, detail: input.payment.method === 'agent_payment_code' ? `Paid with Agent Payment Code ${input.payment.code}.` : `Paid ${formatMoney(input.payment.amount)} by card. Reference ${input.payment.reference}.` },
+      { at: iso(3000), actor, actorType: 'person', action: 'case.submitted', caseId: vc.id, detail: 'Submitted for ACSP review. 36-hour SLA started.' },
+    ],
+  }
+}
+
+const documentLabel: Record<IdDocumentType, string> = {
+  passport: 'Passport, chip read in app',
+  driving_licence: 'UK photocard driving licence',
+  national_identity_card: 'National identity card',
+  biometric_residence_permit: 'Biometric residence permit',
+}
+
+function syntheticDocument(person: Person, type: IdDocumentType): IdDocument {
+  const expires = new Date()
+  expires.setFullYear(expires.getFullYear() + 6)
+  return {
+    type,
+    issuingCountry: 'United Kingdom',
+    numberLastTwo: String(person.id.length * 7).slice(-2).padStart(2, '0'),
+    expiresOn: expires.toISOString().slice(0, 10),
+    nameOnDocument: `${person.givenNames} ${person.familyName}`.toUpperCase(),
+    dobOnDocument: person.dateOfBirth,
+    hasChip: type === 'passport',
+  }
+}
+
+/* B2C: a member of the public who comes to Evidence One directly */
+
+/** The ACSP furthest below its share of this month's direct cases gets the next one. */
+export function nextB2cAcsp(data: DemoData) {
+  return [...data.acsps].sort((a, b) => a.b2cAllocatedThisMonth / a.b2cAllocationShare - b.b2cAllocatedThisMonth / b.b2cAllocationShare)[0]
+}
+
+export const nextCaseId = (data: DemoData) => nextRef(data.cases.map((c) => c.id), 'EO-2026-', 0)
+
+export function createB2cCase(data: DemoData, personId: string, companyNumber: string, acspId: string, caseId = nextCaseId(data)): ActionResult & { caseId: string } {
+  const now = new Date().toISOString()
+  const acsp = data.acsps.find((a) => a.id === acspId)
+  const vc: VerificationCase = {
+    id: caseId,
+    route: 'A',
+    personId,
+    companyNumber,
+    origin: 'b2c',
+    acspId,
+    option: 1,
+    status: 'in_progress',
+    createdAt: now,
+    idvt: { nfcChipRead: 'pending', documentAuthenticity: 'pending', liveness: 'pending', faceMatch: 'pending', pepSanctions: 'pending' },
+    comparison: [],
+    observations: [],
+    evidence: [],
+  }
+  return {
+    caseId,
+    data: { ...data, cases: [...data.cases, vc], acsps: data.acsps.map((a) => (a.id === acspId ? { ...a, b2cAllocatedThisMonth: a.b2cAllocatedThisMonth + 1 } : a)) },
+    audit: [
+      { at: now, actor: personName(data, personId), actorType: 'person', action: 'b2c.started', caseId, detail: 'Started a verification directly on Evidence One.' },
+      { at: now, actor: 'Evidence One', actorType: 'system', action: 'b2c.allocated', caseId, detail: `Allocated to ${acsp?.name} by the allocation rota.` },
+    ],
   }
 }

@@ -4,7 +4,6 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ToastProvider } from '@/components/app/Toaster'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { IndividualPreview } from '@/features/individual/IndividualPreview'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { NotFound } from '@/features/placeholders/NotFound'
 import { ScreenPlaceholder } from '@/features/placeholders/ScreenPlaceholder'
@@ -16,6 +15,8 @@ const AgentDashboard = lazy(() => import('@/features/agent/AgentDashboard').then
 const BulkInvite = lazy(() => import('@/features/agent/BulkInvite').then((m) => ({ default: m.BulkInvite })))
 const CompanyLookup = lazy(() => import('@/features/agent/CompanyLookup').then((m) => ({ default: m.CompanyLookup })))
 const CompanyProfile = lazy(() => import('@/features/agent/CompanyProfile').then((m) => ({ default: m.CompanyProfile })))
+const IndividualJourney = lazy(() => import('@/features/individual/IndividualJourney').then((m) => ({ default: m.IndividualJourney })))
+const VerifyStart = lazy(() => import('@/features/b2c/VerifyStart').then((m) => ({ default: m.VerifyStart })))
 const InviteLog = lazy(() => import('@/features/agent/InviteLog').then((m) => ({ default: m.InviteLog })))
 
 export default function App() {
@@ -29,7 +30,7 @@ export default function App() {
                 <Route index element={<LandingPage />} />
 
                 {/* B2C client */}
-                <Route path="verify" element={<ScreenPlaceholder spec={s.b2c} />} />
+                <Route path="verify" element={<VerifyStart />} />
 
                 {/* Agent */}
                 <Route path="agent">
@@ -41,7 +42,8 @@ export default function App() {
                 </Route>
 
                 {/* Individual, shown in the phone frame */}
-                <Route path="app/:caseId/*" element={<IndividualPreview />} />
+                <Route path="app/:caseId" element={<IndividualJourney />} />
+                <Route path="app/:caseId/:step" element={<IndividualJourney />} />
 
                 {/* ACSP reviewer */}
                 <Route path="acsp">

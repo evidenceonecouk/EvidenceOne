@@ -20,6 +20,7 @@ export const acsps: AcspFirm[] = [
       { id: 'rev-okoro', name: 'James Okoro', role: 'Senior associate, ACSP reviewer' },
     ],
     b2cAllocationShare: 50,
+    b2cAllocatedThisMonth: 9,
     remunerationPerCase: 30,
   },
   {
@@ -30,6 +31,7 @@ export const acsps: AcspFirm[] = [
     acspNumber: 'ACSP-0112-5530',
     reviewers: [{ id: 'rev-basu', name: 'Anjali Basu', role: 'Compliance manager, ACSP reviewer' }],
     b2cAllocationShare: 30,
+    b2cAllocatedThisMonth: 7,
     remunerationPerCase: 30,
   },
   {
@@ -40,6 +42,7 @@ export const acsps: AcspFirm[] = [
     acspNumber: 'ACSP-0201-7764',
     reviewers: [{ id: 'rev-dunmore', name: 'Callum Dunmore', role: 'Director, ACSP reviewer' }],
     b2cAllocationShare: 20,
+    b2cAllocatedThisMonth: 5,
     remunerationPerCase: 30,
   },
 ]

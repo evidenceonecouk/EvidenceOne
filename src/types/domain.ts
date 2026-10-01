@@ -127,6 +127,8 @@ export interface AcspFirm {
   reviewers: Reviewer[]
   /** Share of B2C allocations, as a percentage. */
   b2cAllocationShare: number
+  /** Direct (B2C) cases allocated this month, used by the allocation rota. */
+  b2cAllocatedThisMonth: number
   remunerationPerCase: number
 }
 
@@ -234,6 +236,21 @@ export interface VerificationCase {
   correctionTaskId?: string
   /** Reviewed by the Agent's own ACSP team rather than referred. */
   inHouse?: boolean
+  /** Progress through the individual's app journey before submission. */
+  journey?: JourneyState
+}
+
+export interface JourneyState {
+  detailsConfirmed?: boolean
+  amendment?: { field: string; note: string; at: ISODate }
+  addressConfirmed?: boolean
+  documentType?: IdDocumentType
+  photoPageDone?: boolean
+  chipDone?: boolean
+  selfieDone?: boolean
+  checksDone?: boolean
+  evidenceUploaded?: boolean
+  paid?: boolean
 }
 
 export interface CorrectionTask {

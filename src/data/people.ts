@@ -159,4 +159,15 @@ export const people: Person[] = [
     mobile: '07700 900230',
     addressHistory: [{ address: uk('6 Cotham Vale', 'Bristol', 'BS6 6HR'), from: '2014-03-01' }],
   },
+  {
+    id: 'p-hannah',
+    title: 'Ms',
+    givenNames: 'Hannah Louise',
+    familyName: 'Pryce',
+    dateOfBirth: '1988-10-17',
+    nationality: 'British',
+    email: 'hannah@kestrelbay.example',
+    mobile: '07700 900775',
+    addressHistory: [{ address: uk('Gull Cottage, Church Street', 'Whitby', 'YO22 4AE'), from: '2019-06-01' }],
+  },
 ]
