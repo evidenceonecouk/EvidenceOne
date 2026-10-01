@@ -2,7 +2,12 @@ import type { Address, Person } from '@/types/domain'
 
 /* Fictional people. No real personal data or identity documents. */
 
-const uk = (line1: string, town: string, postcode: string, line2?: string): Address => ({
+const uk = (
+  line1: string,
+  town: string,
+  postcode: string,
+  line2?: string,
+): Address => ({
   line1,
   line2,
   town,
@@ -20,8 +25,22 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'margaret.ashby@example.com',
     mobile: '07700 900114',
-    addressHistory: [{ address: uk('The Old Granary, Corve Street', 'Ludlow', 'SY8 1DA'), from: '2004-03-01' }],
-    document: { type: 'passport', issuingCountry: 'United Kingdom', numberLastTwo: '18', number: '539104218', expiresOn: '2031-02-11', nameOnDocument: 'MARGARET ELLEN ASHBY', dobOnDocument: '1961-05-22', hasChip: true },
+    addressHistory: [
+      {
+        address: uk('The Old Granary, Corve Street', 'Ludlow', 'SY8 1DA'),
+        from: '2004-03-01',
+      },
+    ],
+    document: {
+      type: 'passport',
+      issuingCountry: 'United Kingdom',
+      numberLastTwo: '18',
+      number: '539104218',
+      expiresOn: '2031-02-11',
+      nameOnDocument: 'MARGARET ELLEN ASHBY',
+      dobOnDocument: '1961-05-22',
+      hasChip: true,
+    },
   },
   {
     id: 'p-lucy',
@@ -32,8 +51,20 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'lucy.ashby@example.com',
     mobile: '07700 900398',
-    addressHistory: [{ address: uk('7 Dinham', 'Ludlow', 'SY8 1EH'), from: '2019-03-01' }],
-    document: { type: 'driving_licence', issuingCountry: 'United Kingdom', numberLastTwo: '4L', number: 'ASHBY951173LR94L', expiresOn: '2031-01-16', nameOnDocument: 'LUCY ROSE ASHBY', dobOnDocument: '1993-01-17', hasChip: false, addressOnDocument: '7 Dinham, Ludlow, SY8 1EH' },
+    addressHistory: [
+      { address: uk('7 Dinham', 'Ludlow', 'SY8 1EH'), from: '2019-03-01' },
+    ],
+    document: {
+      type: 'driving_licence',
+      issuingCountry: 'United Kingdom',
+      numberLastTwo: '4L',
+      number: 'ASHBY951173LR94L',
+      expiresOn: '2031-01-16',
+      nameOnDocument: 'LUCY ROSE ASHBY',
+      dobOnDocument: '1993-01-17',
+      hasChip: false,
+      addressOnDocument: '7 Dinham, Ludlow, SY8 1EH',
+    },
   },
   {
     id: 'p-thomas',
@@ -45,10 +76,27 @@ export const people: Person[] = [
     email: 'tom.ashby@example.com',
     mobile: '07700 900287',
     addressHistory: [
-      { address: uk('Flat 2, 9 Broad Street', 'Shrewsbury', 'SY1 1QG'), from: '2026-06-01' },
-      { address: uk('The Old Granary, Corve Street', 'Ludlow', 'SY8 1DA'), from: '2015-09-01', to: '2026-05-31' },
+      {
+        address: uk('Flat 2, 9 Broad Street', 'Shrewsbury', 'SY1 1QG'),
+        from: '2026-06-01',
+      },
+      {
+        address: uk('The Old Granary, Corve Street', 'Ludlow', 'SY8 1DA'),
+        from: '2015-09-01',
+        to: '2026-05-31',
+      },
     ],
-    document: { type: 'driving_licence', issuingCountry: 'United Kingdom', numberLastTwo: '9T', number: 'ASHBY908039TJ99T', expiresOn: '2030-08-02', nameOnDocument: 'THOMAS JAMES ASHBY', dobOnDocument: '1989-08-03', hasChip: false, addressOnDocument: 'The Old Granary, Corve Street, Ludlow, SY8 1DA' },
+    document: {
+      type: 'driving_licence',
+      issuingCountry: 'United Kingdom',
+      numberLastTwo: '9T',
+      number: 'ASHBY908039TJ99T',
+      expiresOn: '2030-08-02',
+      nameOnDocument: 'THOMAS JAMES ASHBY',
+      dobOnDocument: '1989-08-03',
+      hasChip: false,
+      addressOnDocument: 'The Old Granary, Corve Street, Ludlow, SY8 1DA',
+    },
   },
   {
     id: 'p-priya',
@@ -59,23 +107,54 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'priya@lumenfield.example',
     mobile: '07700 900341',
-    addressHistory: [{ address: uk('24 Weetwood Lane', 'Leeds', 'LS16 5NP'), from: '2020-07-01' }],
-    document: { type: 'passport', issuingCountry: 'United Kingdom', numberLastTwo: '63', number: '548227163', expiresOn: '2033-05-30', nameOnDocument: 'PRIYA LAKSHMI RAMAN', dobOnDocument: '1987-02-09', hasChip: true },
+    addressHistory: [
+      {
+        address: uk('24 Weetwood Lane', 'Leeds', 'LS16 5NP'),
+        from: '2020-07-01',
+      },
+    ],
+    document: {
+      type: 'passport',
+      issuingCountry: 'United Kingdom',
+      numberLastTwo: '63',
+      number: '548227163',
+      expiresOn: '2033-05-30',
+      nameOnDocument: 'PRIYA LAKSHMI RAMAN',
+      dobOnDocument: '1987-02-09',
+      hasChip: true,
+    },
   },
   {
-    id: 'p-daniel',
-    title: 'Mr',
-    givenNames: 'Daniel Chukwuemeka',
-    familyName: 'Okafor',
+    id: 'p-anna',
+    title: 'Ms',
+    givenNames: 'Anna',
+    familyName: 'Kovalenko',
     dateOfBirth: '1990-11-26',
-    nationality: 'British',
-    email: 'daniel@lumenfield.example',
+    nationality: 'Ukrainian',
+    email: 'anna@lumenfield.example',
     mobile: '07700 900452',
     addressHistory: [
-      { address: uk('Flat 11, Holbeck House', 'Leeds', 'LS11 9AT'), from: '2025-12-01' },
-      { address: uk('5 Alma Road', 'Manchester', 'M19 2FG'), from: '2021-04-01', to: '2025-11-30' },
+      {
+        address: uk('Flat 11, Holbeck House', 'Leeds', 'LS11 9AT'),
+        from: '2025-12-01',
+      },
+      {
+        address: uk('5 Alma Road', 'Manchester', 'M19 2FG'),
+        from: '2021-04-01',
+        to: '2025-11-30',
+      },
     ],
-    document: { type: 'passport', issuingCountry: 'United Kingdom', numberLastTwo: '47', number: '551930847', expiresOn: '2032-09-14', nameOnDocument: 'DANIEL CHUKWUEMEKA OKAFOR', dobOnDocument: '1990-11-26', hasChip: true },
+    document: {
+      type: 'passport',
+      issuingCountry: 'Ukraine',
+      numberLastTwo: '47',
+      number: 'GK551947',
+      expiresOn: '2032-09-14',
+      nameOnDocument: 'ANNA KOVALENKO',
+      dobOnDocument: '1990-11-26',
+      nationalityOnDocument: 'Ukrainian',
+      hasChip: true,
+    },
   },
   {
     id: 'p-sofia',
@@ -86,8 +165,23 @@ export const people: Person[] = [
     nationality: 'Swedish',
     email: 'sofia@lumenfield.example',
     mobile: '07700 900563',
-    addressHistory: [{ address: uk('3 Park Square East', 'Leeds', 'LS1 2NE'), from: '2024-01-15' }],
-    document: { type: 'passport', issuingCountry: 'Sweden', numberLastTwo: '26', number: 'AA7310526', expiresOn: '2029-03-04', nameOnDocument: 'SOFIA MARIA LINDQVIST', dobOnDocument: '1985-07-19', nationalityOnDocument: 'Swedish', hasChip: true },
+    addressHistory: [
+      {
+        address: uk('3 Park Square East', 'Leeds', 'LS1 2NE'),
+        from: '2024-01-15',
+      },
+    ],
+    document: {
+      type: 'passport',
+      issuingCountry: 'Sweden',
+      numberLastTwo: '26',
+      number: 'AA7310526',
+      expiresOn: '2029-03-04',
+      nameOnDocument: 'SOFIA MARIA LINDQVIST',
+      dobOnDocument: '1985-07-19',
+      nationalityOnDocument: 'Swedish',
+      hasChip: true,
+    },
   },
   {
     id: 'p-marcus',
@@ -98,10 +192,25 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'marcus@lumenfield.example',
     mobile: '07700 900674',
-    addressHistory: [{ address: uk('Hollins Barn, Moor Road', 'Ilkley', 'LS29 8BW'), from: '2012-05-01' }],
-    document: { type: 'passport', issuingCountry: 'United Kingdom', numberLastTwo: '05', number: '520771405', expiresOn: '2027-03-02', nameOnDocument: 'MARCUS EDWARD HALE', dobOnDocument: '1976-01-30', hasChip: true },
+    addressHistory: [
+      {
+        address: uk('Hollins Barn, Moor Road', 'Ilkley', 'LS29 8BW'),
+        from: '2012-05-01',
+      },
+    ],
+    document: {
+      type: 'passport',
+      issuingCountry: 'United Kingdom',
+      numberLastTwo: '05',
+      number: '520771405',
+      expiresOn: '2027-03-02',
+      nameOnDocument: 'MARCUS EDWARD HALE',
+      dobOnDocument: '1976-01-30',
+      hasChip: true,
+    },
     reverificationDue: true,
-    reverificationNote: 'Reverification requested by Fenwick & Shaw after a change of name was notified.',
+    reverificationNote:
+      'Reverification requested by Fenwick & Shaw after a change of name was notified.',
   },
   {
     id: 'p-aidan',
@@ -112,8 +221,26 @@ export const people: Person[] = [
     nationality: 'Irish',
     email: 'aidan@corriganmarine.example',
     mobile: '07700 900785',
-    addressHistory: [{ address: uk('Penrose Cottage, Trelowarren Street', 'Falmouth', 'TR11 3AF'), from: '2009-10-01' }],
-    document: { type: 'passport', issuingCountry: 'Ireland', numberLastTwo: '72', number: 'PX4418272', expiresOn: '2030-11-08', nameOnDocument: 'AIDAN PATRICK CORRIGAN', dobOnDocument: '1979-03-14', hasChip: true },
+    addressHistory: [
+      {
+        address: uk(
+          'Penrose Cottage, Trelowarren Street',
+          'Falmouth',
+          'TR11 3AF',
+        ),
+        from: '2009-10-01',
+      },
+    ],
+    document: {
+      type: 'passport',
+      issuingCountry: 'Ireland',
+      numberLastTwo: '72',
+      number: 'PX4418272',
+      expiresOn: '2030-11-08',
+      nameOnDocument: 'AIDAN PATRICK CORRIGAN',
+      dobOnDocument: '1979-03-14',
+      hasChip: true,
+    },
   },
   {
     id: 'p-fiona',
@@ -124,7 +251,16 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'fiona@corriganmarine.example',
     mobile: '07700 900896',
-    addressHistory: [{ address: uk('Penrose Cottage, Trelowarren Street', 'Falmouth', 'TR11 3AF'), from: '2009-10-01' }],
+    addressHistory: [
+      {
+        address: uk(
+          'Penrose Cottage, Trelowarren Street',
+          'Falmouth',
+          'TR11 3AF',
+        ),
+        from: '2009-10-01',
+      },
+    ],
   },
   {
     id: 'p-grace',
@@ -135,8 +271,22 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'grace@whitakergardens.example',
     mobile: '07700 900907',
-    addressHistory: [{ address: uk('17 Orchard Row', 'Harrogate', 'HG1 2RT'), from: '2018-04-01' }],
-    document: { type: 'passport', issuingCountry: 'United Kingdom', numberLastTwo: '31', number: '533619031', expiresOn: '2029-12-01', nameOnDocument: 'GRACE ELIZABETH WHITAKER', dobOnDocument: '1972-06-08', hasChip: true },
+    addressHistory: [
+      {
+        address: uk('17 Orchard Row', 'Harrogate', 'HG1 2RT'),
+        from: '2018-04-01',
+      },
+    ],
+    document: {
+      type: 'passport',
+      issuingCountry: 'United Kingdom',
+      numberLastTwo: '31',
+      number: '533619031',
+      expiresOn: '2029-12-01',
+      nameOnDocument: 'GRACE ELIZABETH WHITAKER',
+      dobOnDocument: '1972-06-08',
+      hasChip: true,
+    },
   },
   {
     id: 'p-nadia',
@@ -147,8 +297,22 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'nadia.kerr@example.com',
     mobile: '07700 900918',
-    addressHistory: [{ address: uk('41 Killigrew Street', 'Falmouth', 'TR11 3PN'), from: '2019-02-01' }],
-    document: { type: 'passport', issuingCountry: 'United Kingdom', numberLastTwo: '84', number: '512006484', expiresOn: '2024-08-19', nameOnDocument: 'NADIA KERR', dobOnDocument: '1984-12-11', hasChip: true },
+    addressHistory: [
+      {
+        address: uk('41 Killigrew Street', 'Falmouth', 'TR11 3PN'),
+        from: '2019-02-01',
+      },
+    ],
+    document: {
+      type: 'passport',
+      issuingCountry: 'United Kingdom',
+      numberLastTwo: '84',
+      number: '512006484',
+      expiresOn: '2024-08-19',
+      nameOnDocument: 'NADIA KERR',
+      dobOnDocument: '1984-12-11',
+      hasChip: true,
+    },
   },
   {
     id: 'p-imogen',
@@ -159,7 +323,12 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'imogen@hollowayreid.example',
     mobile: '07700 900129',
-    addressHistory: [{ address: uk('12 Royal York Crescent', 'Bristol', 'BS8 4JX'), from: '2017-08-01' }],
+    addressHistory: [
+      {
+        address: uk('12 Royal York Crescent', 'Bristol', 'BS8 4JX'),
+        from: '2017-08-01',
+      },
+    ],
   },
   {
     id: 'p-samuel',
@@ -170,7 +339,12 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'sam@hollowayreid.example',
     mobile: '07700 900230',
-    addressHistory: [{ address: uk('6 Cotham Vale', 'Bristol', 'BS6 6HR'), from: '2014-03-01' }],
+    addressHistory: [
+      {
+        address: uk('6 Cotham Vale', 'Bristol', 'BS6 6HR'),
+        from: '2014-03-01',
+      },
+    ],
   },
   {
     id: 'p-hannah',
@@ -181,6 +355,11 @@ export const people: Person[] = [
     nationality: 'British',
     email: 'hannah@kestrelbay.example',
     mobile: '07700 900775',
-    addressHistory: [{ address: uk('Gull Cottage, Church Street', 'Whitby', 'YO22 4AE'), from: '2019-06-01' }],
+    addressHistory: [
+      {
+        address: uk('Gull Cottage, Church Street', 'Whitby', 'YO22 4AE'),
+        from: '2019-06-01',
+      },
+    ],
   },
 ]

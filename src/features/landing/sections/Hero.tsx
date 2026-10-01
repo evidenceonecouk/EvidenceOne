@@ -1,44 +1,44 @@
-import { ArrowRight, BadgeCheck, Smartphone, UserCheck } from "lucide-react";
-import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
-import { EyeHero } from "@/components/visual/EyeHero";
-import { useDemoStore } from "@/store/DemoStore";
-import { container } from "../parts";
+import { ArrowRight, BadgeCheck, Smartphone, UserCheck } from 'lucide-react'
+import { Link } from 'react-router'
+import { Button } from '@/components/ui/button'
+import { EyeHero } from '@/components/visual/EyeHero'
+import { useDemoStore } from '@/store/DemoStore'
+import { container } from '../parts'
 
 /** Kicker with a trailing rule, as in the client's design. */
 export function RuleKicker({
   children,
-  className = "",
-  tone = "light",
+  className = '',
+  tone = 'light',
 }: {
-  children: React.ReactNode;
-  className?: string;
-  tone?: "light" | "dark";
+  children: React.ReactNode
+  className?: string
+  tone?: 'light' | 'dark'
 }) {
   return (
     <p
-      className={`flex items-center gap-4 text-[0.8125rem] font-medium tracking-[0.28em] uppercase ${tone === "light" ? "text-graphite" : "text-paper/70"} ${className}`}
+      className={`flex items-center gap-4 text-[0.8125rem] font-medium tracking-[0.28em] uppercase ${tone === 'light' ? 'text-graphite' : 'text-paper/70'} ${className}`}
     >
       {children}
       <span
         aria-hidden="true"
-        className={`h-px w-12 ${tone === "light" ? "bg-silver" : "bg-white/30"}`}
+        className={`h-px w-12 ${tone === 'light' ? 'bg-silver' : 'bg-white/30'}`}
       />
     </p>
-  );
+  )
 }
 
 const facts = [
-  { icon: Smartphone, label: "One document, read in the app" },
-  { icon: UserCheck, label: "Decided by a regulated ACSP" },
-  { icon: BadgeCheck, label: "£49 flat fee, nothing hidden" },
-];
+  { icon: Smartphone, label: 'One document, read in the app' },
+  { icon: UserCheck, label: 'Decided by a regulated ACSP' },
+  { icon: BadgeCheck, label: '£49 flat fee, nothing hidden' },
+]
 
 const focusEye = (on: boolean) => () =>
-  window.dispatchEvent(new CustomEvent("eye:focus", { detail: on }));
+  window.dispatchEvent(new CustomEvent('eye:focus', { detail: on }))
 
 export function Hero() {
-  const { setPersona } = useDemoStore();
+  const { setPersona } = useDemoStore()
 
   return (
     <section
@@ -90,7 +90,7 @@ export function Hero() {
               >
                 <Link
                   to="/acsp/queue"
-                  onClick={() => setPersona("reviewer")}
+                  onClick={() => setPersona('reviewer')}
                   onMouseEnter={focusEye(true)}
                   onMouseLeave={focusEye(false)}
                   onFocus={focusEye(true)}
@@ -116,7 +116,7 @@ export function Hero() {
               >
                 <Link
                   to="/verify"
-                  onClick={() => setPersona("b2c")}
+                  onClick={() => setPersona('b2c')}
                   onMouseEnter={focusEye(true)}
                   onMouseLeave={focusEye(false)}
                   onFocus={focusEye(true)}
@@ -153,5 +153,5 @@ export function Hero() {
         </div>
       </div>
     </section>
-  );
+  )
 }

@@ -25,7 +25,10 @@ function vercelApiDev(): Plugin {
             return res.end()
           }
           const response: Response = await handler(
-            new Request(url, { method: req.method, headers: req.headers as Record<string, string> }),
+            new Request(url, {
+              method: req.method,
+              headers: req.headers as Record<string, string>,
+            }),
           )
           res.statusCode = response.status
           response.headers.forEach((value, key) => res.setHeader(key, value))

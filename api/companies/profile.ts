@@ -1,30 +1,39 @@
 // Server-side proxy for a Companies House company profile with its officers, PSCs and recent filings.
 // The API key lives only in the Vercel env var COMPANIES_HOUSE_API_KEY and never reaches the browser.
 export async function GET(request: Request): Promise<Response> {
-  const number = new URL(request.url).searchParams.get("number")?.trim().toUpperCase();
+  const number = new URL(request.url).searchParams
+    .get('number')
+    ?.trim()
+    .toUpperCase()
   if (!number || !/^[A-Z0-9]{8}$/.test(number))
-    return Response.json({ error: "A valid company number is required" }, { status: 400 });
+    return Response.json(
+      { error: 'A valid company number is required' },
+      { status: 400 },
+    )
 
-  const key = process.env.COMPANIES_HOUSE_API_KEY;
+  const key = process.env.COMPANIES_HOUSE_API_KEY
   if (!key)
     return Response.json(
-      { error: "Companies House key not configured" },
+      { error: 'Companies House key not configured' },
       { status: 503 },
-    );
+    )
 
-  const base = "https://api.company-information.service.gov.uk/company/";
-  const headers = { Authorization: "Basic " + btoa(`${key}:`) };
-  const get = (path: string) => fetch(`${base}${number}${path}`, { headers });
+  const base = 'https://api.company-information.service.gov.uk/company/'
+  const headers = { Authorization: 'Basic ' + btoa(`${key}:`) }
+  const get = (path: string) => fetch(`${base}${number}${path}`, { headers })
 
   const [profile, officers, pscs, filings] = await Promise.all([
-    get(""),
-    get("/officers?items_per_page=100"),
-    get("/persons-with-significant-control?items_per_page=50"),
-    get("/filing-history?items_per_page=12"),
-  ]);
+    get(''),
+    get('/officers?items_per_page=100'),
+    get('/persons-with-significant-control?items_per_page=50'),
+    get('/filing-history?items_per_page=12'),
+  ])
 
   if (!profile.ok)
-    return Response.json({ error: "Company not found" }, { status: profile.status });
+    return Response.json(
+      { error: 'Company not found' },
+      { status: profile.status },
+    )
 
   // PSC data can legitimately be missing (for example, exempt companies).
   const body = {
@@ -32,9 +41,9 @@ export async function GET(request: Request): Promise<Response> {
     officers: officers.ok ? await officers.json() : { items: [] },
     pscs: pscs.ok ? await pscs.json() : { items: [] },
     filings: filings.ok ? await filings.json() : { items: [] },
-  };
+  }
 
   return Response.json(body, {
-    headers: { "cache-control": "s-maxage=300" },
-  });
+    headers: { 'cache-control': 's-maxage=300' },
+  })
 }

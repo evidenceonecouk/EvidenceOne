@@ -16,7 +16,8 @@ export function createSeed(now = Date.now()): DemoData {
     .filter((c) => c.connectedAt && c.lodgedByAgentId)
     .map((c) => ({
       at: c.connectedAt!,
-      actor: agents.find((a) => a.id === c.lodgedByAgentId)?.contactName ?? 'Agent',
+      actor:
+        agents.find((a) => a.id === c.lodgedByAgentId)?.contactName ?? 'Agent',
       actorType: 'person' as const,
       action: 'company.connected',
       detail: `${c.name} (${c.number}) connected to the portal from the Companies House register.`,
@@ -43,6 +44,10 @@ export function createSeed(now = Date.now()): DemoData {
     audit: buildChain([...publications, ...connections, ...audit]),
   }
   // Each decided case records the rule set version in force at its decision.
-  data.cases = data.cases.map((c) => (c.decision && c.decision.outcome !== 'request_info' ? { ...c, ruleSetVersion: versionAt(data, c.decision.decidedAt).version } : c))
+  data.cases = data.cases.map((c) =>
+    c.decision && c.decision.outcome !== 'request_info'
+      ? { ...c, ruleSetVersion: versionAt(data, c.decision.decidedAt).version }
+      : c,
+  )
   return structuredClone(data)
 }

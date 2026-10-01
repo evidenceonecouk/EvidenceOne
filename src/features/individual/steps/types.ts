@@ -1,4 +1,9 @@
-import type { Company, Person, RegisterEntry, VerificationCase } from '@/types/domain'
+import type {
+  Company,
+  Person,
+  RegisterEntry,
+  VerificationCase,
+} from '@/types/domain'
 import type { StepId } from '../journey'
 
 export interface StepProps {

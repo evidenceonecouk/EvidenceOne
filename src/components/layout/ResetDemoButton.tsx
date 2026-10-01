@@ -27,13 +27,18 @@ export function ResetDemoButton() {
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-xl">Reset the demo?</AlertDialogTitle>
+          <AlertDialogTitle className="text-xl">
+            Reset the demo?
+          </AlertDialogTitle>
           <AlertDialogDescription className="text-base text-slate">
-            Every company, case, invite and audit entry goes back to its starting point. Timers restart from now.
+            Every company, case, invite and audit entry goes back to its
+            starting point. Timers restart from now.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="h-11 text-base">Keep my progress</AlertDialogCancel>
+          <AlertDialogCancel className="h-11 text-base">
+            Keep my progress
+          </AlertDialogCancel>
           <AlertDialogAction
             className="h-11 text-base"
             onClick={() => {

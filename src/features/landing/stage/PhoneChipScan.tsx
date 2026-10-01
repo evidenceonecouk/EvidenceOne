@@ -25,7 +25,9 @@ export function PhoneChipScan() {
             <i className="h-1 w-5 rounded-full bg-line" />
           </span>
         </div>
-        <p className="mt-4 text-[20px] leading-[1.2] font-normal tracking-[-0.02em]">Hold your passport to the back of your phone</p>
+        <p className="mt-4 text-[20px] leading-[1.2] font-normal tracking-[-0.02em]">
+          Hold your passport to the back of your phone
+        </p>
 
         {/* Chip reader visual */}
         <div className="relative mx-auto mt-6 flex size-[150px] items-center justify-center">
@@ -40,7 +42,9 @@ export function PhoneChipScan() {
               <i className="rounded-[1px] bg-highlight/80" />
               <i className="rounded-[1px] bg-highlight/80" />
             </span>
-            <span className="text-center font-mono text-[7px] tracking-[0.2em] text-paper/60">PASSPORT</span>
+            <span className="text-center font-mono text-[7px] tracking-[0.2em] text-paper/60">
+              PASSPORT
+            </span>
           </span>
         </div>
 
@@ -70,7 +74,8 @@ export function PhoneChipScan() {
         </ul>
 
         <p className="mt-auto text-[10.5px] leading-snug text-slate">
-          Conducted by Harcourt Lane Solicitors LLP using the Evidence One platform.
+          Conducted by Harcourt Lane Solicitors LLP using the Evidence One
+          platform.
         </p>
       </div>
     </div>

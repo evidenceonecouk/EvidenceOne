@@ -7,7 +7,9 @@ export function useFitScale<T extends HTMLElement>(baseWidth: number) {
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => setScale(Math.min(1, entry.contentRect.width / baseWidth)))
+    const ro = new ResizeObserver(([entry]) =>
+      setScale(Math.min(1, entry.contentRect.width / baseWidth)),
+    )
     ro.observe(el)
     return () => ro.disconnect()
   }, [baseWidth])

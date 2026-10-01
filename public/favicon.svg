@@ -1,1 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#16181b"/><text x="31" y="42" text-anchor="middle" font-family="Geist, Inter, Arial, sans-serif" font-size="30" font-weight="600" letter-spacing="-2" fill="#fafaf9">e<tspan fill="#9aa0a6">o</tspan></text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Evidence One</title>
+  <style>
+    .lid { transform-box: view-box; transform-origin: 32px 32px; animation: blink 7s ease-in-out infinite; }
+    .scan { opacity: 0; animation: scan 7s ease-in-out infinite; }
+    @keyframes blink {
+      0%, 90%, 96%, 100% { transform: scaleY(1); }
+      93% { transform: scaleY(0.08); }
+    }
+    @keyframes scan {
+      0%, 40% { opacity: 0; transform: translateY(0); }
+      44% { opacity: 0.9; }
+      66% { opacity: 0.9; }
+      70%, 100% { opacity: 0; transform: translateY(30px); }
+    }
+    @media (prefers-reduced-motion: reduce) { .lid, .scan { animation: none; } }
+  </style>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2e33"/>
+      <stop offset="1" stop-color="#16181b"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.38" stop-color="#16181b"/>
+      <stop offset="1" stop-color="#525960"/>
+    </radialGradient>
+    <clipPath id="almond"><path d="M8 32C17.5 16 46.5 16 56 32C46.5 48 17.5 48 8 32Z"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#tile)"/>
+  <g fill="none" stroke="#a8aeb4" stroke-width="2.2" stroke-linecap="round">
+    <path d="M8.5 17.5V13a4.5 4.5 0 0 1 4.5-4.5h4.5"/>
+    <path d="M46.5 8.5H51a4.5 4.5 0 0 1 4.5 4.5v4.5"/>
+    <path d="M55.5 46.5V51a4.5 4.5 0 0 1-4.5 4.5h-4.5"/>
+    <path d="M17.5 55.5H13a4.5 4.5 0 0 1-4.5-4.5v-4.5"/>
+  </g>
+  <g class="lid">
+    <path d="M8 32C17.5 16 46.5 16 56 32C46.5 48 17.5 48 8 32Z" fill="#fafaf9"/>
+    <g clip-path="url(#almond)">
+      <circle cx="32" cy="32" r="10.5" fill="url(#iris)"/>
+      <circle cx="32" cy="32" r="10.5" fill="none" stroke="#0b0c0e" stroke-width="0.8" opacity="0.6"/>
+      <circle cx="32" cy="32" r="4.2" fill="#0b0c0e"/>
+      <circle cx="35.4" cy="28.6" r="2" fill="#fafaf9"/>
+    </g>
+  </g>
+  <rect class="scan" x="12" y="17" width="40" height="1.4" rx="0.7" fill="#a8aeb4"/>
+</svg>

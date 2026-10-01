@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  type ReactNode,
+} from 'react'
 import { createSeed } from '@/data/seed'
 import { PRIMARY_AGENT_ID } from '@/data/organisations'
 import { appendAudit, type AuditInput } from '@/lib/audit'
@@ -11,7 +19,7 @@ import type { ActionResult } from './actions'
 */
 
 const STORAGE_KEY = 'evidenceone.demo'
-const SCHEMA = 4
+const SCHEMA = 5
 /** A saved demo older than this is reseeded so SLA timers look live again. */
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000
 
@@ -29,12 +37,22 @@ type Action =
   | { type: 'hydrate'; state: DemoState }
   | { type: 'setPersona'; persona: PersonaId }
   | { type: 'setAgent'; agentId: string }
-  | { type: 'update'; recipe: (data: DemoData) => DemoData; audit?: AuditInput[] }
+  | {
+      type: 'update'
+      recipe: (data: DemoData) => DemoData
+      audit?: AuditInput[]
+    }
   | { type: 'apply'; action: (data: DemoData) => ActionResult }
 
 function freshState(persona: PersonaId = 'agent'): DemoState {
   const now = Date.now()
-  return { schema: SCHEMA, seededAt: now, persona, agentId: PRIMARY_AGENT_ID, data: createSeed(now) }
+  return {
+    schema: SCHEMA,
+    seededAt: now,
+    persona,
+    agentId: PRIMARY_AGENT_ID,
+    data: createSeed(now),
+  }
 }
 
 function loadState(): DemoState {
@@ -42,7 +60,8 @@ function loadState(): DemoState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return freshState()
     const saved = JSON.parse(raw) as DemoState
-    if (saved.schema !== SCHEMA || Date.now() - saved.seededAt > STALE_AFTER_MS) return freshState()
+    if (saved.schema !== SCHEMA || Date.now() - saved.seededAt > STALE_AFTER_MS)
+      return freshState()
     return saved
   } catch {
     return freshState()
@@ -62,13 +81,22 @@ function reducer(state: DemoState, action: Action): DemoState {
     case 'update': {
       let data = action.recipe(state.data)
       if (action.audit?.length) {
-        data = { ...data, audit: action.audit.reduce((chain, e) => appendAudit(chain, e), data.audit) }
+        data = {
+          ...data,
+          audit: action.audit.reduce(
+            (chain, e) => appendAudit(chain, e),
+            data.audit,
+          ),
+        }
       }
       return { ...state, data }
     }
     case 'apply': {
       const result = action.action(state.data)
-      const audit = result.audit.reduce((chain, e) => appendAudit(chain, e), result.data.audit)
+      const audit = result.audit.reduce(
+        (chain, e) => appendAudit(chain, e),
+        result.data.audit,
+      )
       return { ...state, data: { ...result.data, audit } }
     }
   }
@@ -114,25 +142,49 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const setPersona = useCallback((persona: PersonaId) => dispatch({ type: 'setPersona', persona }), [])
-  const setAgent = useCallback((agentId: string) => dispatch({ type: 'setAgent', agentId }), [])
+  const setPersona = useCallback(
+    (persona: PersonaId) => dispatch({ type: 'setPersona', persona }),
+    [],
+  )
+  const setAgent = useCallback(
+    (agentId: string) => dispatch({ type: 'setAgent', agentId }),
+    [],
+  )
   const update = useCallback(
-    (recipe: (data: DemoData) => DemoData, audit?: AuditInput[]) => dispatch({ type: 'update', recipe, audit }),
+    (recipe: (data: DemoData) => DemoData, audit?: AuditInput[]) =>
+      dispatch({ type: 'update', recipe, audit }),
     [],
   )
   const reset = useCallback(() => dispatch({ type: 'reset' }), [])
-  const apply = useCallback((action: (data: DemoData) => ActionResult) => dispatch({ type: 'apply', action }), [])
+  const apply = useCallback(
+    (action: (data: DemoData) => ActionResult) =>
+      dispatch({ type: 'apply', action }),
+    [],
+  )
 
   const value = useMemo(
-    () => ({ state, data: state.data, setPersona, setAgent, update, apply, reset }),
+    () => ({
+      state,
+      data: state.data,
+      setPersona,
+      setAgent,
+      update,
+      apply,
+      reset,
+    }),
     [state, setPersona, setAgent, update, apply, reset],
   )
 
-  return <DemoStoreContext.Provider value={value}>{children}</DemoStoreContext.Provider>
+  return (
+    <DemoStoreContext.Provider value={value}>
+      {children}
+    </DemoStoreContext.Provider>
+  )
 }
 
 export function useDemoStore(): DemoStoreValue {
   const ctx = useContext(DemoStoreContext)
-  if (!ctx) throw new Error('useDemoStore must be used inside DemoStoreProvider')
+  if (!ctx)
+    throw new Error('useDemoStore must be used inside DemoStoreProvider')
   return ctx
 }

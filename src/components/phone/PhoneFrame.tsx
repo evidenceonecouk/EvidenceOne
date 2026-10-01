@@ -31,7 +31,10 @@ export function PhoneFrame({
       >
         <StatusBar />
         <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
-        <div aria-hidden="true" className="hidden h-7 shrink-0 items-center justify-center sm:flex">
+        <div
+          aria-hidden="true"
+          className="hidden h-7 shrink-0 items-center justify-center sm:flex"
+        >
           <span className="h-[5px] w-32 rounded-full bg-ink/85" />
         </div>
       </div>
@@ -41,7 +44,10 @@ export function PhoneFrame({
 
 function StatusBar() {
   return (
-    <div aria-hidden="true" className="relative hidden h-11 shrink-0 items-center justify-between px-7 text-[0.9375rem] font-semibold text-ink sm:flex">
+    <div
+      aria-hidden="true"
+      className="relative hidden h-11 shrink-0 items-center justify-between px-7 text-[0.9375rem] font-semibold text-ink sm:flex"
+    >
       <span className="tabular">9:41</span>
       <span className="absolute top-2.5 left-1/2 h-[1.6rem] w-[6.5rem] -translate-x-1/2 rounded-full bg-ink" />
       <span className="flex items-center gap-1.5">
@@ -54,11 +60,30 @@ function StatusBar() {
 }
 
 /** Standard screen inside the phone frame: scrolling content with an optional fixed action footer. */
-export function PhoneScreen({ children, footer, className }: { children: ReactNode; footer?: ReactNode; className?: string }) {
+export function PhoneScreen({
+  children,
+  footer,
+  className,
+}: {
+  children: ReactNode
+  footer?: ReactNode
+  className?: string
+}) {
   return (
     <>
-      <div className={cn('flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-3 pb-6', className)}>{children}</div>
-      {footer && <div className="shrink-0 border-t border-line/70 bg-paper px-5 pt-4 pb-5">{footer}</div>}
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-3 pb-6',
+          className,
+        )}
+      >
+        {children}
+      </div>
+      {footer && (
+        <div className="shrink-0 border-t border-line/70 bg-paper px-5 pt-4 pb-5">
+          {footer}
+        </div>
+      )}
     </>
   )
 }

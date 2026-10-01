@@ -2,7 +2,13 @@ import { cn } from '@/lib/utils'
 import { Wordmark } from './Wordmark'
 
 /** Compact monogram from the wordmark, for small square spaces (app bars, emails, documents). */
-export function LogoMark({ className, inverted = false }: { className?: string; inverted?: boolean }) {
+export function LogoMark({
+  className,
+  inverted = false,
+}: {
+  className?: string
+  inverted?: boolean
+}) {
   return (
     <span
       aria-hidden="true"
@@ -18,12 +24,33 @@ export function LogoMark({ className, inverted = false }: { className?: string; 
 }
 
 /** The full logo: the client's wordmark, with an optional product name for the app. */
-export function Logo({ className, inverted = false, suffix }: { className?: string; inverted?: boolean; suffix?: string }) {
+export function Logo({
+  className,
+  inverted = false,
+  suffix,
+}: {
+  className?: string
+  inverted?: boolean
+  suffix?: string
+}) {
   return (
     <span className={cn('inline-flex items-center gap-3', className)}>
-      <Wordmark inverted={inverted} tagline={false} className="[&>span:first-child]:text-[1.5rem]" />
+      <Wordmark
+        inverted={inverted}
+        tagline={false}
+        className="[&>span:first-child]:text-[1.5rem]"
+      />
       {suffix && (
-        <span className={cn('rounded-full px-2.5 py-0.5 text-[0.8125rem] font-medium', inverted ? 'bg-white/10 text-paper/80' : 'bg-ink/[0.06] text-graphite')}>{suffix}</span>
+        <span
+          className={cn(
+            'rounded-full px-2.5 py-0.5 text-[0.8125rem] font-medium',
+            inverted
+              ? 'bg-white/10 text-paper/80'
+              : 'bg-ink/[0.06] text-graphite',
+          )}
+        >
+          {suffix}
+        </span>
       )}
     </span>
   )

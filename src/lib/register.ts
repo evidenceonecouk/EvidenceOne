@@ -1,6 +1,19 @@
 import type { Person, RegisterEntry } from '@/types/domain'
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 
 /** "REID, Imogen Clare" becomes "IMOGEN CLARE REID", the order names appear on a document. */
 export function registerNameToDocumentOrder(registerName: string): string {
@@ -23,7 +36,8 @@ export function normaliseName(name: string): string {
     .trim()
 }
 
-export const NORMALISATION_NOTE = 'Compared after normalisation only: case, spacing, and hyphen and apostrophe forms. Any other difference halts the case and raises a register correction in Route B.'
+export const NORMALISATION_NOTE =
+  'Compared after normalisation only: case, spacing, and hyphen and apostrophe forms. Any other difference halts the case and raises a register correction in Route B.'
 
 export function monthYear(iso: string): string {
   const d = new Date(iso)
@@ -31,7 +45,11 @@ export function monthYear(iso: string): string {
 }
 
 /** True when the person moved within the address history period, so the identity document alone cannot confirm it. */
-export function movedWithin(person: Person, months: number, now = Date.now()): boolean {
+export function movedWithin(
+  person: Person,
+  months: number,
+  now = Date.now(),
+): boolean {
   const since = new Date(now)
   since.setMonth(since.getMonth() - months)
   const current = person.addressHistory.find((a) => !a.to)
@@ -39,10 +57,16 @@ export function movedWithin(person: Person, months: number, now = Date.now()): b
 }
 
 /** True when the dated address periods cover the whole history period with no gap. */
-export function historyCovers(person: Person, months: number, now = Date.now()): boolean {
+export function historyCovers(
+  person: Person,
+  months: number,
+  now = Date.now(),
+): boolean {
   const since = new Date(now)
   since.setMonth(since.getMonth() - months)
-  const periods = [...person.addressHistory].sort((a, b) => b.from.localeCompare(a.from))
+  const periods = [...person.addressHistory].sort((a, b) =>
+    b.from.localeCompare(a.from),
+  )
   let edge = now
   for (const p of periods) {
     const to = p.to ? new Date(p.to).getTime() + 2 * 86400000 : now
@@ -53,4 +77,5 @@ export function historyCovers(person: Person, months: number, now = Date.now()):
   return false
 }
 
-export const registerOrder = (entry: RegisterEntry) => registerNameToDocumentOrder(entry.registerName)
+export const registerOrder = (entry: RegisterEntry) =>
+  registerNameToDocumentOrder(entry.registerName)

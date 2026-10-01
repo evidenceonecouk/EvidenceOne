@@ -77,7 +77,8 @@ const SIC: Record<string, string> = {
   '43999': 'Other specialised construction activities',
   '45111': 'Sale of new cars and light motor vehicles',
   '46900': 'Non-specialised wholesale trade',
-  '47110': 'Retail sale in non-specialised stores with food, beverages or tobacco predominating',
+  '47110':
+    'Retail sale in non-specialised stores with food, beverages or tobacco predominating',
   '47190': 'Other retail sale in non-specialised stores',
   '47910': 'Retail sale via mail order houses or via Internet',
   '49410': 'Freight transport by road',
@@ -87,7 +88,8 @@ const SIC: Record<string, string> = {
   '56210': 'Event catering activities',
   '56302': 'Public houses and bars',
   '58290': 'Other software publishing',
-  '62011': 'Ready-made interactive leisure and entertainment software development',
+  '62011':
+    'Ready-made interactive leisure and entertainment software development',
   '62012': 'Business and domestic software development',
   '62020': 'Information technology consultancy activities',
   '62090': 'Other information technology service activities',
@@ -96,7 +98,8 @@ const SIC: Record<string, string> = {
   '64205': 'Activities of financial services holding companies',
   '64209': 'Activities of other holding companies not elsewhere classified',
   '64999': 'Financial intermediation not elsewhere classified',
-  '66190': 'Activities auxiliary to financial intermediation not elsewhere classified',
+  '66190':
+    'Activities auxiliary to financial intermediation not elsewhere classified',
   '68100': 'Buying and selling of own real estate',
   '68209': 'Other letting and operating of own or leased real estate',
   '68320': 'Management of real estate on a fee or contract basis',
@@ -120,13 +123,28 @@ const SIC: Record<string, string> = {
   '99999': 'Dormant company',
 }
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 
 export function demoSearch(data: DemoData, q: string): CompanySummary[] {
   const term = q.trim().toLowerCase()
   if (!term) return []
   return data.companies
-    .filter((c) => c.name.toLowerCase().includes(term) || c.number.includes(term))
+    .filter(
+      (c) => c.name.toLowerCase().includes(term) || c.number.includes(term),
+    )
     .map((c) => ({
       number: c.number,
       name: c.name,
@@ -137,10 +155,17 @@ export function demoSearch(data: DemoData, q: string): CompanySummary[] {
     }))
 }
 
-export async function liveSearch(q: string, signal?: AbortSignal): Promise<CompanySummary[] | null> {
+export async function liveSearch(
+  q: string,
+  signal?: AbortSignal,
+): Promise<CompanySummary[] | null> {
   try {
-    const res = await fetch(`/api/companies/search?q=${encodeURIComponent(q)}`, { signal })
-    if (!res.ok || !res.headers.get('content-type')?.includes('json')) return null
+    const res = await fetch(
+      `/api/companies/search?q=${encodeURIComponent(q)}`,
+      { signal },
+    )
+    if (!res.ok || !res.headers.get('content-type')?.includes('json'))
+      return null
     const body = (await res.json()) as { items?: Array<Record<string, string>> }
     return (body.items ?? []).map((i) => ({
       number: i.company_number,
@@ -161,22 +186,37 @@ const roleLabels: Record<RegisterRole, string> = {
   director_psc: 'Director and PSC',
 }
 
-export function demoProfile(data: DemoData, number: string): CompanyProfile | null {
+export function demoProfile(
+  data: DemoData,
+  number: string,
+): CompanyProfile | null {
   const c = data.companies.find((x) => x.number === number)
   if (!c) return null
   const d = registerDetails[number]
   const now = Date.now()
-  const deadline = <T extends { nextDue?: string }>(x: T | undefined) => x && { ...x, overdue: !!x.nextDue && new Date(x.nextDue).getTime() < now }
+  const deadline = <T extends { nextDue?: string }>(x: T | undefined) =>
+    x && { ...x, overdue: !!x.nextDue && new Date(x.nextDue).getTime() < now }
   return {
     number: c.number,
     name: c.name,
     status: c.status,
     incorporatedOn: c.incorporatedOn,
     address: formatAddress(c.registeredOffice),
-    type: c.type === 'plc' ? 'Public limited company' : c.type === 'llp' ? 'Limited liability partnership' : 'Private limited company',
+    type:
+      c.type === 'plc'
+        ? 'Public limited company'
+        : c.type === 'llp'
+          ? 'Limited liability partnership'
+          : 'Private limited company',
     jurisdiction: 'England and Wales',
-    sic: c.sicCodes.map((code, i) => ({ code, description: i === 0 ? c.sicDescription : SIC[code] })),
-    accounts: d && { ...deadline(d.accounts)!, reference: `${d.accountingReference.day} ${MONTHS[d.accountingReference.month - 1]}` },
+    sic: c.sicCodes.map((code, i) => ({
+      code,
+      description: i === 0 ? c.sicDescription : SIC[code],
+    })),
+    accounts: d && {
+      ...deadline(d.accounts)!,
+      reference: `${d.accountingReference.day} ${MONTHS[d.accountingReference.month - 1]}`,
+    },
     confirmationStatement: deadline(d?.confirmationStatement),
     previousNames: d?.previousNames ?? [],
     hasCharges: d?.hasCharges ?? false,
@@ -200,13 +240,19 @@ export function demoProfile(data: DemoData, number: string): CompanyProfile | nu
         identityVerified: !!r.identityVerified,
         personId: r.personId,
       })),
-    resigned: (d?.resigned ?? []).map((r) => ({ ...r, role: 'director' as const })),
+    resigned: (d?.resigned ?? []).map((r) => ({
+      ...r,
+      role: 'director' as const,
+    })),
   }
 }
 
 type Json = Record<string, unknown>
 
-const humanise = (v: unknown) => String(v ?? '').replace(/-/g, ' ').replace(/^\w/, (m) => m.toUpperCase())
+const humanise = (v: unknown) =>
+  String(v ?? '')
+    .replace(/-/g, ' ')
+    .replace(/^\w/, (m) => m.toUpperCase())
 
 const FILING_CATEGORIES: Record<string, string> = {
   'confirmation-statement': 'Confirmation statement',
@@ -256,10 +302,15 @@ function describeFiling(f: Json): string {
   }
 }
 
-export async function liveProfile(number: string): Promise<CompanyProfile | null> {
+export async function liveProfile(
+  number: string,
+): Promise<CompanyProfile | null> {
   try {
-    const res = await fetch(`/api/companies/profile?number=${encodeURIComponent(number)}`)
-    if (!res.ok || !res.headers.get('content-type')?.includes('json')) return null
+    const res = await fetch(
+      `/api/companies/profile?number=${encodeURIComponent(number)}`,
+    )
+    if (!res.ok || !res.headers.get('content-type')?.includes('json'))
+      return null
     const { profile, officers, pscs, filings } = (await res.json()) as {
       profile: Json
       officers: { items?: Json[] }
@@ -268,14 +319,21 @@ export async function liveProfile(number: string): Promise<CompanyProfile | null
     }
     const dob = (d: unknown) => {
       const v = d as { month?: number; year?: number } | undefined
-      return v?.month && v?.year ? `${MONTHS[v.month - 1]} ${v.year}` : undefined
+      return v?.month && v?.year
+        ? `${MONTHS[v.month - 1]} ${v.year}`
+        : undefined
     }
     const officer = (o: Json): RegisterPerson => {
       const role = String(o.officer_role ?? '')
-      const idv = o.identity_verification_details as Record<string, string> | undefined
+      const idv = o.identity_verification_details as
+        Record<string, string> | undefined
       return {
         name: String(o.name),
-        role: role.includes('director') ? 'director' : role === 'secretary' ? 'secretary' : 'other',
+        role: role.includes('director')
+          ? 'director'
+          : role === 'secretary'
+            ? 'secretary'
+            : 'other',
         roleLabel: role ? humanise(role) : 'Officer',
         appointedOn: o.appointed_on as string | undefined,
         resignedOn: o.resigned_on as string | undefined,
@@ -295,37 +353,91 @@ export async function liveProfile(number: string): Promise<CompanyProfile | null
         .map((p) => ({
           name: String(p.name),
           role: 'psc' as const,
-          roleLabel: String(p.kind ?? '').includes('corporate') ? 'Corporate PSC' : 'Person with significant control',
+          roleLabel: String(p.kind ?? '').includes('corporate')
+            ? 'Corporate PSC'
+            : 'Person with significant control',
           appointedOn: p.notified_on as string | undefined,
           nationality: p.nationality as string | undefined,
           dobMonthYear: dob(p.date_of_birth),
           countryOfResidence: p.country_of_residence as string | undefined,
-          natureOfControl: ((p.natures_of_control as string[] | undefined) ?? []).map(controlLabel).join('; '),
+          natureOfControl: (
+            (p.natures_of_control as string[] | undefined) ?? []
+          )
+            .map(controlLabel)
+            .join('; '),
         })),
     ]
-    const addr = profile.registered_office_address as Record<string, string> | undefined
-    const acc = profile.accounts as { next_due?: string; next_made_up_to?: string; overdue?: boolean; last_accounts?: { made_up_to?: string; type?: string }; accounting_reference_date?: { day?: string; month?: string } } | undefined
-    const cs = profile.confirmation_statement as { next_due?: string; next_made_up_to?: string; last_made_up_to?: string; overdue?: boolean } | undefined
+    const addr = profile.registered_office_address as
+      Record<string, string> | undefined
+    const acc = profile.accounts as
+      | {
+          next_due?: string
+          next_made_up_to?: string
+          overdue?: boolean
+          last_accounts?: { made_up_to?: string; type?: string }
+          accounting_reference_date?: { day?: string; month?: string }
+        }
+      | undefined
+    const cs = profile.confirmation_statement as
+      | {
+          next_due?: string
+          next_made_up_to?: string
+          last_made_up_to?: string
+          overdue?: boolean
+        }
+      | undefined
     const ard = acc?.accounting_reference_date
     return {
       number: String(profile.company_number),
       name: String(profile.company_name),
       status: humanise(profile.company_status ?? 'unknown').toLowerCase(),
       incorporatedOn: profile.date_of_creation as string | undefined,
-      address: addr ? [addr.premises, addr.address_line_1, addr.address_line_2, addr.locality, addr.region, addr.postal_code, addr.country].filter(Boolean).join(', ') : undefined,
+      address: addr
+        ? [
+            addr.premises,
+            addr.address_line_1,
+            addr.address_line_2,
+            addr.locality,
+            addr.region,
+            addr.postal_code,
+            addr.country,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : undefined,
       type: COMPANY_TYPES[String(profile.type)] ?? humanise(profile.type),
-      jurisdiction: humanise(profile.jurisdiction).replace(/\bwales\b/i, 'Wales'),
-      sic: ((profile.sic_codes as string[] | undefined) ?? []).map((code) => ({ code, description: SIC[code] })),
+      jurisdiction: humanise(profile.jurisdiction).replace(
+        /\bwales\b/i,
+        'Wales',
+      ),
+      sic: ((profile.sic_codes as string[] | undefined) ?? []).map((code) => ({
+        code,
+        description: SIC[code],
+      })),
       accounts: acc && {
         lastMadeUpTo: acc.last_accounts?.made_up_to,
         lastType: acc.last_accounts?.type && humanise(acc.last_accounts.type),
         nextMadeUpTo: acc.next_made_up_to,
         nextDue: acc.next_due,
         overdue: acc.overdue,
-        reference: ard?.day && ard.month ? `${Number(ard.day)} ${MONTHS[Number(ard.month) - 1]}` : undefined,
+        reference:
+          ard?.day && ard.month
+            ? `${Number(ard.day)} ${MONTHS[Number(ard.month) - 1]}`
+            : undefined,
       },
-      confirmationStatement: cs && { lastMadeUpTo: cs.last_made_up_to, nextMadeUpTo: cs.next_made_up_to, nextDue: cs.next_due, overdue: cs.overdue },
-      previousNames: ((profile.previous_company_names as Json[] | undefined) ?? []).map((n) => ({ name: String(n.name), from: String(n.effective_from), to: String(n.ceased_on) })),
+      confirmationStatement: cs && {
+        lastMadeUpTo: cs.last_made_up_to,
+        nextMadeUpTo: cs.next_made_up_to,
+        nextDue: cs.next_due,
+        overdue: cs.overdue,
+      },
+      previousNames: (
+        (profile.previous_company_names as Json[] | undefined) ?? []
+      ).map((n) => ({
+        name: String(n.name),
+        from: String(n.effective_from),
+        to: String(n.ceased_on),
+      })),
       hasCharges: !!profile.has_charges,
       hasInsolvencyHistory: !!profile.has_insolvency_history,
       officeInDispute: !!profile.registered_office_is_in_dispute,
@@ -351,7 +463,8 @@ const COMPANY_TYPES: Record<string, string> = {
   llp: 'Limited liability partnership',
   'private-unlimited': 'Private unlimited company',
   'private-limited-guarant-nsc': 'Private company limited by guarantee',
-  'private-limited-guarant-nsc-limited-exemption': 'Private company limited by guarantee',
+  'private-limited-guarant-nsc-limited-exemption':
+    'Private company limited by guarantee',
   'limited-partnership': 'Limited partnership',
   'scottish-partnership': 'Scottish partnership',
   'registered-society-non-jurisdictional': 'Registered society',
@@ -367,9 +480,13 @@ function controlLabel(key: string): string {
     '50-to-75': 'more than 50% but less than 75%',
     '75-to-100': '75% or more',
   }
-  if (key.startsWith('ownership-of-shares') && band) return `Ownership of shares: ${bands[band]}`
-  if (key.startsWith('voting-rights') && band) return `Voting rights: ${bands[band]}`
-  if (key.startsWith('right-to-appoint-and-remove-directors')) return 'Right to appoint and remove directors'
-  if (key.startsWith('significant-influence-or-control')) return 'Significant influence or control'
+  if (key.startsWith('ownership-of-shares') && band)
+    return `Ownership of shares: ${bands[band]}`
+  if (key.startsWith('voting-rights') && band)
+    return `Voting rights: ${bands[band]}`
+  if (key.startsWith('right-to-appoint-and-remove-directors'))
+    return 'Right to appoint and remove directors'
+  if (key.startsWith('significant-influence-or-control'))
+    return 'Significant influence or control'
   return humanise(key)
 }

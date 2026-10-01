@@ -1,7 +1,13 @@
 import { Fingerprint, KeyRound, Loader2, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { newStepUpRef } from '@/store/actions'
 
 /**
@@ -9,7 +15,17 @@ import { newStepUpRef } from '@/store/actions'
   submission. Passkey or authenticator app only; there is no SMS option.
   Both are simulated in the demo.
 */
-export function StepUpDialog({ open, action, onClose, onConfirmed }: { open: boolean; action: string; onClose: () => void; onConfirmed: (ref: string, method: 'passkey' | 'authenticator') => void }) {
+export function StepUpDialog({
+  open,
+  action,
+  onClose,
+  onConfirmed,
+}: {
+  open: boolean
+  action: string
+  onClose: () => void
+  onConfirmed: (ref: string, method: 'passkey' | 'authenticator') => void
+}) {
   const [phase, setPhase] = useState<'idle' | 'passkey'>('idle')
   const [code, setCode] = useState('')
 
@@ -42,12 +58,26 @@ export function StepUpDialog({ open, action, onClose, onConfirmed }: { open: boo
             <ShieldCheck className="size-5" aria-hidden="true" />
             Confirm it’s you
           </DialogTitle>
-          <DialogDescription className="text-base text-slate">To {action}, confirm with your passkey or your authenticator app. The step-up reference is written to the audit trail.</DialogDescription>
+          <DialogDescription className="text-base text-slate">
+            To {action}, confirm with your passkey or your authenticator app.
+            The step-up reference is written to the audit trail.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 px-6 py-5">
-          <Button size="lg" className="w-full disabled:opacity-100" onClick={passkey} disabled={phase === 'passkey'}>
-            {phase === 'passkey' ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Fingerprint aria-hidden="true" />}
-            {phase === 'passkey' ? 'Waiting for your passkey' : 'Use my passkey'}
+          <Button
+            size="lg"
+            className="w-full disabled:opacity-100"
+            onClick={passkey}
+            disabled={phase === 'passkey'}
+          >
+            {phase === 'passkey' ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Fingerprint aria-hidden="true" />
+            )}
+            {phase === 'passkey'
+              ? 'Waiting for your passkey'
+              : 'Use my passkey'}
           </Button>
           <div className="flex items-center gap-3 text-sm text-slate">
             <span className="h-px flex-1 bg-line" />
@@ -55,7 +85,10 @@ export function StepUpDialog({ open, action, onClose, onConfirmed }: { open: boo
             <span className="h-px flex-1 bg-line" />
           </div>
           <div>
-            <label htmlFor="stepup-code" className="flex items-center gap-2 text-[0.9375rem] font-medium text-ink">
+            <label
+              htmlFor="stepup-code"
+              className="flex items-center gap-2 text-[0.9375rem] font-medium text-ink"
+            >
               <KeyRound className="size-4" aria-hidden="true" />
               Code from your authenticator app
             </label>
@@ -70,11 +103,18 @@ export function StepUpDialog({ open, action, onClose, onConfirmed }: { open: boo
                 placeholder="000000"
                 className="h-12 w-40 rounded-xl border border-line bg-white px-3.5 text-center font-mono text-lg tracking-[0.3em] text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
               />
-              <Button variant="outline" size="lg" disabled={code.length !== 6 || phase === 'passkey'} onClick={() => finish('authenticator')}>
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={code.length !== 6 || phase === 'passkey'}
+                onClick={() => finish('authenticator')}
+              >
                 Confirm
               </Button>
             </div>
-            <p className="mt-1.5 text-sm text-slate">Any six digits work in this demonstration.</p>
+            <p className="mt-1.5 text-sm text-slate">
+              Any six digits work in this demonstration.
+            </p>
           </div>
         </div>
       </DialogContent>

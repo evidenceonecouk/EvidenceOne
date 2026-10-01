@@ -1,19 +1,39 @@
-import type { CaseStatus, DemoData, PersonStatus, VerificationCase } from '@/types/domain'
+import type {
+  CaseStatus,
+  DemoData,
+  PersonStatus,
+  VerificationCase,
+} from '@/types/domain'
 
-export const getPerson = (data: DemoData, id: string) => data.people.find((p) => p.id === id)
-export const getCompany = (data: DemoData, number: string) => data.companies.find((c) => c.number === number)
-export const getCase = (data: DemoData, id: string) => data.cases.find((c) => c.id === id)
-export const getAcsp = (data: DemoData, id: string) => data.acsps.find((a) => a.id === id)
-export const getAgent = (data: DemoData, id: string) => data.agents.find((a) => a.id === id)
-export const getEntry = (data: DemoData, vc: VerificationCase) => data.register.find((r) => r.personId === vc.personId && r.companyNumber === vc.companyNumber)
+export const getPerson = (data: DemoData, id: string) =>
+  data.people.find((p) => p.id === id)
+export const getCompany = (data: DemoData, number: string) =>
+  data.companies.find((c) => c.number === number)
+export const getCase = (data: DemoData, id: string) =>
+  data.cases.find((c) => c.id === id)
+export const getAcsp = (data: DemoData, id: string) =>
+  data.acsps.find((a) => a.id === id)
+export const getAgent = (data: DemoData, id: string) =>
+  data.agents.find((a) => a.id === id)
+export const getEntry = (data: DemoData, vc: VerificationCase) =>
+  data.register.find(
+    (r) => r.personId === vc.personId && r.companyNumber === vc.companyNumber,
+  )
 
 /** Submitted to Companies House, whether or not the verification reference is recorded yet. */
-export const isSubmitted = (s: CaseStatus) => s === 'submitted' || s === 'confirmed'
+export const isSubmitted = (s: CaseStatus) =>
+  s === 'submitted' || s === 'confirmed'
 /** Approved, and anywhere in the submission workflow. */
-export const isApprovedOrLater = (s: CaseStatus) => s === 'approved' || s === 'submission_started' || isSubmitted(s)
+export const isApprovedOrLater = (s: CaseStatus) =>
+  s === 'approved' || s === 'submission_started' || isSubmitted(s)
 
-export function casesForPerson(data: DemoData, personId: string): VerificationCase[] {
-  return data.cases.filter((c) => c.personId === personId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+export function casesForPerson(
+  data: DemoData,
+  personId: string,
+): VerificationCase[] {
+  return data.cases
+    .filter((c) => c.personId === personId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
 const statusMap: Record<CaseStatus, PersonStatus> = {
@@ -36,21 +56,30 @@ export function personStatus(data: DemoData, personId: string): PersonStatus {
   const latest = casesForPerson(data, personId)[0]
   if (!latest) return 'not_started'
   const s = statusMap[latest.status]
-  return s === 'verified' && person?.reverificationDue ? 'reverification_due' : s
+  return s === 'verified' && person?.reverificationDue
+    ? 'reverification_due'
+    : s
 }
 
 export function auditForCase(data: DemoData, caseId: string) {
   return data.audit.filter((e) => e.caseId === caseId)
 }
 
-export const roleLabel = { director: 'Director', psc: 'Person with significant control', director_psc: 'Director and PSC' } as const
+export const roleLabel = {
+  director: 'Director',
+  psc: 'Person with significant control',
+  director_psc: 'Director and PSC',
+} as const
 
 export function companiesForAgent(data: DemoData, agentId: string) {
   return data.companies.filter((c) => c.lodgedByAgentId === agentId)
 }
 
 /** Name of whoever reviews a case: an ACSP firm, or an Agent reviewing in-house. */
-export function reviewerOrgName(data: DemoData, orgId: string): string | undefined {
+export function reviewerOrgName(
+  data: DemoData,
+  orgId: string,
+): string | undefined {
   return getAcsp(data, orgId)?.name ?? getAgent(data, orgId)?.name
 }
 
@@ -77,23 +106,36 @@ const caseDetail: Record<CaseStatus, string> = {
   approved: 'Approved, awaiting submission to Companies House',
   submission_started: 'Being submitted to Companies House',
   submitted: 'Submitted to Companies House',
-  confirmed: 'Verified. Companies House emails the personal code to the individual',
+  confirmed:
+    'Verified. Companies House emails the personal code to the individual',
   declined: 'Not completed',
   abandoned: 'Not completed',
 }
 
-export function peopleForCompany(data: DemoData, companyNumber: string): PersonRow[] {
+export function peopleForCompany(
+  data: DemoData,
+  companyNumber: string,
+): PersonRow[] {
   return data.register
     .filter((r) => r.companyNumber === companyNumber)
     .map((r) => {
       const person = getPerson(data, r.personId)!
       const latestCase = casesForPerson(data, r.personId)[0]
       const status = personStatus(data, r.personId)
-      const invite = latestCase && data.invites.find((i) => i.caseId === latestCase.id)
-      let detail = r.identityVerified ? 'The register already shows this identity as verified' : 'Not yet invited'
-      if (status === 'reverification_due') detail = person.reverificationNote ?? 'Reverification due'
-      else if (latestCase?.status === 'abandoned' && invite?.status === 'expired') detail = 'Invite expired before completion'
-      else if (latestCase?.status === 'invited' && invite?.status === 'opened') detail = 'Invite opened in the app'
+      const invite =
+        latestCase && data.invites.find((i) => i.caseId === latestCase.id)
+      let detail = r.identityVerified
+        ? 'The register already shows this identity as verified'
+        : 'Not yet invited'
+      if (status === 'reverification_due')
+        detail = person.reverificationNote ?? 'Reverification due'
+      else if (
+        latestCase?.status === 'abandoned' &&
+        invite?.status === 'expired'
+      )
+        detail = 'Invite expired before completion'
+      else if (latestCase?.status === 'invited' && invite?.status === 'opened')
+        detail = 'Invite opened in the app'
       else if (latestCase) detail = caseDetail[latestCase.status]
       return {
         personId: r.personId,
@@ -103,7 +145,10 @@ export function peopleForCompany(data: DemoData, companyNumber: string): PersonR
         status,
         latestCase,
         detail,
-        invitable: !latestCase || status === 'not_completed' || status === 'reverification_due',
+        invitable:
+          !latestCase ||
+          status === 'not_completed' ||
+          status === 'reverification_due',
         registerVerified: !!r.identityVerified,
       }
     })
@@ -118,16 +163,49 @@ export interface AttentionItem {
 }
 
 /** Follow-ups for an Agent, from status alone. */
-export function attentionForAgent(data: DemoData, agentId: string): AttentionItem[] {
+export function attentionForAgent(
+  data: DemoData,
+  agentId: string,
+): AttentionItem[] {
   const items: AttentionItem[] = []
   for (const company of companiesForAgent(data, agentId)) {
     for (const row of peopleForCompany(data, company.number)) {
       const base = { personName: row.name, companyName: company.name }
-      if (row.registerVerified && !row.latestCase) items.push({ ...base, id: `v-${row.personId}`, status: 'register_verified', title: 'Register already shows identity verified' })
-      else if (row.status === 'not_started' && !row.latestCase) items.push({ ...base, id: `u-${row.personId}`, status: 'not_started', title: 'Not yet invited' })
-      if (row.status === 'not_completed') items.push({ ...base, id: `n-${row.personId}`, status: 'not_completed', title: 'Verification not completed' })
-      if (row.status === 'awaiting_info') items.push({ ...base, id: `a-${row.personId}`, status: 'awaiting_info', title: 'Awaiting information from the individual' })
-      if (row.status === 'reverification_due') items.push({ ...base, id: `r-${row.personId}`, status: 'reverification_due', title: 'Reverification due' })
+      if (row.registerVerified && !row.latestCase)
+        items.push({
+          ...base,
+          id: `v-${row.personId}`,
+          status: 'register_verified',
+          title: 'Register already shows identity verified',
+        })
+      else if (row.status === 'not_started' && !row.latestCase)
+        items.push({
+          ...base,
+          id: `u-${row.personId}`,
+          status: 'not_started',
+          title: 'Not yet invited',
+        })
+      if (row.status === 'not_completed')
+        items.push({
+          ...base,
+          id: `n-${row.personId}`,
+          status: 'not_completed',
+          title: 'Verification not completed',
+        })
+      if (row.status === 'awaiting_info')
+        items.push({
+          ...base,
+          id: `a-${row.personId}`,
+          status: 'awaiting_info',
+          title: 'Awaiting information from the individual',
+        })
+      if (row.status === 'reverification_due')
+        items.push({
+          ...base,
+          id: `r-${row.personId}`,
+          status: 'reverification_due',
+          title: 'Reverification due',
+        })
     }
   }
   return items

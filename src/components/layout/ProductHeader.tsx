@@ -60,7 +60,11 @@ function OrgBadge({ persona }: { persona: PersonaId }) {
   if (persona === 'agent') {
     const agent = getAgent(data, state.agentId)
     primary = agent?.name
-    secondary = agent ? (agent.hasAcspStatus ? 'Agent with ACSP status' : 'Agent without ACSP status') : undefined
+    secondary = agent
+      ? agent.hasAcspStatus
+        ? 'Agent with ACSP status'
+        : 'Agent without ACSP status'
+      : undefined
   } else if (persona === 'reviewer') {
     const acsp = getAcsp(data, PRIMARY_ACSP_ID)
     primary = acsp?.reviewers[0].name
@@ -78,16 +82,42 @@ function OrgBadge({ persona }: { persona: PersonaId }) {
   )
 }
 
-export function ProductHeader({ persona, publicNav = false, className }: { persona: PersonaId; publicNav?: boolean; className?: string }) {
+export function ProductHeader({
+  persona,
+  publicNav = false,
+  className,
+}: {
+  persona: PersonaId
+  publicNav?: boolean
+  className?: string
+}) {
   const items = publicNav ? [] : navByPersona[persona]
   return (
-    <header className={cn('sticky top-14 z-30 print:hidden border-b border-line/80 backdrop-blur-xl backdrop-saturate-150', publicNav ? 'bg-[#f4f4f3]/[0.92]' : 'bg-white/[0.92]', className)}>
-      <div className={cn('relative mx-auto flex max-w-[88rem] items-center gap-6 px-4 sm:px-6', publicNav ? 'h-20' : 'h-16')}>
+    <header
+      className={cn(
+        'sticky top-14 z-30 print:hidden border-b border-line/80 backdrop-blur-xl backdrop-saturate-150',
+        publicNav ? 'bg-[#f4f4f3]/[0.92]' : 'bg-white/[0.92]',
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          'relative mx-auto flex max-w-[88rem] items-center gap-6 px-4 sm:px-6',
+          publicNav ? 'h-20' : 'h-16',
+        )}
+      >
         <Link to="/" className="rounded-lg" aria-label="Evidence One home">
-          {publicNav ? <Wordmark /> : <Logo suffix={suffixByPersona[persona]} />}
+          {publicNav ? (
+            <Wordmark />
+          ) : (
+            <Logo suffix={suffixByPersona[persona]} />
+          )}
         </Link>
         {items.length > 0 && (
-          <nav aria-label="Main" className="-mx-1 flex min-w-0 items-center gap-1 overflow-x-auto">
+          <nav
+            aria-label="Main"
+            className="-mx-1 flex min-w-0 items-center gap-1 overflow-x-auto"
+          >
             {items.map((item) => (
               <NavLink
                 key={item.to}
@@ -96,7 +126,9 @@ export function ProductHeader({ persona, publicNav = false, className }: { perso
                 className={({ isActive }) =>
                   cn(
                     'rounded-lg px-3 py-2 text-[0.9375rem] font-medium whitespace-nowrap transition-colors duration-150',
-                    isActive ? 'bg-ink/[0.06] text-ink' : 'text-slate hover:bg-ink/[0.04] hover:text-ink',
+                    isActive
+                      ? 'bg-ink/[0.06] text-ink'
+                      : 'text-slate hover:bg-ink/[0.04] hover:text-ink',
                   )
                 }
               >
@@ -108,14 +140,24 @@ export function ProductHeader({ persona, publicNav = false, className }: { perso
         <div className="ml-auto flex items-center gap-3">
           {publicNav ? (
             <>
-              <nav aria-label="Main" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 xl:flex">
+              <nav
+                aria-label="Main"
+                className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 xl:flex"
+              >
                 {publicLinks.map(([label, href]) => (
-                  <a key={label} href={href} className="rounded-lg px-3 py-2 text-[0.9375rem] text-ink transition-colors duration-150 hover:bg-ink/[0.05]">
+                  <a
+                    key={label}
+                    href={href}
+                    className="rounded-lg px-3 py-2 text-[0.9375rem] text-ink transition-colors duration-150 hover:bg-ink/[0.05]"
+                  >
                     {label}
                   </a>
                 ))}
               </nav>
-              <Link to="/signin" className="hidden rounded-lg px-3 py-2 text-base text-ink hover:bg-ink/[0.05] sm:inline-block">
+              <Link
+                to="/signin"
+                className="hidden rounded-lg px-3 py-2 text-base text-ink hover:bg-ink/[0.05] sm:inline-block"
+              >
                 Log in
               </Link>
               <Button asChild size="sm" className="rounded-full px-5">

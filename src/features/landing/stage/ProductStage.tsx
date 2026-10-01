@@ -25,8 +25,20 @@ export function ProductStage() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
         />
-        <div ref={ref} aria-hidden="true" className="relative mx-auto hidden w-full max-w-[1310px] sm:block" style={{ height: BASE_H * scale }}>
-          <div className="absolute top-0 left-0 origin-top-left" style={{ width: BASE_W, height: BASE_H, transform: `scale(${scale})` }}>
+        <div
+          ref={ref}
+          aria-hidden="true"
+          className="relative mx-auto hidden w-full max-w-[1310px] sm:block"
+          style={{ height: BASE_H * scale }}
+        >
+          <div
+            className="absolute top-0 left-0 origin-top-left"
+            style={{
+              width: BASE_W,
+              height: BASE_H,
+              transform: `scale(${scale})`,
+            }}
+          >
             <div className="absolute top-0 right-0">
               <CaseReviewWindow />
             </div>
@@ -36,7 +48,10 @@ export function ProductStage() {
           </div>
         </div>
         {/* Small screens: the app on its own, at full size */}
-        <div aria-hidden="true" className="relative -mb-24 flex justify-center sm:hidden">
+        <div
+          aria-hidden="true"
+          className="relative -mb-24 flex justify-center sm:hidden"
+        >
           <PhoneChipScan />
         </div>
       </figure>

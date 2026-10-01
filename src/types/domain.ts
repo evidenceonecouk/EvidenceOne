@@ -5,7 +5,8 @@
 
 export type ISODate = string
 
-export type PersonaId = 'agent' | 'reviewer' | 'individual' | 'b2c' | 'admin' | 'admin2'
+export type PersonaId =
+  'agent' | 'reviewer' | 'individual' | 'b2c' | 'admin' | 'admin2'
 
 /** Route A is identity verification; Route B is Companies House filings. */
 export type Route = 'A' | 'B'
@@ -38,10 +39,20 @@ export type CaseStatus =
 export type DecisionOutcome = 'approve' | 'request_info' | 'decline'
 
 /** The six outcomes a rule can produce. No rule ever declines a case. */
-export type RuleOutcome = 'pass' | 'flag' | 'mandatory' | 'request' | 'halt' | 'block'
+export type RuleOutcome =
+  'pass' | 'flag' | 'mandatory' | 'request' | 'halt' | 'block'
 
 /** The step of the journey a rule result or AI observation belongs to. */
-export type CaseStep = 'info' | 'register' | 'document' | 'idvt' | 'aml' | 'evidence' | 'option' | 'decision' | 'submission'
+export type CaseStep =
+  | 'info'
+  | 'register'
+  | 'document'
+  | 'idvt'
+  | 'aml'
+  | 'evidence'
+  | 'option'
+  | 'decision'
+  | 'submission'
 
 export interface Address {
   line1: string
@@ -161,11 +172,17 @@ export interface Reviewer {
   name: string
   role: string
   /** Training attestation for Option 2 person checks (rule OPT-03). */
-  attestation?: { course: string; completedOn: ISODate; expiresOn: ISODate; reference: string }
+  attestation?: {
+    course: string
+    completedOn: ISODate
+    expiresOn: ISODate
+    reference: string
+  }
   senior?: boolean
 }
 
-export type CheckResult = 'pass' | 'fail' | 'refer' | 'pending' | 'not_applicable'
+export type CheckResult =
+  'pass' | 'fail' | 'refer' | 'pending' | 'not_applicable'
 
 export interface IdvtResults {
   nfcChipRead: CheckResult
@@ -209,7 +226,8 @@ export interface RegisterComparisonRow {
   note?: string
 }
 
-export type SupportingEvidenceType = 'bank_statement' | 'utility_bill' | 'insurance' | 'passport_use'
+export type SupportingEvidenceType =
+  'bank_statement' | 'utility_bill' | 'insurance' | 'passport_use'
 
 export interface EvidenceItem {
   id: string
@@ -280,7 +298,8 @@ export interface Submission {
   corrections?: SubmissionCorrection[]
 }
 
-export type Option2Reason = 'attempts_used' | 'unsupported_document' | 'no_chip_phone'
+export type Option2Reason =
+  'attempts_used' | 'unsupported_document' | 'no_chip_phone'
 
 export interface Option2State {
   reason: Option2Reason
@@ -421,7 +440,8 @@ export interface RuleSettings {
 
 export type SettingKey = keyof RuleSettings
 
-export type RuleSetStatus = 'current' | 'draft' | 'pending_approval' | 'superseded'
+export type RuleSetStatus =
+  'current' | 'draft' | 'pending_approval' | 'superseded'
 
 export interface RuleSetVersion {
   version: string

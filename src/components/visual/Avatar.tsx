@@ -13,7 +13,17 @@ function hash(s: string) {
   Illustrated avatar for fictional people (never a photograph of a real person).
   Falls back to tinted initials if the illustration cannot load.
 */
-export function Avatar({ seed, name, size = 40, className }: { seed: string; name: string; size?: number; className?: string }) {
+export function Avatar({
+  seed,
+  name,
+  size = 40,
+  className,
+}: {
+  seed: string
+  name: string
+  size?: number
+  className?: string
+}) {
   const [failed, setFailed] = useState(false)
   const tint = tints[hash(seed) % tints.length]
   const initials = name
@@ -26,8 +36,16 @@ export function Avatar({ seed, name, size = 40, className }: { seed: string; nam
   return (
     <span
       aria-hidden="true"
-      className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-medium text-ink ring-2 ring-white', className)}
-      style={{ width: size, height: size, background: tint, fontSize: size * 0.38 }}
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-medium text-ink ring-2 ring-white',
+        className,
+      )}
+      style={{
+        width: size,
+        height: size,
+        background: tint,
+        fontSize: size * 0.38,
+      }}
     >
       {failed ? (
         initials
@@ -49,20 +67,40 @@ export function Avatar({ seed, name, size = 40, className }: { seed: string; nam
 const marks = [['#1d1f23', '#fafaf9']] as const
 
 /** Monogram tile standing in for a client company's logo. */
-export function CompanyMark({ name, size = 44, className }: { name: string; size?: number; className?: string }) {
+export function CompanyMark({
+  name,
+  size = 44,
+  className,
+}: {
+  name: string
+  size?: number
+  className?: string
+}) {
   const [bg, fg] = marks[hash(name) % marks.length]
   const letters = name
     .replace(/&/g, ' ')
     .split(/\s+/)
-    .filter((w) => w && !['LTD', 'LIMITED', 'LLP', 'PLC', 'THE'].includes(w.toUpperCase()))
+    .filter(
+      (w) =>
+        w && !['LTD', 'LIMITED', 'LLP', 'PLC', 'THE'].includes(w.toUpperCase()),
+    )
     .slice(0, 2)
     .map((w) => w[0])
     .join('')
   return (
     <span
       aria-hidden="true"
-      className={cn('inline-flex shrink-0 items-center justify-center rounded-[10px] font-medium tracking-[-0.01em]', className)}
-      style={{ width: size, height: size, background: bg, color: fg, fontSize: size * 0.36 }}
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-[10px] font-medium tracking-[-0.01em]',
+        className,
+      )}
+      style={{
+        width: size,
+        height: size,
+        background: bg,
+        color: fg,
+        fontSize: size * 0.36,
+      }}
     >
       {letters}
     </span>

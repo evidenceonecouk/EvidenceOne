@@ -1,4 +1,19 @@
-import { ArrowRight, Clock3, FileDiff, GitBranch, History, Lock, Pencil, Search, Send, ShieldCheck, Sparkles, Trash2, Undo2, UserCheck } from 'lucide-react'
+import {
+  ArrowRight,
+  Clock3,
+  FileDiff,
+  GitBranch,
+  History,
+  Lock,
+  Pencil,
+  Search,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  Undo2,
+  UserCheck,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { HeroBanner, Page, Panel, PanelHeader } from '@/components/app/Page'
@@ -6,18 +21,60 @@ import { SidePanel } from '@/components/app/SidePanel'
 import { useToast } from '@/components/app/Toaster'
 import { OutcomeChip, RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
-import { paramDefs, ruleById, ruleGroups, rules, RULE_SET_NAME, SECOND_APPROVER, settingDefs, sourceNames, SUPER_ADMIN, type RuleDef, type RuleGroupId } from '@/data/rules'
+import {
+  paramDefs,
+  ruleById,
+  ruleGroups,
+  rules,
+  RULE_SET_NAME,
+  SECOND_APPROVER,
+  settingDefs,
+  sourceNames,
+  SUPER_ADMIN,
+  type RuleDef,
+  type RuleGroupId,
+} from '@/data/rules'
 import { CopilotPanel } from '@/features/copilot/CopilotPanel'
 import { formatDate, formatDateTime, fullName } from '@/lib/format'
-import { casesAffectedBy, currentRuleSet, draftRuleSet, outcomeUnder } from '@/lib/rules'
+import {
+  casesAffectedBy,
+  currentRuleSet,
+  draftRuleSet,
+  outcomeUnder,
+} from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { versionChanges } from '@/lib/versionDiff'
-import { discardDraft, proposeRuleChange, publishDraft, returnDraft, submitDraft } from '@/store/actions'
+import {
+  discardDraft,
+  proposeRuleChange,
+  publishDraft,
+  returnDraft,
+  submitDraft,
+} from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
-import type { ParamKey, RuleOutcome, RuleSetStatus, RuleSettings, RuleSetVersion, SettingKey } from '@/types/domain'
+import type {
+  ParamKey,
+  RuleOutcome,
+  RuleSetStatus,
+  RuleSettings,
+  RuleSetVersion,
+  SettingKey,
+} from '@/types/domain'
 
-const OUTCOMES: RuleOutcome[] = ['pass', 'flag', 'mandatory', 'request', 'halt', 'block']
-const statusLabel: Record<RuleSetStatus, string> = { current: 'Current', draft: 'Draft', pending_approval: 'Waiting for second approver', superseded: 'Superseded' }
+const OUTCOMES: RuleOutcome[] = [
+  'pass',
+  'flag',
+  'mandatory',
+  'request',
+  'halt',
+  'block',
+]
+const statusLabel: Record<RuleSetStatus, string> = {
+  current: 'Current',
+  draft: 'Draft',
+  pending_approval: 'Waiting for second approver',
+  superseded: 'Superseded',
+}
 
 /**
   The Route A rule set. Reviewers read it; an administrator proposes changes,
@@ -33,7 +90,12 @@ export function RulesPage() {
   const draft = draftRuleSet(data)
 
   return (
-    <div className={cn('transition-[padding] duration-300 ease-out', copilot && 'xl:pr-[27rem]')}>
+    <div
+      className={cn(
+        'transition-[padding] duration-300 ease-out',
+        copilot && 'xl:pr-[27rem]',
+      )}
+    >
       <Page>
         <HeroBanner
           kicker="Evidence One Compliance · Rules"
@@ -41,19 +103,31 @@ export function RulesPage() {
           description={`${RULE_SET_NAME}. Every rule is data: an ID, a condition, one outcome and its source. No rule declines a case; only the ACSP reviewer approves or declines.`}
           meta={
             <>
-              <span data-cite={`version:${current.version}`} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 font-mono text-[0.875rem] text-ink">
+              <span
+                data-cite={`version:${current.version}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 font-mono text-[0.875rem] text-ink"
+              >
                 <GitBranch className="size-4" aria-hidden="true" />
                 Version {current.version}
               </span>
               <StatusPill status="current" />
-              {current.effectiveFrom && <span className="rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] text-graphite">Effective {formatDate(current.effectiveFrom)}</span>}
+              {current.effectiveFrom && (
+                <span className="rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] text-graphite">
+                  Effective {formatDate(current.effectiveFrom)}
+                </span>
+              )}
               <span className="rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] text-graphite">
                 {rules.length} rules · {paramDefs.length} parameters
               </span>
             </>
           }
           actions={
-            <Button variant={copilot ? 'default' : 'outline'} onClick={() => setCopilot((o) => !o)} aria-expanded={copilot} aria-controls="copilot-panel">
+            <Button
+              variant={copilot ? 'default' : 'outline'}
+              onClick={() => setCopilot((o) => !o)}
+              aria-expanded={copilot}
+              aria-controls="copilot-panel"
+            >
               <Sparkles aria-hidden="true" />
               Ask the Copilot
             </Button>
@@ -70,7 +144,11 @@ export function RulesPage() {
             ['#rules-settings', 'Decision settings'],
             ['#rules-history', 'Version history'],
           ].map(([href, label]) => (
-            <a key={href} href={href} className="rounded-full border border-line bg-white px-4 py-2 text-[0.9375rem] text-ink hover:border-silver">
+            <a
+              key={href}
+              href={href}
+              className="rounded-full border border-line bg-white px-4 py-2 text-[0.9375rem] text-ink hover:border-silver"
+            >
               {label}
             </a>
           ))}
@@ -79,27 +157,50 @@ export function RulesPage() {
         <div className="space-y-6">
           <RulesList onOpen={setOpenRule} />
           <div className="grid items-start gap-6 xl:grid-cols-2">
-            <ParamsPanel canEdit={canPropose && draft?.status !== 'pending_approval'} />
-            <SettingsPanel canEdit={canPropose && draft?.status !== 'pending_approval'} />
+            <ParamsPanel
+              canEdit={canPropose && draft?.status !== 'pending_approval'}
+            />
+            <SettingsPanel
+              canEdit={canPropose && draft?.status !== 'pending_approval'}
+            />
           </div>
           <HistoryPanel />
         </div>
 
         <p className="mt-8 flex items-center justify-center gap-2 text-center text-[0.9375rem] text-graphite">
           <ShieldCheck className="size-4" aria-hidden="true" />
-          Rules are evaluated the same way every time. No rule is ever evaluated by AI.
+          Rules are evaluated the same way every time. No rule is ever evaluated
+          by AI.
         </p>
 
         <RuleDetail rule={openRule} onClose={() => setOpenRule(null)} />
       </Page>
-      <CopilotPanel open={copilot} onClose={() => setCopilot(false)} scope={{ kind: 'rules' }} />
+      <CopilotPanel
+        open={copilot}
+        onClose={() => setCopilot(false)}
+        scope={{ kind: 'rules' }}
+      />
     </div>
   )
 }
 
 function StatusPill({ status }: { status: RuleSetStatus }) {
-  const tone = status === 'current' ? 'border-approve/25 bg-approve-wash text-approve' : status === 'superseded' ? 'border-line bg-mist text-graphite' : 'border-info/25 bg-info-wash text-info'
-  return <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-[0.875rem] font-medium whitespace-nowrap', tone)}>{statusLabel[status]}</span>
+  const tone =
+    status === 'current'
+      ? 'border-approve/25 bg-approve-wash text-approve'
+      : status === 'superseded'
+        ? 'border-line bg-mist text-graphite'
+        : 'border-info/25 bg-info-wash text-info'
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-3 py-1 text-[0.875rem] font-medium whitespace-nowrap',
+        tone,
+      )}
+    >
+      {statusLabel[status]}
+    </span>
+  )
 }
 
 function PendingBadge() {
@@ -118,7 +219,8 @@ function RoleNotice({ persona }: { persona: string }) {
       : persona === 'admin2'
         ? 'You are the second approver. Review the proposed version and publish it with an effective date, or return it. You cannot publish a change you proposed.'
         : 'Read only. Changes are proposed by an administrator and published by a second approver. Decided cases keep the version applied at their decision.'
-  const Icon = persona === 'admin' ? Pencil : persona === 'admin2' ? UserCheck : Lock
+  const Icon =
+    persona === 'admin' ? Pencil : persona === 'admin2' ? UserCheck : Lock
   return (
     <p className="mb-6 flex items-start gap-3 rounded-2xl border border-line bg-white px-5 py-4 text-[0.9375rem] leading-relaxed text-graphite">
       <Icon className="mt-0.5 size-4 shrink-0 text-ink" aria-hidden="true" />
@@ -127,17 +229,28 @@ function RoleNotice({ persona }: { persona: string }) {
   )
 }
 
-function DraftPanel({ draft, current }: { draft: RuleSetVersion; current: RuleSetVersion }) {
+function DraftPanel({
+  draft,
+  current,
+}: {
+  draft: RuleSetVersion
+  current: RuleSetVersion
+}) {
   const { state, apply, setPersona } = useDemoStore()
   const toast = useToast()
-  const [effective, setEffective] = useState(() => new Date().toISOString().slice(0, 10))
+  const [effective, setEffective] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  )
   const [note, setNote] = useState('')
   const changes = versionChanges(current, draft)
   const persona = state.persona
   const pending = draft.status === 'pending_approval'
 
   return (
-    <Panel aria-labelledby="draft-title" className="mb-6 overflow-hidden border-info/30">
+    <Panel
+      aria-labelledby="draft-title"
+      className="mb-6 overflow-hidden border-info/30"
+    >
       <PanelHeader
         id="draft-title"
         title={
@@ -151,7 +264,9 @@ function DraftPanel({ draft, current }: { draft: RuleSetVersion; current: RuleSe
       />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[34rem] text-left">
-          <caption className="sr-only">What changes in draft {draft.version}</caption>
+          <caption className="sr-only">
+            What changes in draft {draft.version}
+          </caption>
           <thead className="bg-mist/50 text-[0.875rem] text-slate">
             <tr>
               <th scope="col" className="py-2.5 pr-4 pl-5 font-normal sm:pl-6">
@@ -170,20 +285,30 @@ function DraftPanel({ draft, current }: { draft: RuleSetVersion; current: RuleSe
               <tr key={c.key} className="border-t border-line/70">
                 <td className="py-3.5 pr-4 pl-5 text-[0.9375rem] text-ink sm:pl-6">
                   {c.label}
-                  <span className="block font-mono text-[0.8125rem] text-slate">{c.key}</span>
+                  <span className="block font-mono text-[0.8125rem] text-slate">
+                    {c.key}
+                  </span>
                 </td>
                 <td className="py-3.5 pr-4">
-                  <span className="rounded-md bg-decline-wash px-2 py-1 font-mono text-[0.875rem] text-decline line-through decoration-decline/50">{c.from}</span>
+                  <span className="rounded-md bg-decline-wash px-2 py-1 font-mono text-[0.875rem] text-decline line-through decoration-decline/50">
+                    {c.from}
+                  </span>
                 </td>
                 <td className="py-3.5 pr-6">
-                  <span className="rounded-md bg-approve-wash px-2 py-1 font-mono text-[0.875rem] text-approve">{c.to}</span>
+                  <span className="rounded-md bg-approve-wash px-2 py-1 font-mono text-[0.875rem] text-approve">
+                    {c.to}
+                  </span>
                 </td>
               </tr>
             ))}
             {changes.length === 0 && (
               <tr className="border-t border-line/70">
-                <td colSpan={3} className="px-6 py-4 text-[0.9375rem] text-slate">
-                  No differences yet. Change a parameter or decision setting below.
+                <td
+                  colSpan={3}
+                  className="px-6 py-4 text-[0.9375rem] text-slate"
+                >
+                  No differences yet. Change a parameter or decision setting
+                  below.
                 </td>
               </tr>
             )}
@@ -198,13 +323,19 @@ function DraftPanel({ draft, current }: { draft: RuleSetVersion; current: RuleSe
               disabled={!changes.length}
               onClick={() => {
                 apply((d) => submitDraft(d, SUPER_ADMIN))
-                toast({ title: `Draft ${draft.version} submitted`, description: 'A second approver must review and publish it.' })
+                toast({
+                  title: `Draft ${draft.version} submitted`,
+                  description: 'A second approver must review and publish it.',
+                })
               }}
             >
               <Send aria-hidden="true" />
               Submit for approval
             </Button>
-            <Button variant="ghost" onClick={() => apply((d) => discardDraft(d, SUPER_ADMIN))}>
+            <Button
+              variant="ghost"
+              onClick={() => apply((d) => discardDraft(d, SUPER_ADMIN))}
+            >
               <Trash2 aria-hidden="true" />
               Discard draft
             </Button>
@@ -212,7 +343,11 @@ function DraftPanel({ draft, current }: { draft: RuleSetVersion; current: RuleSe
         )}
         {persona === 'admin' && pending && (
           <div className="flex flex-wrap items-center gap-4">
-            <p className="flex-1 text-[0.9375rem] text-graphite">Submitted {draft.submittedAt && formatDateTime(draft.submittedAt)}. You cannot publish your own change. A second approver must review it.</p>
+            <p className="flex-1 text-[0.9375rem] text-graphite">
+              Submitted {draft.submittedAt && formatDateTime(draft.submittedAt)}
+              . You cannot publish your own change. A second approver must
+              review it.
+            </p>
             <Button onClick={() => setPersona('admin2')}>
               <UserCheck aria-hidden="true" />
               Switch to Admin (second approver)
@@ -226,17 +361,31 @@ function DraftPanel({ draft, current }: { draft: RuleSetVersion; current: RuleSe
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label htmlFor="effective" className="block text-[0.9375rem] font-medium text-ink">
+                <label
+                  htmlFor="effective"
+                  className="block text-[0.9375rem] font-medium text-ink"
+                >
                   Effective date
                 </label>
-                <input id="effective" type="date" value={effective} onChange={(e) => setEffective(e.target.value)} className="mt-1.5 h-11 rounded-xl border border-line bg-white px-3.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10" />
+                <input
+                  id="effective"
+                  type="date"
+                  value={effective}
+                  onChange={(e) => setEffective(e.target.value)}
+                  className="mt-1.5 h-11 rounded-xl border border-line bg-white px-3.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+                />
               </div>
               <Button
                 disabled={!effective || draft.submittedBy === SECOND_APPROVER}
                 onClick={() => {
-                  const at = new Date(`${effective}T${new Date().toISOString().slice(11)}`).toISOString()
+                  const at = new Date(
+                    `${effective}T${new Date().toISOString().slice(11)}`,
+                  ).toISOString()
                   apply((d) => publishDraft(d, at, SECOND_APPROVER))
-                  toast({ title: `Version ${draft.version} published`, description: `Version ${current.version} is now superseded. New cases use ${draft.version}.` })
+                  toast({
+                    title: `Version ${draft.version} published`,
+                    description: `Version ${current.version} is now superseded. New cases use ${draft.version}.`,
+                  })
                 }}
               >
                 <ShieldCheck aria-hidden="true" />
@@ -245,20 +394,46 @@ function DraftPanel({ draft, current }: { draft: RuleSetVersion; current: RuleSe
             </div>
             <div className="flex flex-wrap items-end gap-3 border-t border-line/70 pt-4">
               <div className="min-w-[16rem] flex-1">
-                <label htmlFor="return-note" className="block text-[0.9375rem] font-medium text-ink">
+                <label
+                  htmlFor="return-note"
+                  className="block text-[0.9375rem] font-medium text-ink"
+                >
                   Or return it with a note
                 </label>
-                <input id="return-note" value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-line bg-white px-3.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10" />
+                <input
+                  id="return-note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-xl border border-line bg-white px-3.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+                />
               </div>
-              <Button variant="outline" disabled={!note.trim()} onClick={() => apply((d) => returnDraft(d, SECOND_APPROVER, note.trim()))}>
+              <Button
+                variant="outline"
+                disabled={!note.trim()}
+                onClick={() =>
+                  apply((d) => returnDraft(d, SECOND_APPROVER, note.trim()))
+                }
+              >
                 <Undo2 aria-hidden="true" />
                 Return to draft
               </Button>
             </div>
           </div>
         )}
-        {persona === 'admin2' && !pending && <p className="text-[0.9375rem] text-graphite">The administrator has not submitted this draft yet.</p>}
-        {persona !== 'admin' && persona !== 'admin2' && <p className="text-[0.9375rem] text-graphite">{pending ? 'Waiting for the second approver.' : 'Being prepared by an administrator.'} Cases keep using version {current.version} until a new version is published.</p>}
+        {persona === 'admin2' && !pending && (
+          <p className="text-[0.9375rem] text-graphite">
+            The administrator has not submitted this draft yet.
+          </p>
+        )}
+        {persona !== 'admin' && persona !== 'admin2' && (
+          <p className="text-[0.9375rem] text-graphite">
+            {pending
+              ? 'Waiting for the second approver.'
+              : 'Being prepared by an administrator.'}{' '}
+            Cases keep using version {current.version} until a new version is
+            published.
+          </p>
+        )}
       </div>
     </Panel>
   )
@@ -271,23 +446,53 @@ function RulesList({ onOpen }: { onOpen: (r: RuleDef) => void }) {
   const [outcomes, setOutcomes] = useState<RuleOutcome[]>([])
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
-  const shown = rules.filter((r) => (group === 'all' || r.group === group) && (!outcomes.length || outcomes.includes(outcomeUnder(r.id, rs))) && (!q || r.id.toLowerCase().includes(q) || r.condition.toLowerCase().includes(q) || r.source.toLowerCase().includes(q)))
+  const shown = rules.filter(
+    (r) =>
+      (group === 'all' || r.group === group) &&
+      (!outcomes.length || outcomes.includes(outcomeUnder(r.id, rs))) &&
+      (!q ||
+        r.id.toLowerCase().includes(q) ||
+        r.condition.toLowerCase().includes(q) ||
+        r.source.toLowerCase().includes(q)),
+  )
 
   return (
-    <Panel id="rules-list" aria-labelledby="rules-title" className="scroll-mt-40 overflow-hidden">
-      <PanelHeader id="rules-title" title="Rules" description={`${shown.length} of ${rules.length} shown. Open a rule for its full detail and the cases it has affected.`} />
+    <Panel
+      id="rules-list"
+      aria-labelledby="rules-title"
+      className="scroll-mt-40 overflow-hidden"
+    >
+      <PanelHeader
+        id="rules-title"
+        title="Rules"
+        description={`${shown.length} of ${rules.length} shown. Open a rule for its full detail and the cases it has affected.`}
+      />
       <div className="flex flex-col gap-3 border-b border-line/80 px-5 py-4 sm:px-6 lg:flex-row lg:items-center">
         <div className="relative lg:w-72">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate" aria-hidden="true" />
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate"
+            aria-hidden="true"
+          />
           <label htmlFor="rule-search" className="sr-only">
             Search by ID or text
           </label>
-          <input id="rule-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by ID or text" className="h-11 w-full rounded-xl border border-line bg-white pr-3 pl-10 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10" />
+          <input
+            id="rule-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by ID or text"
+            className="h-11 w-full rounded-xl border border-line bg-white pr-3 pl-10 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+          />
         </div>
         <label htmlFor="rule-group" className="sr-only">
           Group
         </label>
-        <select id="rule-group" value={group} onChange={(e) => setGroup(e.target.value as RuleGroupId | 'all')} className="h-11 rounded-xl border border-line bg-white px-3 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10">
+        <select
+          id="rule-group"
+          value={group}
+          onChange={(e) => setGroup(e.target.value as RuleGroupId | 'all')}
+          className="h-11 rounded-xl border border-line bg-white px-3 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+        >
           <option value="all">All groups</option>
           {ruleGroups.map((g) => (
             <option key={g.id} value={g.id}>
@@ -295,11 +500,30 @@ function RulesList({ onOpen }: { onOpen: (r: RuleDef) => void }) {
             </option>
           ))}
         </select>
-        <div role="group" aria-label="Filter by outcome" className="flex flex-wrap gap-1.5">
+        <div
+          role="group"
+          aria-label="Filter by outcome"
+          className="flex flex-wrap gap-1.5"
+        >
           {OUTCOMES.map((o) => {
             const on = outcomes.includes(o)
             return (
-              <button key={o} type="button" aria-pressed={on} onClick={() => setOutcomes((xs) => (on ? xs.filter((x) => x !== o) : [...xs, o]))} className={cn('cursor-pointer rounded-full border p-0.5 transition-colors duration-150', on ? 'border-ink bg-ink/5' : 'border-transparent hover:border-line')}>
+              <button
+                key={o}
+                type="button"
+                aria-pressed={on}
+                onClick={() =>
+                  setOutcomes((xs) =>
+                    on ? xs.filter((x) => x !== o) : [...xs, o],
+                  )
+                }
+                className={cn(
+                  'cursor-pointer rounded-full border p-0.5 transition-colors duration-150',
+                  on
+                    ? 'border-ink bg-ink/5'
+                    : 'border-transparent hover:border-line',
+                )}
+              >
                 <OutcomeChip outcome={o} />
               </button>
             )
@@ -310,7 +534,10 @@ function RulesList({ onOpen }: { onOpen: (r: RuleDef) => void }) {
         .filter((g) => shown.some((r) => r.group === g.id))
         .map((g) => (
           <section key={g.id} aria-labelledby={`grp-${g.id}`}>
-            <h3 id={`grp-${g.id}`} className="border-b border-line/70 bg-[#f8f8f7] px-5 py-2.5 text-[0.875rem] font-medium tracking-[0.04em] text-slate uppercase sm:px-6">
+            <h3
+              id={`grp-${g.id}`}
+              className="border-b border-line/70 bg-[#f8f8f7] px-5 py-2.5 text-[0.875rem] font-medium tracking-[0.04em] text-slate uppercase sm:px-6"
+            >
               {g.label}
             </h3>
             <ul className="divide-y divide-line/70">
@@ -318,56 +545,112 @@ function RulesList({ onOpen }: { onOpen: (r: RuleDef) => void }) {
                 .filter((r) => r.group === g.id)
                 .map((r) => (
                   <li key={r.id} data-cite={`rule:${r.id}`}>
-                    <button type="button" onClick={() => onOpen(r)} className="group grid w-full cursor-pointer grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-4 gap-y-1.5 px-5 py-3.5 text-left transition-colors duration-150 hover:bg-mist/40 sm:px-6 lg:grid-cols-[6.5rem_minmax(0,1fr)_11rem_14rem_1.25rem]">
+                    <button
+                      type="button"
+                      onClick={() => onOpen(r)}
+                      className="group grid w-full cursor-pointer grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-4 gap-y-1.5 px-5 py-3.5 text-left transition-colors duration-150 hover:bg-mist/40 sm:px-6 lg:grid-cols-[6.5rem_minmax(0,1fr)_11rem_14rem_1.25rem]"
+                    >
                       <RuleIdTag id={r.id} className="w-fit" />
                       <span className="text-[0.9375rem] leading-snug text-ink">
                         {r.condition}
-                        {r.param && <span className="mt-0.5 block font-mono text-[0.8125rem] text-slate">Reads {r.param} = {rs.params[r.param]}</span>}
-                        {r.setting && <span className="mt-0.5 block text-[0.8125rem] text-slate">Set by: {settingDefs.find((s) => s.key === r.setting)?.label}</span>}
+                        {r.param && (
+                          <span className="mt-0.5 block font-mono text-[0.8125rem] text-slate">
+                            Reads {r.param} = {rs.params[r.param]}
+                          </span>
+                        )}
+                        {r.setting && (
+                          <span className="mt-0.5 block text-[0.8125rem] text-slate">
+                            Set by:{' '}
+                            {
+                              settingDefs.find((s) => s.key === r.setting)
+                                ?.label
+                            }
+                          </span>
+                        )}
                       </span>
                       <span className="col-start-2 lg:col-start-auto">
                         <OutcomeChip outcome={outcomeUnder(r.id, rs)} />
                       </span>
-                      <span className="col-start-2 text-[0.875rem] text-slate lg:col-start-auto">{r.source}</span>
-                      <ArrowRight className="hidden size-4 text-slate transition-transform duration-150 group-hover:translate-x-0.5 lg:block" aria-hidden="true" />
+                      <span className="col-start-2 text-[0.875rem] text-slate lg:col-start-auto">
+                        {r.source}
+                      </span>
+                      <ArrowRight
+                        className="hidden size-4 text-slate transition-transform duration-150 group-hover:translate-x-0.5 lg:block"
+                        aria-hidden="true"
+                      />
                     </button>
                   </li>
                 ))}
             </ul>
           </section>
         ))}
-      {shown.length === 0 && <p className="px-6 py-8 text-center text-base text-slate">No rules match these filters.</p>}
+      {shown.length === 0 && (
+        <p className="px-6 py-8 text-center text-base text-slate">
+          No rules match these filters.
+        </p>
+      )}
     </Panel>
   )
 }
 
-function RuleDetail({ rule, onClose }: { rule: RuleDef | null; onClose: () => void }) {
+function RuleDetail({
+  rule,
+  onClose,
+}: {
+  rule: RuleDef | null
+  onClose: () => void
+}) {
   const { data, state } = useDemoStore()
   const rs = currentRuleSet(data)
-  const affected = useMemo(() => (rule ? casesAffectedBy(data, rule.id) : []), [data, rule])
+  const affected = useMemo(
+    () => (rule ? casesAffectedBy(data, rule.id) : []),
+    [data, rule],
+  )
   const def = rule ? ruleById(rule.id) : undefined
   const nonPass = affected.filter((a) => a.result.outcome !== 'pass')
   return (
-    <SidePanel open={!!rule} onClose={onClose} title={def ? <span className="flex items-center gap-2.5"><RuleIdTag id={def.id} className="text-[0.9375rem]" />{ruleGroups.find((g) => g.id === def.group)?.label}</span> : ''} description={def ? `Version ${rs.version}` : undefined}>
+    <SidePanel
+      open={!!rule}
+      onClose={onClose}
+      title={
+        def ? (
+          <span className="flex items-center gap-2.5">
+            <RuleIdTag id={def.id} className="text-[0.9375rem]" />
+            {ruleGroups.find((g) => g.id === def.group)?.label}
+          </span>
+        ) : (
+          ''
+        )
+      }
+      description={def ? `Version ${rs.version}` : undefined}
+    >
       {def && (
         <div className="space-y-6 p-6">
           <div>
             <p className="text-[0.875rem] text-slate">Condition</p>
-            <p className="mt-1 text-lg leading-relaxed text-ink">{def.condition}</p>
+            <p className="mt-1 text-lg leading-relaxed text-ink">
+              {def.condition}
+            </p>
           </div>
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>
               <dt className="text-[0.875rem] text-slate">Outcome</dt>
               <dd className="mt-1">
                 <OutcomeChip outcome={outcomeUnder(def.id, rs)} />
-                {def.outcomeNote && <span className="mt-1 block text-[0.9375rem] text-graphite">{def.outcomeNote}</span>}
+                {def.outcomeNote && (
+                  <span className="mt-1 block text-[0.9375rem] text-graphite">
+                    {def.outcomeNote}
+                  </span>
+                )}
               </dd>
             </div>
             <div>
               <dt className="text-[0.875rem] text-slate">Source</dt>
               <dd className="mt-1 text-[0.9375rem] text-ink">
                 {def.source}
-                <span className="block text-slate">{def.sources.map((s) => `${s}: ${sourceNames[s]}`).join('; ')}</span>
+                <span className="block text-slate">
+                  {def.sources.map((s) => `${s}: ${sourceNames[s]}`).join('; ')}
+                </span>
               </dd>
             </div>
             {def.param && (
@@ -382,7 +665,14 @@ function RuleDetail({ rule, onClose }: { rule: RuleDef | null; onClose: () => vo
               <div>
                 <dt className="text-[0.875rem] text-slate">Decision setting</dt>
                 <dd className="mt-1 text-[0.9375rem] text-ink">
-                  {settingDefs.find((s) => s.key === def.setting)?.label}: {settingDefs.find((s) => s.key === def.setting)?.options.find((o) => o.value === rs.settings[def.setting!])?.label}
+                  {settingDefs.find((s) => s.key === def.setting)?.label}:{' '}
+                  {
+                    settingDefs
+                      .find((s) => s.key === def.setting)
+                      ?.options.find(
+                        (o) => o.value === rs.settings[def.setting!],
+                      )?.label
+                  }
                   <span className="mt-1 block">
                     <PendingBadge />
                   </span>
@@ -393,16 +683,25 @@ function RuleDetail({ rule, onClose }: { rule: RuleDef | null; onClose: () => vo
               <dt className="text-[0.875rem] text-slate">Inputs</dt>
               <dd className="mt-1 flex flex-wrap gap-1.5">
                 {def.inputs.map((i) => (
-                  <span key={i} className="rounded-md border border-line bg-white px-1.5 py-0.5 font-mono text-[0.8125rem] text-graphite">
+                  <span
+                    key={i}
+                    className="rounded-md border border-line bg-white px-1.5 py-0.5 font-mono text-[0.8125rem] text-graphite"
+                  >
                     {i}
                   </span>
                 ))}
               </dd>
             </div>
           </dl>
-          <p className="rounded-xl bg-mist px-4 py-3 text-[0.9375rem] text-graphite">Evaluated the same way every time. Never evaluated by AI. Where an input comes from AI extraction, the rule records which extraction it used and the reviewer sees both.</p>
+          <p className="rounded-xl bg-mist px-4 py-3 text-[0.9375rem] text-graphite">
+            Evaluated the same way every time. Never evaluated by AI. Where an
+            input comes from AI extraction, the rule records which extraction it
+            used and the reviewer sees both.
+          </p>
           <div>
-            <p className="text-[0.9375rem] font-medium text-ink">Cases in this demo it has affected</p>
+            <p className="text-[0.9375rem] font-medium text-ink">
+              Cases in this demo it has affected
+            </p>
             {nonPass.length ? (
               <ul className="mt-2 divide-y divide-line/70 rounded-2xl border border-line bg-white">
                 {nonPass.map(({ vc, result }) => {
@@ -410,9 +709,15 @@ function RuleDetail({ rule, onClose }: { rule: RuleDef | null; onClose: () => vo
                   const row = (
                     <>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[0.9375rem] font-medium text-ink">{fullName(p)}</span>
-                        <span className="block text-[0.875rem] leading-snug text-slate">{result.title}</span>
-                        <span className="block font-mono text-[0.8125rem] text-slate">{vc.id}</span>
+                        <span className="block text-[0.9375rem] font-medium text-ink">
+                          {fullName(p)}
+                        </span>
+                        <span className="block text-[0.875rem] leading-snug text-slate">
+                          {result.title}
+                        </span>
+                        <span className="block font-mono text-[0.8125rem] text-slate">
+                          {vc.id}
+                        </span>
                       </span>
                       <OutcomeChip outcome={result.outcome} />
                     </>
@@ -420,18 +725,27 @@ function RuleDetail({ rule, onClose }: { rule: RuleDef | null; onClose: () => vo
                   return (
                     <li key={vc.id}>
                       {state.persona === 'reviewer' ? (
-                        <Link to={`/acsp/cases/${vc.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-mist/50">
+                        <Link
+                          to={`/acsp/cases/${vc.id}`}
+                          className="flex items-start gap-3 px-4 py-3 hover:bg-mist/50"
+                        >
                           {row}
                         </Link>
                       ) : (
-                        <div className="flex items-start gap-3 px-4 py-3">{row}</div>
+                        <div className="flex items-start gap-3 px-4 py-3">
+                          {row}
+                        </div>
                       )}
                     </li>
                   )
                 })}
               </ul>
             ) : (
-              <p className="mt-1 text-[0.9375rem] text-slate">{affected.length ? `Passed on ${affected.length} case${affected.length === 1 ? '' : 's'}. No other outcome in the demo.` : 'Not evaluated on any case in the demo yet.'}</p>
+              <p className="mt-1 text-[0.9375rem] text-slate">
+                {affected.length
+                  ? `Passed on ${affected.length} case${affected.length === 1 ? '' : 's'}. No other outcome in the demo.`
+                  : 'Not evaluated on any case in the demo yet.'}
+              </p>
             )}
           </div>
         </div>
@@ -448,14 +762,29 @@ function ParamsPanel({ canEdit }: { canEdit: boolean }) {
   const [editing, setEditing] = useState<ParamKey | null>(null)
   const [value, setValue] = useState('')
   return (
-    <Panel id="rules-params" aria-labelledby="params-title" className="scroll-mt-40 overflow-hidden">
-      <PanelHeader id="params-title" title="Parameters" description="Held in the version. Changing one publishes a new version, never a software release." />
+    <Panel
+      id="rules-params"
+      aria-labelledby="params-title"
+      className="scroll-mt-40 overflow-hidden"
+    >
+      <PanelHeader
+        id="params-title"
+        title="Parameters"
+        description="Held in the version. Changing one publishes a new version, never a software release."
+      />
       <ul className="divide-y divide-line/70">
         {paramDefs.map((p) => {
           const cur = current.params[p.key]
-          const drafted = draft && draft.params[p.key] !== cur ? draft.params[p.key] : undefined
+          const drafted =
+            draft && draft.params[p.key] !== cur
+              ? draft.params[p.key]
+              : undefined
           return (
-            <li key={p.key} data-cite={`param:${p.key}`} className="px-5 py-3.5 sm:px-6">
+            <li
+              key={p.key}
+              data-cite={`param:${p.key}`}
+              className="px-5 py-3.5 sm:px-6"
+            >
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-[0.9375rem] text-ink">{p.label}</p>
@@ -470,19 +799,42 @@ function ParamsPanel({ canEdit }: { canEdit: boolean }) {
                       e.preventDefault()
                       const n = Number(value)
                       if (!Number.isFinite(n) || n < p.min || n > p.max) return
-                      apply((d) => proposeRuleChange(d, { kind: 'param', key: p.key, value: n }, SUPER_ADMIN))
-                      toast({ title: 'Saved to the draft', description: `Version ${current.version} is unchanged.` })
+                      apply((d) =>
+                        proposeRuleChange(
+                          d,
+                          { kind: 'param', key: p.key, value: n },
+                          SUPER_ADMIN,
+                        ),
+                      )
+                      toast({
+                        title: 'Saved to the draft',
+                        description: `Version ${current.version} is unchanged.`,
+                      })
                       setEditing(null)
                     }}
                   >
                     <label htmlFor={`p-${p.key}`} className="sr-only">
                       {p.label}
                     </label>
-                    <input id={`p-${p.key}`} type="number" min={p.min} max={p.max} value={value} onChange={(e) => setValue(e.target.value)} className="h-10 w-24 rounded-lg border border-line bg-white px-3 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10" autoFocus />
+                    <input
+                      id={`p-${p.key}`}
+                      type="number"
+                      min={p.min}
+                      max={p.max}
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                      className="h-10 w-24 rounded-lg border border-line bg-white px-3 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+                      autoFocus
+                    />
                     <Button size="sm" type="submit">
                       Save to draft
                     </Button>
-                    <Button size="sm" variant="ghost" type="button" onClick={() => setEditing(null)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      type="button"
+                      onClick={() => setEditing(null)}
+                    >
                       Cancel
                     </Button>
                   </form>
@@ -526,14 +878,28 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
   const current = currentRuleSet(data)
   const draft = draftRuleSet(data)
   return (
-    <Panel id="rules-settings" aria-labelledby="settings-title" className="scroll-mt-40 overflow-hidden">
-      <PanelHeader id="settings-title" title="Decision settings" description="Points from the rule set that are for the client’s decision. Each one is read by the demo flows." />
+    <Panel
+      id="rules-settings"
+      aria-labelledby="settings-title"
+      className="scroll-mt-40 overflow-hidden"
+    >
+      <PanelHeader
+        id="settings-title"
+        title="Decision settings"
+        description="Points from the rule set that are for the client’s decision. Each one is read by the demo flows."
+      />
       <ul className="divide-y divide-line/70">
         {settingDefs.map((s) => {
           const cur = current.settings[s.key]
-          const shown = (draft ? draft.settings[s.key] : cur) as RuleSettings[SettingKey]
+          const shown = (
+            draft ? draft.settings[s.key] : cur
+          ) as RuleSettings[SettingKey]
           return (
-            <li key={s.key} data-cite={`setting:${s.key}`} className="px-5 py-4 sm:px-6">
+            <li
+              key={s.key}
+              data-cite={`setting:${s.key}`}
+              className="px-5 py-4 sm:px-6"
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-base font-medium text-ink">{s.label}</p>
                 <PendingBadge />
@@ -541,8 +907,14 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
                   {s.rules.join(', ')} · {s.decisionPoint}
                 </span>
               </div>
-              <p className="mt-1 text-[0.9375rem] text-graphite">{s.question}</p>
-              <div role="radiogroup" aria-label={s.label} className="mt-3 inline-flex rounded-xl border border-line bg-mist p-1">
+              <p className="mt-1 text-[0.9375rem] text-graphite">
+                {s.question}
+              </p>
+              <div
+                role="radiogroup"
+                aria-label={s.label}
+                className="mt-3 inline-flex rounded-xl border border-line bg-mist p-1"
+              >
                 {s.options.map((o) => {
                   const on = shown === o.value
                   return (
@@ -554,17 +926,36 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
                       disabled={!canEdit}
                       onClick={() => {
                         if (on) return
-                        apply((d) => proposeRuleChange(d, { kind: 'setting', key: s.key, value: o.value }, SUPER_ADMIN))
-                        toast({ title: 'Saved to the draft', description: `Version ${current.version} is unchanged.` })
+                        apply((d) =>
+                          proposeRuleChange(
+                            d,
+                            { kind: 'setting', key: s.key, value: o.value },
+                            SUPER_ADMIN,
+                          ),
+                        )
+                        toast({
+                          title: 'Saved to the draft',
+                          description: `Version ${current.version} is unchanged.`,
+                        })
                       }}
-                      className={cn('h-9 rounded-lg px-3.5 text-[0.9375rem] transition-colors duration-150 disabled:cursor-default', on ? 'bg-white font-medium text-ink shadow-sm' : 'text-graphite enabled:cursor-pointer enabled:hover:text-ink')}
+                      className={cn(
+                        'h-9 rounded-lg px-3.5 text-[0.9375rem] transition-colors duration-150 disabled:cursor-default',
+                        on
+                          ? 'bg-white font-medium text-ink shadow-sm'
+                          : 'text-graphite enabled:cursor-pointer enabled:hover:text-ink',
+                      )}
                     >
                       {o.label}
                     </button>
                   )
                 })}
               </div>
-              {draft && draft.settings[s.key] !== cur && <p className="mt-2 text-[0.875rem] text-info">Draft {draft.version} changes this. Version {current.version} still uses: {s.options.find((o) => o.value === cur)?.label}.</p>}
+              {draft && draft.settings[s.key] !== cur && (
+                <p className="mt-2 text-[0.875rem] text-info">
+                  Draft {draft.version} changes this. Version {current.version}{' '}
+                  still uses: {s.options.find((o) => o.value === cur)?.label}.
+                </p>
+              )}
             </li>
           )
         })}
@@ -575,16 +966,44 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
 
 function HistoryPanel() {
   const { data } = useDemoStore()
-  const versions = [...data.ruleSets].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const versions = [...data.ruleSets].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  )
   return (
-    <Panel id="rules-history" aria-labelledby="history-title" className="scroll-mt-40 overflow-hidden">
-      <PanelHeader id="history-title" title={<span className="inline-flex items-center gap-2"><History className="size-5" aria-hidden="true" />Version history</span>} description="A published version never changes. Each case records the version applied at its decision." />
+    <Panel
+      id="rules-history"
+      aria-labelledby="history-title"
+      className="scroll-mt-40 overflow-hidden"
+    >
+      <PanelHeader
+        id="history-title"
+        title={
+          <span className="inline-flex items-center gap-2">
+            <History className="size-5" aria-hidden="true" />
+            Version history
+          </span>
+        }
+        description="A published version never changes. Each case records the version applied at its decision."
+      />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[46rem] text-left">
           <thead className="bg-mist/50 text-[0.875rem] text-slate">
             <tr>
-              {['Version', 'Status', 'Effective', 'Proposed by', 'Approved and published by'].map((h, i) => (
-                <th key={h} scope="col" className={cn('py-2.5 pr-4 font-normal', i === 0 && 'pl-5 sm:pl-6')}>
+              {[
+                'Version',
+                'Status',
+                'Effective',
+                'Proposed by',
+                'Approved and published by',
+              ].map((h, i) => (
+                <th
+                  key={h}
+                  scope="col"
+                  className={cn(
+                    'py-2.5 pr-4 font-normal',
+                    i === 0 && 'pl-5 sm:pl-6',
+                  )}
+                >
                   {h}
                 </th>
               ))}
@@ -592,19 +1011,37 @@ function HistoryPanel() {
           </thead>
           <tbody>
             {versions.map((v) => (
-              <tr key={v.version} data-cite={`version:${v.version}`} className="border-t border-line/70 align-top">
-                <td className="py-3.5 pr-4 pl-5 font-mono text-[0.9375rem] text-ink sm:pl-6">{v.version}</td>
+              <tr
+                key={v.version}
+                data-cite={`version:${v.version}`}
+                className="border-t border-line/70 align-top"
+              >
+                <td className="py-3.5 pr-4 pl-5 font-mono text-[0.9375rem] text-ink sm:pl-6">
+                  {v.version}
+                </td>
                 <td className="py-3.5 pr-4">
                   <StatusPill status={v.status} />
                 </td>
                 <td className="py-3.5 pr-4 text-[0.9375rem] text-graphite">
-                  {v.effectiveFrom ? formatDate(v.effectiveFrom) : 'Not published'}
-                  {v.supersededAt && <span className="block text-[0.875rem] text-slate">Superseded {formatDate(v.supersededAt)}</span>}
+                  {v.effectiveFrom
+                    ? formatDate(v.effectiveFrom)
+                    : 'Not published'}
+                  {v.supersededAt && (
+                    <span className="block text-[0.875rem] text-slate">
+                      Superseded {formatDate(v.supersededAt)}
+                    </span>
+                  )}
                 </td>
-                <td className="py-3.5 pr-4 text-[0.9375rem] text-graphite">{v.submittedBy ?? v.createdBy}</td>
+                <td className="py-3.5 pr-4 text-[0.9375rem] text-graphite">
+                  {v.submittedBy ?? v.createdBy}
+                </td>
                 <td className="py-3.5 pr-6 text-[0.9375rem] text-graphite">
                   {v.approvedBy ?? 'Waiting'}
-                  {v.publishedAt && <span className="block text-[0.875rem] text-slate">{formatDateTime(v.publishedAt)}</span>}
+                  {v.publishedAt && (
+                    <span className="block text-[0.875rem] text-slate">
+                      {formatDateTime(v.publishedAt)}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
