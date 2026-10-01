@@ -645,7 +645,7 @@ export function EyeHero({ className }: { className?: string }) {
           />
           <g transform="translate(-230 -212)">
             <rect
-              width="182"
+              width="172"
               height="30"
               rx="15"
               fill="#16181b"
