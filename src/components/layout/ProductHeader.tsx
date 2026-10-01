@@ -22,7 +22,7 @@ const navByPersona: Record<PersonaId, NavItem[]> = {
   reviewer: [
     { to: '/acsp/queue', label: 'Review queue' },
     { to: '/acsp/filings', label: 'Filings' },
-    { to: '/records/EO-2026-000118', label: 'Records' },
+    { to: '/records', label: 'Records' },
   ],
   individual: [],
   b2c: [],
@@ -72,7 +72,7 @@ function OrgBadge({ persona }: { persona: PersonaId }) {
 export function ProductHeader({ persona, publicNav = false, className }: { persona: PersonaId; publicNav?: boolean; className?: string }) {
   const items = publicNav ? [] : navByPersona[persona]
   return (
-    <header className={cn('sticky top-0 z-30 border-b border-line/80 bg-white/[0.92] backdrop-blur-xl backdrop-saturate-150', className)}>
+    <header className={cn('sticky top-0 z-30 print:hidden border-b border-line/80 bg-white/[0.92] backdrop-blur-xl backdrop-saturate-150', className)}>
       <div className="relative mx-auto flex h-16 max-w-[88rem] items-center gap-6 px-4 sm:px-6">
         <Link to="/" className="rounded-lg" aria-label="Evidence One home">
           <Logo suffix={publicNav ? undefined : suffixByPersona[persona]} />

@@ -8,7 +8,7 @@ import { ResetDemoButton } from './ResetDemoButton'
 */
 export function PresenterBar() {
   return (
-    <div className="on-dark bg-ink text-paper">
+    <div className="on-dark bg-ink text-paper print:hidden">
       <div className="mx-auto flex max-w-[88rem] items-center gap-3 px-4 py-2 sm:px-6">
         <span className="hidden text-sm font-medium tracking-wide text-paper/70 uppercase xl:inline">Demo view</span>
         <PersonaSwitcher />

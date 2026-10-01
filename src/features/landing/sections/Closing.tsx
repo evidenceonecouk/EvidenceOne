@@ -106,7 +106,7 @@ export function ClosingCta() {
 }
 
 const footerLinks: { heading: string; links: [string, string][] }[] = [
-  { heading: 'Platform', links: [['Verify', '/app/EO-2026-000135/invite'], ['Compliance', '/acsp/queue'], ['File', '/records/EO-2026-000118'], ['Admin', '/admin']] },
+  { heading: 'Platform', links: [['Verify', '/app/EO-2026-000135/invite'], ['Compliance', '/acsp/queue'], ['File', '/records'], ['Admin', '/admin']] },
   { heading: 'For', links: [['Directors and PSCs', '/verify'], ['Agents', '/agent'], ['ACSPs', '/acsp/queue']] },
 ]
 

@@ -20,6 +20,9 @@ const VerifyStart = lazy(() => import('@/features/b2c/VerifyStart').then((m) => 
 const ReviewQueue = lazy(() => import('@/features/acsp/ReviewQueue').then((m) => ({ default: m.ReviewQueue })))
 const CaseReview = lazy(() => import('@/features/acsp/CaseReview').then((m) => ({ default: m.CaseReview })))
 const Filings = lazy(() => import('@/features/acsp/Filings').then((m) => ({ default: m.Filings })))
+const Submission = lazy(() => import('@/features/acsp/Submission').then((m) => ({ default: m.Submission })))
+const RecordsIndex = lazy(() => import('@/features/records/RecordsIndex').then((m) => ({ default: m.RecordsIndex })))
+const VerificationRecord = lazy(() => import('@/features/records/VerificationRecord').then((m) => ({ default: m.VerificationRecord })))
 const InviteLog = lazy(() => import('@/features/agent/InviteLog').then((m) => ({ default: m.InviteLog })))
 
 export default function App() {
@@ -52,10 +55,11 @@ export default function App() {
                 <Route path="acsp">
                   <Route path="queue" element={<ReviewQueue />} />
                   <Route path="cases/:caseId" element={<CaseReview />} />
-                  <Route path="cases/:caseId/submit" element={<ScreenPlaceholder spec={s.acspSubmit} />} />
+                  <Route path="cases/:caseId/submit" element={<Submission />} />
                   <Route path="filings" element={<Filings />} />
                 </Route>
-                <Route path="records/:caseId" element={<ScreenPlaceholder spec={s.record} />} />
+                <Route path="records" element={<RecordsIndex />} />
+                <Route path="records/:caseId" element={<VerificationRecord />} />
 
                 {/* Admin */}
                 <Route path="admin" element={<ScreenPlaceholder spec={s.admin} />} />

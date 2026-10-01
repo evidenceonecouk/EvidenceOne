@@ -382,3 +382,34 @@ export function registerUpdated(data: DemoData, taskId: string): ActionResult {
     ],
   }
 }
+
+/* Submission to Companies House through GOV.UK One Login */
+
+export function handOffSubmission(data: DemoData, caseId: string, reviewerId: string): ActionResult {
+  const now = new Date().toISOString()
+  return {
+    data: patchCase(data, caseId, (c) => ({ ...c, submission: { ...c.submission, handedOffAt: now } })),
+    audit: [{ at: now, actor: reviewerName(data, reviewerId), actorType: 'person', action: 'submission.handoff', caseId, detail: 'Submission pack prepared. Handed off to GOV.UK One Login.' }],
+  }
+}
+
+export function recordSubmission(data: DemoData, caseId: string, personalCode: string, reviewerId: string): ActionResult {
+  const now = new Date().toISOString()
+  return {
+    data: patchCase(data, caseId, (c) => ({ ...c, status: 'submitted', submission: { ...c.submission, submittedAt: now, personalCode } })),
+    audit: [{ at: now, actor: reviewerName(data, reviewerId), actorType: 'person', action: 'submission.recorded', caseId, detail: 'Returned from GOV.UK One Login. Companies House personal code recorded.' }],
+  }
+}
+
+/** A plausible, clearly synthetic 11-character code for the demo. */
+export function examplePersonalCode(seed: string): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let h = 0
+  for (const ch of seed) h = (Math.imul(h, 33) + ch.charCodeAt(0)) >>> 0
+  let out = ''
+  for (let i = 0; i < 11; i++) {
+    h = (Math.imul(h, 1103515245) + 12345) >>> 0
+    out += alphabet[(h >>> 16) % alphabet.length]
+  }
+  return out
+}

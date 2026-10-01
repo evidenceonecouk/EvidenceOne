@@ -235,3 +235,8 @@
     scroll-behavior: auto !important;
   }
 }
+
+@media print {
+  body { background: #ffffff; }
+  @page { margin: 16mm; }
+}
