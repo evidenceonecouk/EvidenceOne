@@ -3,6 +3,7 @@ import { createSeed } from '@/data/seed'
 import { PRIMARY_AGENT_ID } from '@/data/organisations'
 import { appendAudit, type AuditInput } from '@/lib/audit'
 import type { DemoData, PersonaId } from '@/types/domain'
+import type { ActionResult } from './actions'
 
 /*
   Single demo store. Seeded from src/data, saved to localStorage so a presenter
@@ -10,7 +11,7 @@ import type { DemoData, PersonaId } from '@/types/domain'
 */
 
 const STORAGE_KEY = 'evidenceone.demo'
-const SCHEMA = 1
+const SCHEMA = 2
 /** A saved demo older than this is reseeded so SLA timers look live again. */
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000
 
@@ -28,6 +29,7 @@ type Action =
   | { type: 'setPersona'; persona: PersonaId }
   | { type: 'setAgent'; agentId: string }
   | { type: 'update'; recipe: (data: DemoData) => DemoData; audit?: AuditInput[] }
+  | { type: 'apply'; action: (data: DemoData) => ActionResult }
 
 function freshState(persona: PersonaId = 'agent'): DemoState {
   const now = Date.now()
@@ -61,6 +63,11 @@ function reducer(state: DemoState, action: Action): DemoState {
       }
       return { ...state, data }
     }
+    case 'apply': {
+      const result = action.action(state.data)
+      const audit = result.audit.reduce((chain, e) => appendAudit(chain, e), result.data.audit)
+      return { ...state, data: { ...result.data, audit } }
+    }
   }
 }
 
@@ -71,6 +78,8 @@ interface DemoStoreValue {
   setAgent: (agentId: string) => void
   /** Apply an immutable change to the data and append any audit events to the chain. */
   update: (recipe: (data: DemoData) => DemoData, audit?: AuditInput[]) => void
+  /** Run a store action from src/store/actions.ts; its audit events are chained automatically. */
+  apply: (action: (data: DemoData) => ActionResult) => void
   reset: () => void
 }
 
@@ -94,10 +103,11 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     [],
   )
   const reset = useCallback(() => dispatch({ type: 'reset' }), [])
+  const apply = useCallback((action: (data: DemoData) => ActionResult) => dispatch({ type: 'apply', action }), [])
 
   const value = useMemo(
-    () => ({ state, data: state.data, setPersona, setAgent, update, reset }),
-    [state, setPersona, setAgent, update, reset],
+    () => ({ state, data: state.data, setPersona, setAgent, update, apply, reset }),
+    [state, setPersona, setAgent, update, apply, reset],
   )
 
   return <DemoStoreContext.Provider value={value}>{children}</DemoStoreContext.Provider>

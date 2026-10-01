@@ -1,3 +1,4 @@
+import { AgentSwitcher } from './AgentSwitcher'
 import { PersonaSwitcher } from './PersonaSwitcher'
 import { ResetDemoButton } from './ResetDemoButton'
 
@@ -11,6 +12,9 @@ export function PresenterBar() {
       <div className="mx-auto flex max-w-[88rem] items-center gap-3 px-4 py-2 sm:px-6">
         <span className="hidden text-sm font-medium tracking-wide text-paper/70 uppercase xl:inline">Demo view</span>
         <PersonaSwitcher />
+        <div className="hidden md:block">
+          <AgentSwitcher />
+        </div>
         <div className="ml-auto flex items-center gap-1">
           <ResetDemoButton />
         </div>

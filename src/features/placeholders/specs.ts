@@ -1,40 +1,6 @@
 import type { PlaceholderSpec } from './ScreenPlaceholder'
 
 export const placeholderSpecs = {
-  agentDashboard: {
-    eyebrow: 'Agent portal',
-    title: 'Client companies',
-    summary: 'Every lodged company with its directors and PSCs, their verification status and AI flags.',
-    planned: [
-      'Status chips: Verified, In progress, Not started, Expired, Reverification due',
-      'AI flags summary across the portfolio',
-      'Switch between an Agent with ACSP status and one without',
-    ],
-  },
-  agentLookup: {
-    eyebrow: 'Agent portal',
-    title: 'Companies House lookup',
-    summary: 'Search the live register, see officers and PSCs, and connect a company to the portal.',
-    planned: ['Live search through the Companies House proxy, with a fictional fallback', 'Company profile with officers and PSCs', 'Connect company to portal'],
-  },
-  agentCompany: {
-    eyebrow: 'Agent portal',
-    title: 'Company profile',
-    summary: 'Directors and PSCs from the register, with their verification status.',
-    planned: ['Register association for each person', 'Select people to invite'],
-  },
-  agentInvite: {
-    eyebrow: 'Agent portal',
-    title: 'Bulk invite',
-    summary: 'Invite several directors and PSCs at once, pre-filled from the register.',
-    planned: ['Review pre-filled details', 'Pay myself or Agent Payment Code', 'Every invite written to the audit trail'],
-  },
-  agentInvites: {
-    eyebrow: 'Agent portal',
-    title: 'Invites',
-    summary: 'Every invite sent, its status and its audit entry.',
-    planned: ['Sent, opened, accepted, amendment requested and expired invites'],
-  },
   b2c: {
     eyebrow: 'Evidence One Verify',
     title: 'Verify my identity',

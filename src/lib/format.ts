@@ -68,3 +68,15 @@ export function fullName(p: { title?: string; givenNames: string; familyName: st
 export function initials(p: { givenNames: string; familyName: string }): string {
   return `${p.givenNames[0] ?? ''}${p.familyName[0] ?? ''}`.toUpperCase()
 }
+
+export function timeAgo(iso: ISODate, now = Date.now()): string {
+  const diff = Math.max(0, now - new Date(iso).getTime())
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`
+  return formatShortDate(iso)
+}

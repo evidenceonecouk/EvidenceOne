@@ -232,6 +232,8 @@ export interface VerificationCase {
   submission?: Submission
   /** Linked Route B correction task when the register does not match. */
   correctionTaskId?: string
+  /** Reviewed by the Agent's own ACSP team rather than referred. */
+  inHouse?: boolean
 }
 
 export interface CorrectionTask {
@@ -259,6 +261,8 @@ export interface Invite {
   paymentCode?: string
   status: 'sent' | 'opened' | 'accepted' | 'amendment_requested' | 'expired'
   caseId?: string
+  /** Agents with ACSP status may review in-house; everyone else refers to an ACSP. */
+  review?: 'referred' | 'in_house'
 }
 
 export type AuditActorType = 'person' | 'system' | 'ai'

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { personaForPath } from '@/store/personas'
 import { useDemoStore } from '@/store/DemoStore'
@@ -32,7 +32,9 @@ export function AppShell() {
       <PresenterBar />
       <ProductHeader persona={pathPersona ?? state.persona} publicNav={isLanding} className={isApp ? 'hidden sm:block' : undefined} />
       <main id="main" className="flex-1">
-        <Outlet />
+        <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )
