@@ -86,3 +86,73 @@ export function Checkbox({ className, ...props }: React.InputHTMLAttributes<HTML
     />
   )
 }
+
+/** Colourful page hero for portal home screens: mesh gradient, copy, actions and an illustration. */
+export function HeroBanner({
+  kicker,
+  title,
+  description,
+  actions,
+  illustration,
+  meta,
+}: {
+  kicker?: ReactNode
+  title: ReactNode
+  description?: ReactNode
+  actions?: ReactNode
+  illustration?: ReactNode
+  meta?: ReactNode
+}) {
+  return (
+    <section className="mesh relative mb-6 overflow-hidden rounded-[28px] border border-line/70 px-6 py-8 sm:px-10 sm:py-10">
+      <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_20rem]">
+        <div className="min-w-0">
+          {kicker && <div className="mb-3 font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">{kicker}</div>}
+          <h1 className="text-[2.25rem] leading-[1.06] font-normal tracking-[-0.035em] text-ink sm:text-[2.875rem]">{title}</h1>
+          {description && <p className="mt-3 max-w-2xl text-lg leading-relaxed text-graphite">{description}</p>}
+          {meta && <div className="mt-4 flex flex-wrap items-center gap-2">{meta}</div>}
+          {actions && <div className="mt-6 flex flex-wrap items-center gap-3">{actions}</div>}
+        </div>
+        {illustration && <div className="hidden justify-self-end lg:block">{illustration}</div>}
+      </div>
+    </section>
+  )
+}
+
+const statTones = {
+  ink: 'bg-ink text-paper',
+  progress: 'bg-progress-wash text-progress',
+  approve: 'bg-approve-wash text-approve',
+  info: 'bg-info-wash text-info',
+  ai: 'bg-ai-wash text-ai',
+  teal: 'bg-teal-wash text-teal',
+  decline: 'bg-decline-wash text-decline',
+} as const
+
+/** A stat with a coloured icon tile. */
+export function StatTile({
+  label,
+  value,
+  detail,
+  icon: Icon,
+  tone = 'ink',
+}: {
+  label: string
+  value: ReactNode
+  detail?: ReactNode
+  icon: React.ComponentType<{ className?: string }>
+  tone?: keyof typeof statTones
+}) {
+  return (
+    <div className="flex items-start gap-4 rounded-[20px] border border-line/80 bg-white p-5 shadow-[0_1px_2px_rgb(22_24_27/0.04)]">
+      <span className={cn('flex size-11 shrink-0 items-center justify-center rounded-[14px]', statTones[tone])}>
+        <Icon className="size-5" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <dt className="text-[0.9375rem] text-slate">{label}</dt>
+        <dd className="mt-1 text-[2rem] leading-none font-light tracking-[-0.04em] text-ink tabular">{value}</dd>
+        {detail && <dd className="mt-1.5 text-[0.875rem] leading-snug text-slate">{detail}</dd>}
+      </div>
+    </div>
+  )
+}

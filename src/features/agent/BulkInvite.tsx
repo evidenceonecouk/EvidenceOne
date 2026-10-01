@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { attributionText } from '@/lib/attribution'
 import { formatMoney, formatShortDate, VERIFICATION_FEE } from '@/lib/format'
+import { Avatar } from '@/components/visual/Avatar'
 import { cn } from '@/lib/utils'
 import { sendInvites } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
@@ -94,6 +95,7 @@ export function BulkInvite() {
                   />
                   <div className="min-w-0 flex-1">
                     <label htmlFor={id} className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
+                      <Avatar seed={r.personId} name={r.name} size={36} />
                       <span className="text-base font-medium text-ink">{r.name}</span>
                       <PersonStatusChip status={r.status} />
                     </label>

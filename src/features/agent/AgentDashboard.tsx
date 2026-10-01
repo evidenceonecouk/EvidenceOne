@@ -1,14 +1,40 @@
-import { ArrowRight, Plus, Send, ShieldCheck, Sparkles, Waypoints } from 'lucide-react'
+import {
+  ArrowRight,
+  BadgeCheck,
+  Building2,
+  CircleDot,
+  Link2,
+  Plus,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  UserRoundX,
+  Users,
+  Waypoints,
+  type LucideIcon,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Checkbox, MonoLabel, Page, PageHeader, Panel, PanelHeader, Stat } from '@/components/app/Page'
+import { Checkbox, HeroBanner, Page, Panel, PanelHeader, StatTile } from '@/components/app/Page'
 import { PersonStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
+import { AiTag } from '@/components/visual/AiTag'
+import { Avatar, CompanyMark } from '@/components/visual/Avatar'
+import { VerifyIllustration } from '@/components/visual/Illustrations'
 import { formatShortDate, shortHash, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import { aiFlagsForAgent, companiesForAgent, getAgent, peopleForCompany, roleLabel, type AiFlag } from '@/store/selectors'
-import type { Company } from '@/types/domain'
+import type { Company, PersonStatus } from '@/types/domain'
+
+const segmentColour: Record<PersonStatus, string> = {
+  verified: 'bg-approve',
+  in_progress: 'bg-progress',
+  not_started: 'bg-line',
+  expired: 'bg-decline',
+  reverification_due: 'bg-info',
+}
 
 export function AgentDashboard() {
   const { data, state } = useDemoStore()
@@ -16,61 +42,64 @@ export function AgentDashboard() {
   const companies = companiesForAgent(data, agent.id)
   const rows = companies.flatMap((c) => peopleForCompany(data, c.number))
   const flags = aiFlagsForAgent(data, agent.id)
-  const count = (s: string) => rows.filter((r) => r.status === s).length
+  const count = (s: PersonStatus) => rows.filter((r) => r.status === s).length
   const needAction = rows.filter((r) => r.invitable).length
 
   return (
     <Page>
-      <PageHeader
+      <HeroBanner
         kicker="Agent portal"
-        title="Client companies"
+        title={`Good to see you, ${agent.contactName.split(' ')[0]}`}
+        description={
+          agent.hasAcspStatus
+            ? `${agent.name} has ACSP status, so you can approve or decline verifications yourself, or refer them to an ACSP on Evidence One.`
+            : `${agent.name} does not have ACSP status, so every verification you start is referred to an ACSP on Evidence One, who makes the decision.`
+        }
         meta={
-          <>
-            <span className="text-ink">{agent.name}</span>
-            <span className="inline-flex items-center gap-1.5">
-              {agent.hasAcspStatus ? <ShieldCheck className="size-4" aria-hidden="true" /> : <Waypoints className="size-4" aria-hidden="true" />}
-              {agent.hasAcspStatus ? 'Agent with ACSP status' : 'Agent without ACSP status'}
-            </span>
-          </>
+          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.875rem] font-medium', agent.hasAcspStatus ? 'bg-approve-wash text-approve' : 'bg-teal-wash text-teal')}>
+            {agent.hasAcspStatus ? <ShieldCheck className="size-4" aria-hidden="true" /> : <Waypoints className="size-4" aria-hidden="true" />}
+            {agent.hasAcspStatus ? 'Agent with ACSP status' : 'Agent without ACSP status'}
+          </span>
         }
         actions={
           <>
-            <Button asChild variant="outline">
-              <Link to="/agent/invites">Invite log</Link>
-            </Button>
             <Button asChild>
               <Link to="/agent/lookup">
                 <Plus aria-hidden="true" />
                 Connect a company
               </Link>
             </Button>
+            <Button asChild variant="outline">
+              <Link to="/agent/invites">
+                <Send aria-hidden="true" />
+                Invite log
+              </Link>
+            </Button>
           </>
         }
+        illustration={<VerifyIllustration className="h-48 w-auto" />}
       />
 
-      <p className="mb-6 rounded-2xl border border-line/80 bg-white/60 px-5 py-4 text-base leading-relaxed text-graphite">
-        {agent.hasAcspStatus
-          ? `${agent.name} has ACSP status, so you can approve or decline verifications yourself, or refer them to an ACSP on Evidence One.`
-          : `${agent.name} does not have ACSP status, so every verification you start is referred to an ACSP on Evidence One, who makes the decision.`}
-      </p>
-
-      <Panel as="div" className="mb-6">
-        <dl className="grid grid-cols-2 divide-line/80 md:grid-cols-5 md:divide-x [&>div:nth-child(n+3)]:border-t [&>div:nth-child(n+3)]:border-line/80 md:[&>div:nth-child(n+3)]:border-t-0">
-          <Stat label="Companies" value={companies.length} />
-          <Stat label="Directors and PSCs" value={rows.length} />
-          <Stat label="Verified" value={count('verified')} />
-          <Stat label="In progress" value={count('in_progress')} />
-          <Stat label="Need an invite" value={needAction} detail={needAction ? 'Not started, expired or due again' : 'Everyone is covered'} />
-        </dl>
-      </Panel>
+      <dl className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatTile label="Companies" value={companies.length} icon={Building2} tone="ink" />
+        <StatTile label="Directors and PSCs" value={rows.length} icon={Users} tone="teal" />
+        <StatTile label="Verified" value={count('verified')} icon={BadgeCheck} tone="approve" />
+        <StatTile label="In progress" value={count('in_progress')} icon={CircleDot} tone="progress" />
+        <StatTile label="Need an invite" value={needAction} icon={RefreshCw} tone="info" detail={needAction ? 'Not started, expired or due again' : 'Everyone is covered'} />
+      </dl>
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_24rem]">
         <div className="space-y-6">
           {companies.length === 0 && (
-            <Panel className="p-10 text-center">
-              <p className="text-lg text-ink">No companies connected yet.</p>
+            <Panel className="flex flex-col items-center p-10 text-center">
+              <VerifyIllustration className="h-36 w-auto" />
+              <p className="mt-4 text-lg text-ink">No companies connected yet</p>
+              <p className="mt-1 text-base text-slate">Find a client company on the Companies House register to get started.</p>
               <Button asChild className="mt-5">
-                <Link to="/agent/lookup">Find a company on the register</Link>
+                <Link to="/agent/lookup">
+                  <Link2 aria-hidden="true" />
+                  Find a company
+                </Link>
               </Button>
             </Panel>
           )}
@@ -96,10 +125,12 @@ function CompanyBlock({ company }: { company: Company }) {
   const verified = rows.filter((r) => r.status === 'verified').length
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
   const headingId = `co-${company.number}`
+  const anyInvitable = rows.some((r) => r.invitable)
 
   return (
-    <Panel aria-labelledby={headingId}>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-4 border-b border-line/80 px-5 py-5 sm:px-6">
+    <Panel aria-labelledby={headingId} className="overflow-hidden">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-4 border-b border-line/80 px-5 py-5 sm:px-6">
+        <CompanyMark name={company.name} />
         <div className="min-w-0 flex-1">
           <h2 id={headingId} className="text-lg font-medium text-ink">
             <Link to={`/agent/companies/${company.number}`} className="underline-offset-4 hover:underline">
@@ -107,63 +138,76 @@ function CompanyBlock({ company }: { company: Company }) {
             </Link>
           </h2>
           <p className="mt-0.5 text-[0.9375rem] text-slate">
-            <span className="font-mono tabular">{company.number}</span> · Connected {company.connectedAt && formatShortDate(company.connectedAt)}
+            <span className="font-mono tabular">{company.number}</span> · {company.sicDescription}
+            {company.connectedAt && <> · Connected {formatShortDate(company.connectedAt)}</>}
           </p>
         </div>
-        <div className="w-40">
+        <div className="w-44">
           <div className="flex justify-between text-[0.9375rem]">
             <span className="text-slate">Verified</span>
             <span className="font-medium text-ink tabular">
               {verified} of {rows.length}
             </span>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-label={`${company.name} verified`} aria-valuemin={0} aria-valuemax={rows.length} aria-valuenow={verified}>
-            <div className="h-full rounded-full bg-ink transition-[width] duration-500" style={{ width: `${(verified / Math.max(1, rows.length)) * 100}%` }} />
+          {/* One segment per person, coloured by status */}
+          <div className="mt-2 flex gap-1" aria-hidden="true">
+            {rows.map((r) => (
+              <span key={r.personId} className={cn('h-2 flex-1 rounded-full', segmentColour[r.status])} />
+            ))}
           </div>
         </div>
         <Button
           variant={selected.length ? 'default' : 'outline'}
           size="sm"
-          disabled={!rows.some((r) => r.invitable)}
+          disabled={!anyInvitable}
           onClick={() => {
             const ids = selected.length ? selected : rows.filter((r) => r.invitable).map((r) => r.personId)
             navigate(`/agent/companies/${company.number}/invite?people=${ids.join(',')}`)
           }}
         >
           <Send aria-hidden="true" />
-          {selected.length ? `Invite ${selected.length} selected` : 'Invite people'}
+          {selected.length ? `Invite ${selected.length} selected` : anyInvitable ? 'Invite people' : 'All invited'}
         </Button>
       </div>
 
       <table className="w-full text-left">
         <caption className="sr-only">Directors and PSCs of {company.name}</caption>
-        <thead className="hidden text-[0.9375rem] text-slate sm:table-header-group">
+        <thead className="hidden bg-mist/50 text-[0.875rem] text-slate sm:table-header-group">
           <tr>
-            <th scope="col" className="w-12 py-3 pl-5 sm:pl-6">
-              <span className="sr-only">Select</span>
+            {anyInvitable && (
+              <th scope="col" className="w-12 py-2.5 pl-5 sm:pl-6">
+                <span className="sr-only">Select</span>
+              </th>
+            )}
+            <th scope="col" className={cn('py-2.5 pr-4 font-normal', !anyInvitable && 'pl-5 sm:pl-6')}>
+              Person
             </th>
-            <th scope="col" className="py-3 pr-4 font-normal">Person</th>
-            <th scope="col" className="py-3 pr-4 font-normal">Status</th>
-            <th scope="col" className="hidden py-3 pr-6 font-normal lg:table-cell">Latest</th>
+            <th scope="col" className="py-2.5 pr-4 font-normal">Status</th>
+            <th scope="col" className="hidden py-2.5 pr-6 font-normal lg:table-cell">Latest</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.personId} className={cn('border-t border-line/70 align-middle transition-colors duration-150', selected.includes(r.personId) && 'bg-mist/60')}>
-              <td className="py-4 pl-5 sm:pl-6">
-                {r.invitable && (
-                  <Checkbox aria-label={`Select ${r.name} to invite`} checked={selected.includes(r.personId)} onChange={() => toggle(r.personId)} />
-                )}
+            <tr key={r.personId} className={cn('border-t border-line/70 transition-colors duration-150', selected.includes(r.personId) && 'bg-highlight-wash/40')}>
+              {anyInvitable && (
+                <td className="py-4 pl-5 align-middle sm:pl-6">
+                  {r.invitable && <Checkbox aria-label={`Select ${r.name} to invite`} checked={selected.includes(r.personId)} onChange={() => toggle(r.personId)} />}
+                </td>
+              )}
+              <td className={cn('py-4 pr-4 align-middle', !anyInvitable && 'pl-5 sm:pl-6')}>
+                <div className="flex items-center gap-3">
+                  <Avatar seed={r.personId} name={r.name} size={40} />
+                  <div className="min-w-0">
+                    <p className="text-base font-medium text-ink">{r.name}</p>
+                    <p className="text-[0.9375rem] text-slate">{roleLabel[r.role]}</p>
+                    <p className="mt-1 text-[0.9375rem] text-slate lg:hidden">{r.detail}</p>
+                  </div>
+                </div>
               </td>
-              <td className="py-4 pr-4">
-                <p className="text-base font-medium text-ink">{r.name}</p>
-                <p className="text-[0.9375rem] text-slate">{roleLabel[r.role]}</p>
-                <p className="mt-1 text-[0.9375rem] text-slate lg:hidden">{r.detail}</p>
-              </td>
-              <td className="py-4 pr-4">
+              <td className="py-4 pr-4 align-middle">
                 <PersonStatusChip status={r.status} />
               </td>
-              <td className="hidden py-4 pr-6 text-[0.9375rem] text-graphite lg:table-cell">
+              <td className="hidden py-4 pr-6 align-middle text-[0.9375rem] text-graphite lg:table-cell">
                 {r.detail}
                 {r.latestCase && <span className="mt-0.5 block font-mono text-[0.8125rem] text-slate">{r.latestCase.id}</span>}
               </td>
@@ -175,44 +219,53 @@ function CompanyBlock({ company }: { company: Company }) {
   )
 }
 
-const flagLabel: Record<AiFlag['kind'], string> = {
-  observation: 'Observation',
-  unverified: 'Unverified',
-  expired: 'Expired',
-  reverification: 'Reverification',
+const flagSpec: Record<AiFlag['kind'], { label: string; icon: LucideIcon; tone: string }> = {
+  observation: { label: 'AI observation', icon: Sparkles, tone: 'bg-ai-wash text-ai' },
+  unverified: { label: 'Not verified', icon: UserRoundX, tone: 'bg-mist text-graphite' },
+  expired: { label: 'Expired', icon: UserRoundX, tone: 'bg-decline-wash text-decline' },
+  reverification: { label: 'Reverification', icon: RefreshCw, tone: 'bg-info-wash text-info' },
 }
 
 function FlagsPanel({ flags }: { flags: AiFlag[] }) {
   return (
-    <Panel aria-labelledby="flags-title">
+    <Panel aria-labelledby="flags-title" className="overflow-hidden">
       <PanelHeader
         id="flags-title"
-        title={
-          <span className="inline-flex items-center gap-2">
-            <Sparkles className="size-[1.125rem]" aria-hidden="true" />
-            AI flags
-          </span>
-        }
-        description="Evidence One Intelligence · advisory only"
-        actions={<span className="rounded-full bg-mist px-2.5 py-0.5 text-[0.9375rem] font-medium text-ink tabular">{flags.length}</span>}
+        title="Needs your attention"
+        description={<AiTag className="mt-1.5" label="Flagged by AI · advisory only" />}
+        actions={<span className="flex size-8 items-center justify-center rounded-full bg-ink text-[0.9375rem] font-medium text-paper tabular">{flags.length}</span>}
       />
       <ul className="divide-y divide-line/70">
-        {flags.map((f) => (
-          <li key={f.id} className="px-5 py-4 sm:px-6">
-            <MonoLabel>{flagLabel[f.kind]}</MonoLabel>
-            <p className="mt-1.5 text-base font-medium text-ink">{f.title}</p>
-            <p className="text-[0.9375rem] text-slate">
-              {f.personName} · {f.companyName}
-            </p>
-          </li>
-        ))}
+        {flags.map((f) => {
+          const spec = flagSpec[f.kind]
+          return (
+            <li key={f.id} className="flex gap-3 px-5 py-4 sm:px-6">
+              <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl', spec.tone)}>
+                <spec.icon className="size-[1.125rem]" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[0.8125rem] font-medium tracking-wide text-slate uppercase">{spec.label}</p>
+                <p className="mt-0.5 text-base font-medium text-ink">{f.title}</p>
+                <p className="text-[0.9375rem] text-slate">
+                  {f.personName} · {f.companyName}
+                </p>
+              </div>
+            </li>
+          )
+        })}
         {flags.length === 0 && <li className="px-6 py-6 text-base text-slate">Nothing needs your attention.</li>}
       </ul>
-      <p className="border-t border-line/70 px-5 py-3.5 text-[0.9375rem] leading-snug text-slate sm:px-6">
-        Flags are observations to help you follow up. Decisions are made by an ACSP.
+      <p className="border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] leading-snug text-slate sm:px-6">
+        Flags help you follow up. Decisions are always made by an ACSP.
       </p>
     </Panel>
   )
+}
+
+const activityIcon: Record<string, { icon: LucideIcon; tone: string }> = {
+  'invite.sent': { icon: Send, tone: 'bg-progress-wash text-progress' },
+  'company.connected': { icon: Link2, tone: 'bg-teal-wash text-teal' },
+  'case.decision.approved': { icon: BadgeCheck, tone: 'bg-approve-wash text-approve' },
 }
 
 function ActivityPanel() {
@@ -225,11 +278,11 @@ function ActivityPanel() {
     .reverse()
 
   return (
-    <Panel aria-labelledby="activity-title">
+    <Panel aria-labelledby="activity-title" className="overflow-hidden">
       <PanelHeader
         id="activity-title"
         title="Recent activity"
-        description="From the audit trail"
+        description="From the hash-chained audit trail"
         actions={
           <Link to="/agent/invites" className="inline-flex items-center gap-1 text-[0.9375rem] text-ink underline-offset-4 hover:underline">
             All invites
@@ -238,17 +291,25 @@ function ActivityPanel() {
         }
       />
       <ol className="divide-y divide-line/70">
-        {events.map((e) => (
-          <li key={e.seq} className="px-5 py-4 sm:px-6">
-            <p className="text-[0.9375rem] leading-snug text-ink">{e.detail}</p>
-            <p className="mt-1.5 flex items-center justify-between gap-3 text-[0.875rem] text-slate">
-              <span>{timeAgo(e.at)}</span>
-              <span className="font-mono">
-                #{e.seq} · {shortHash(e.hash)}
+        {events.map((e) => {
+          const spec = activityIcon[e.action] ?? (e.actorType === 'ai' ? { icon: Sparkles, tone: 'bg-ai-wash text-ai' } : { icon: CircleDot, tone: 'bg-mist text-graphite' })
+          return (
+            <li key={e.seq} className="flex gap-3 px-5 py-4 sm:px-6">
+              <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', spec.tone)}>
+                <spec.icon className="size-4" aria-hidden="true" />
               </span>
-            </p>
-          </li>
-        ))}
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.9375rem] leading-snug text-ink">{e.detail}</p>
+                <p className="mt-1.5 flex items-center justify-between gap-3 text-[0.875rem] text-slate">
+                  <span>{timeAgo(e.at)}</span>
+                  <span className="font-mono">
+                    #{e.seq} · {shortHash(e.hash)}
+                  </span>
+                </p>
+              </div>
+            </li>
+          )
+        })}
       </ol>
     </Panel>
   )

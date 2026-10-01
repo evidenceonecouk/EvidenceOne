@@ -1,3 +1,4 @@
+import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { ArrowLeft, Check, Link2, Loader2, Send } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -88,7 +89,12 @@ export function CompanyProfile() {
       </Link>
       <PageHeader
         kicker={profile.source === 'live' ? 'Live from Companies House' : 'Companies House register · fictional demo company'}
-        title={profile.name}
+        title={
+          <span className="flex items-center gap-4">
+            <CompanyMark name={profile.name} size={56} />
+            {profile.name}
+          </span>
+        }
         meta={
           <>
             <span className="font-mono text-ink tabular">{profile.number}</span>
@@ -140,8 +146,13 @@ export function CompanyProfile() {
                 {profile.people.map((p, i) => (
                   <tr key={`${p.name}-${i}`} className="border-t border-line/70">
                     <td className="py-4 pr-4 pl-5 sm:pl-6">
-                      <p className="font-mono text-[0.9375rem] text-ink">{p.name}</p>
-                      {p.natureOfControl && <p className="mt-1 text-[0.9375rem] text-slate first-letter:uppercase">{p.natureOfControl}</p>}
+                      <div className="flex items-center gap-3">
+                        <Avatar seed={p.personId ?? p.name} name={p.name.split(',').reverse().join(' ')} size={36} />
+                        <div>
+                          <p className="font-mono text-[0.9375rem] text-ink">{p.name}</p>
+                          {p.natureOfControl && <p className="mt-1 text-[0.9375rem] text-slate first-letter:uppercase">{p.natureOfControl}</p>}
+                        </div>
+                      </div>
                     </td>
                     <td className="py-4 pr-4 text-[0.9375rem] text-graphite">{p.roleLabel}</td>
                     <td className="py-4 pr-4 text-[0.9375rem] text-graphite">{p.appointedOn ? formatShortDate(p.appointedOn) : 'Not shown'}</td>

@@ -1,3 +1,4 @@
+import { CompanyMark } from '@/components/visual/Avatar'
 import { ChevronRight, Loader2, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -113,6 +114,7 @@ function ResultGroup({ title, results, agentId }: { title: string; results: Comp
                   to={`/agent/companies/${r.number}`}
                   className="group flex items-center gap-4 px-5 py-4 transition-colors duration-150 hover:bg-mist/60 sm:px-6"
                 >
+                  <CompanyMark name={r.name} size={40} />
                   <div className="min-w-0 flex-1">
                     <p className="text-base font-medium text-ink">{r.name}</p>
                     <p className="mt-0.5 text-[0.9375rem] text-slate">

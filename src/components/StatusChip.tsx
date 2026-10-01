@@ -44,7 +44,7 @@ const caseSpecs: Record<CaseStatus, ChipSpec> = {
 
 const toneClasses: Record<Tone, string> = {
   neutral: 'bg-mist text-graphite border-line',
-  progress: 'bg-paper text-ink border-silver',
+  progress: 'bg-progress-wash text-progress border-progress/20',
   complete: 'bg-approve-wash text-approve border-approve/25',
   attention: 'bg-info-wash text-info border-info/25',
   negative: 'bg-decline-wash text-decline border-decline/25',

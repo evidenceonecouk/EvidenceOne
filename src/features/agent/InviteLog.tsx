@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router'
 import { Page, PageHeader, Panel } from '@/components/app/Page'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, shortHash } from '@/lib/format'
+import { Avatar } from '@/components/visual/Avatar'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import { getCompany, getPerson, reviewerOrgName } from '@/store/selectors'
@@ -62,8 +63,13 @@ export function InviteLog() {
                       {isNew && <p className="mt-1 text-sm font-medium text-ink">Just sent</p>}
                     </td>
                     <td className="py-4 pr-4">
-                      <p className="text-base font-medium text-ink">{person && `${person.givenNames} ${person.familyName}`}</p>
-                      <p className="text-[0.9375rem] text-slate">{company?.name}</p>
+                      <div className="flex items-center gap-3">
+                        <Avatar seed={inv.personId} name={person ? `${person.givenNames} ${person.familyName}` : ''} size={36} />
+                        <div>
+                          <p className="text-base font-medium text-ink">{person && `${person.givenNames} ${person.familyName}`}</p>
+                          <p className="text-[0.9375rem] text-slate">{company?.name}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-4 pr-4 text-[0.9375rem] text-graphite tabular">{formatDateTime(inv.sentAt)}</td>
                     <td className="py-4 pr-4 text-[0.9375rem] text-graphite">
