@@ -450,4 +450,12 @@ export interface DemoData {
   invites: Invite[]
   ruleSets: RuleSetVersion[]
   audit: AuditEvent[]
+  /** Retention holds by case ID. A hold suspends destruction until it is lifted. */
+  retentionHolds?: Record<string, RetentionHold>
+}
+
+export interface RetentionHold {
+  reason: string
+  placedAt: ISODate
+  placedBy: string
 }

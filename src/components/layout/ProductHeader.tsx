@@ -28,7 +28,11 @@ const navByPersona: Record<PersonaId, NavItem[]> = {
   ],
   individual: [],
   b2c: [],
-  admin: [{ to: '/admin', label: 'ACSPs and allocation' }],
+  admin: [
+    { to: '/admin', label: 'Operations', end: true },
+    { to: '/admin/compliance', label: 'Compliance' },
+    { to: '/admin/audit', label: 'Audit trail' },
+  ],
   admin2: [{ to: '/rules', label: 'Rules' }],
 }
 

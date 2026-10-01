@@ -329,7 +329,7 @@ export function EyeHero({ className }: { className?: string }) {
     <div
       ref={rootRef}
       aria-hidden="true"
-      className={cn("relative overflow-hidden bg-[#a8998f]", className)}
+      className={cn("relative overflow-hidden bg-[#e6dbd3]", className)}
     >
       <svg
         ref={svgRef}
@@ -360,11 +360,12 @@ export function EyeHero({ className }: { className?: string }) {
               <feFuncA type="linear" slope="0.22" />
             </feComponentTransfer>
           </filter>
-          <radialGradient id="skinTone" cx="56%" cy="46%" r="75%">
+          {/* Centred left of the eye so the left edge stays light and meets the hero background */}
+          <radialGradient id="skinTone" cx="42%" cy="48%" r="75%">
             <stop offset="0" stopColor="#efe7e1" />
-            <stop offset="0.35" stopColor="#d9cbc1" />
-            <stop offset="0.7" stopColor="#a8958a" />
-            <stop offset="1" stopColor="#6c5b52" />
+            <stop offset="0.45" stopColor="#e6dbd3" />
+            <stop offset="0.75" stopColor="#b9a89d" />
+            <stop offset="1" stopColor="#7a685e" />
           </radialGradient>
           <radialGradient id="socket" cx="50%" cy="50%" r="50%">
             <stop offset="0.55" stopColor="#4a3a33" stopOpacity="0.5" />

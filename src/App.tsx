@@ -26,6 +26,12 @@ const Submission = lazy(() => import('@/features/acsp/Submission').then((m) => (
 const RecordsIndex = lazy(() => import('@/features/records/RecordsIndex').then((m) => ({ default: m.RecordsIndex })))
 const VerificationRecord = lazy(() => import('@/features/records/VerificationRecord').then((m) => ({ default: m.VerificationRecord })))
 const AdminConsole = lazy(() => import('@/features/admin/AdminConsole').then((m) => ({ default: m.AdminConsole })))
+const CompliancePage = lazy(() => import('@/features/admin/CompliancePage').then((m) => ({ default: m.CompliancePage })))
+const AuditTrailPage = lazy(() => import('@/features/admin/AuditTrailPage').then((m) => ({ default: m.AuditTrailPage })))
+const RetentionPage = lazy(() => import('@/features/admin/RetentionPage').then((m) => ({ default: m.RetentionPage })))
+const NotificationsPage = lazy(() => import('@/features/admin/NotificationsPage').then((m) => ({ default: m.NotificationsPage })))
+const UsersRolesPage = lazy(() => import('@/features/admin/UsersRolesPage').then((m) => ({ default: m.UsersRolesPage })))
+const WhiteLabelPage = lazy(() => import('@/features/admin/WhiteLabelPage').then((m) => ({ default: m.WhiteLabelPage })))
 const InviteLog = lazy(() => import('@/features/agent/InviteLog').then((m) => ({ default: m.InviteLog })))
 
 export default function App() {
@@ -77,6 +83,12 @@ export default function App() {
 
                 {/* Admin */}
                 <Route path="admin" element={<AdminConsole />} />
+                <Route path="admin/compliance" element={<CompliancePage />} />
+                <Route path="admin/audit" element={<AuditTrailPage />} />
+                <Route path="admin/retention" element={<RetentionPage />} />
+                <Route path="admin/notifications" element={<NotificationsPage />} />
+                <Route path="admin/users" element={<UsersRolesPage />} />
+                <Route path="admin/white-label" element={<WhiteLabelPage />} />
                 <Route path="rules" element={<RulesPage />} />
 
                 <Route path="*" element={<NotFound />} />

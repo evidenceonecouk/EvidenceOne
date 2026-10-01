@@ -1,8 +1,7 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, BadgeCheck, Smartphone, UserCheck } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { EyeHero } from "@/components/visual/EyeHero";
-import { PRIMARY_ACSP_ID } from "@/data/organisations";
 import { useDemoStore } from "@/store/DemoStore";
 import { container } from "../parts";
 
@@ -29,31 +28,33 @@ export function RuleKicker({
   );
 }
 
+const facts = [
+  { icon: Smartphone, label: "One document, read in the app" },
+  { icon: UserCheck, label: "Decided by a regulated ACSP" },
+  { icon: BadgeCheck, label: "£49 flat fee, nothing hidden" },
+];
+
 const focusEye = (on: boolean) => () =>
   window.dispatchEvent(new CustomEvent("eye:focus", { detail: on }));
 
 export function Hero() {
-  const { data, setPersona } = useDemoStore();
-  const inReview = data.cases.filter(
-    (c) => c.acspId === PRIMARY_ACSP_ID && c.status === "in_review",
-  ).length;
-  const verified = data.cases.filter((c) => c.status === "submitted" || c.status === "confirmed").length;
+  const { setPersona } = useDemoStore();
 
   return (
     <section
       aria-labelledby="hero-title"
-      className="relative overflow-hidden bg-[#f4f4f3]"
+      className="relative overflow-hidden bg-[#e6dbd3]"
     >
       {/* Interactive eye, full bleed on the right */}
       <div className="relative h-[22rem] sm:h-[28rem] lg:absolute lg:inset-y-0 lg:right-0 lg:h-auto lg:w-[56%]">
         <EyeHero className="absolute inset-0" />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 hidden w-2/5 bg-gradient-to-r from-[#f4f4f3] via-[#f4f4f3]/60 to-transparent lg:block"
+          className="pointer-events-none absolute inset-y-0 left-0 hidden w-1/5 bg-gradient-to-r from-[#e6dbd3] to-transparent lg:block"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f4f4f3] to-transparent lg:hidden"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#e6dbd3] to-transparent lg:hidden"
         />
       </div>
 
@@ -75,7 +76,7 @@ export function Hero() {
               <span className="[animation-delay:180ms]">connection.</span>
             </span>
           </h1>
-          <p className="animate-rise mt-6 max-w-[34rem] text-[1.375rem] leading-[1.3] tracking-[-0.02em] text-[#6d7279] [animation-delay:280ms] sm:text-[1.75rem]">
+          <p className="animate-rise mt-6 max-w-[34rem] text-[1.375rem] leading-[1.3] tracking-[-0.02em] text-[#575b61] [animation-delay:280ms] sm:text-[1.75rem]">
             Infrastructure connecting businesses with ACSPs to verify, submit
             and file.
           </p>
@@ -135,23 +136,20 @@ export function Hero() {
             </div>
           </div>
 
-          <div className="animate-rise mt-10 inline-flex flex-wrap items-center gap-x-4 gap-y-2 rounded-full border border-line bg-white/70 py-2 pr-5 pl-3 text-[0.9375rem] text-graphite backdrop-blur [animation-delay:440ms]">
-            <span className="relative flex size-2.5">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-approve/60" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-approve" />
-            </span>
-            <span>
-              <span className="font-medium text-ink tabular">{inReview}</span>{" "}
-              in review now
-            </span>
-            <span aria-hidden="true" className="h-4 w-px bg-line" />
-            <span>
-              <span className="font-medium text-ink tabular">{verified}</span>{" "}
-              submitted to Companies House
-            </span>
-            <span aria-hidden="true" className="h-4 w-px bg-line" />
-            <span>36-hour review target</span>
-          </div>
+          <ul className="animate-rise mt-12 grid gap-x-8 gap-y-4 border-t border-ink/15 pt-6 [animation-delay:440ms] sm:grid-cols-3">
+            {facts.map((f) => (
+              <li key={f.label} className="flex items-start gap-3">
+                <f.icon
+                  className="mt-0.5 size-5 shrink-0 text-ink"
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+                <span className="text-base leading-snug text-graphite">
+                  {f.label}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>

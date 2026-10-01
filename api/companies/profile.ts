@@ -1,4 +1,4 @@
-// Server-side proxy for a Companies House company profile with its officers and PSCs.
+// Server-side proxy for a Companies House company profile with its officers, PSCs and recent filings.
 // The API key lives only in the Vercel env var COMPANIES_HOUSE_API_KEY and never reaches the browser.
 export async function GET(request: Request): Promise<Response> {
   const number = new URL(request.url).searchParams.get("number")?.trim().toUpperCase();
@@ -16,10 +16,11 @@ export async function GET(request: Request): Promise<Response> {
   const headers = { Authorization: "Basic " + btoa(`${key}:`) };
   const get = (path: string) => fetch(`${base}${number}${path}`, { headers });
 
-  const [profile, officers, pscs] = await Promise.all([
+  const [profile, officers, pscs, filings] = await Promise.all([
     get(""),
-    get("/officers?items_per_page=50"),
+    get("/officers?items_per_page=100"),
     get("/persons-with-significant-control?items_per_page=50"),
+    get("/filing-history?items_per_page=12"),
   ]);
 
   if (!profile.ok)
@@ -30,6 +31,7 @@ export async function GET(request: Request): Promise<Response> {
     profile: await profile.json(),
     officers: officers.ok ? await officers.json() : { items: [] },
     pscs: pscs.ok ? await pscs.json() : { items: [] },
+    filings: filings.ok ? await filings.json() : { items: [] },
   };
 
   return Response.json(body, {

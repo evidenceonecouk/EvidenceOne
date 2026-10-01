@@ -1,7 +1,8 @@
-import { Archive, ChevronsUpDown, Gauge, Inbox, LayoutDashboard, ListChecks, Menu, Search, Send, ShieldCheck, Waypoints, X, type LucideIcon } from 'lucide-react'
+import { Archive, ChevronsUpDown, Gauge, Hourglass, Inbox, LayoutDashboard, Link2, ListChecks, Menu, Palette, Search, Send, ShieldCheck, Users, Waypoints, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { Logo } from '@/components/brand/Logo'
+import { NotificationsPreview } from '@/features/admin/NotificationsPreview'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
@@ -49,8 +50,13 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
   return {
     section: 'Administration',
     items: [
-      { to: '/admin', label: 'Operations', icon: Gauge },
+      { to: '/admin', label: 'Operations', icon: Gauge, end: true },
+      { to: '/admin/compliance', label: 'Compliance', icon: ShieldCheck },
       { to: '/rules', label: 'Rules', icon: ListChecks, count: data.ruleSets.filter((v) => v.status === 'draft').length },
+      { to: '/admin/audit', label: 'Audit trail', icon: Link2 },
+      { to: '/admin/retention', label: 'Retention', icon: Hourglass },
+      { to: '/admin/users', label: 'Users and roles', icon: Users },
+      { to: '/admin/white-label', label: 'White label', icon: Palette },
     ],
   }
 }
@@ -152,7 +158,8 @@ function Sidebar({ persona, onNavigate }: { persona: PersonaId; onNavigate?: () 
       </nav>
 
       <div className="mt-auto space-y-3">
-        <div className="rounded-2xl bg-[linear-gradient(140deg,#16181b,#2b2f36)] p-4 text-paper">
+        {persona === 'admin' && <NotificationsPreview onNavigate={onNavigate} />}
+        <div className={cn('rounded-2xl bg-[linear-gradient(140deg,#16181b,#2b2f36)] p-4 text-paper', persona === 'admin' && 'hidden')}>
           <ShieldCheck className="size-5 text-highlight" aria-hidden="true" />
           <p className="mt-2 text-[0.9375rem] font-medium">Human decisions only</p>
           <p className="mt-1 text-[0.8125rem] leading-snug text-paper/70">Rules are deterministic and AI is advisory. Only an ACSP reviewer can approve or decline.</p>
