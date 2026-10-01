@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Checkbox, MonoLabel, Page, PageHeader, Panel, PanelHeader } from '@/components/app/Page'
 import { Stepper } from '@/components/app/Stepper'
 import { useToast } from '@/components/app/Toaster'
-import { LogoMark } from '@/components/brand/Logo'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { PersonStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
@@ -218,7 +218,7 @@ export function BulkInvite() {
                   </p>
                 </div>
                 <div className="px-6 py-7">
-                  <LogoMark className="size-7 p-1.5" />
+                  <Wordmark />
                   <p className="mt-6 text-lg text-ink">Dear {chosen[0].name.split(' ')[0]},</p>
                   <p className="mt-3 text-base leading-relaxed text-graphite">
                     Companies House now asks every director and person with significant control to verify their identity. {agent.name} has invited you to do this for {company.name}.

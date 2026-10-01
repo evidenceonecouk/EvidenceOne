@@ -4,7 +4,7 @@ import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
 import { CaseStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
-import { LogoMark } from '@/components/brand/Logo'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { reasonCodes } from '@/data/reasonCodes'
 import { verifyChain } from '@/lib/audit'
 import { formatDate, formatDateTime, fullName, retentionExpiry, shortHash } from '@/lib/format'
@@ -70,12 +70,9 @@ export function VerificationRecord() {
         <div className="mesh h-2 print:hidden" aria-hidden="true" />
         <div className="p-7 sm:p-10">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <LogoMark />
-              <div>
-                <p className="text-base font-semibold text-ink">Evidence One File</p>
-                <p className="text-[0.875rem] text-slate">Verification record</p>
-              </div>
+            <div>
+              <Wordmark />
+              <p className="mt-3 text-[0.875rem] text-slate">Evidence One File · Verification record</p>
             </div>
             <div className="text-right">
               <p className="font-mono text-[0.9375rem] text-ink">{vc.id}</p>

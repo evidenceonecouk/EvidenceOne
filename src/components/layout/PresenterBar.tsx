@@ -1,4 +1,3 @@
-import { AgentSwitcher } from './AgentSwitcher'
 import { PersonaSwitcher } from './PersonaSwitcher'
 import { ResetDemoButton } from './ResetDemoButton'
 
@@ -8,13 +7,10 @@ import { ResetDemoButton } from './ResetDemoButton'
 */
 export function PresenterBar() {
   return (
-    <div className="on-dark bg-ink text-paper print:hidden">
-      <div className="mx-auto flex max-w-[88rem] items-center gap-3 px-4 py-2 sm:px-6">
+    <div className="on-dark sticky top-0 z-40 h-14 bg-ink text-paper print:hidden">
+      <div className="mx-auto flex h-full max-w-[88rem] items-center gap-3 px-4 sm:px-6">
         <span className="hidden text-sm font-medium tracking-wide text-paper/70 uppercase xl:inline">Demo view</span>
         <PersonaSwitcher />
-        <div className="hidden md:block">
-          <AgentSwitcher />
-        </div>
         <div className="ml-auto flex items-center gap-1">
           <ResetDemoButton />
         </div>

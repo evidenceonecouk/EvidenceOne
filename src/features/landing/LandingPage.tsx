@@ -1,20 +1,24 @@
 import { Audiences } from './sections/Audiences'
-import { ClosingCta, Footer, Numbers, Standards } from './sections/Closing'
+import { Standards } from './sections/Closing'
+import { Hub, Steps, TrustStrip } from './sections/Connect'
+import { DarkFooter, Forward } from './sections/Forward'
 import { Hero } from './sections/Hero'
-import { Pillars } from './sections/Pillars'
 import { Platform } from './sections/Platform'
+import { SeeItWorking } from './sections/SeeItWorking'
 
 export function LandingPage() {
   return (
-    <div className="bg-white">
+    <div className="bg-[#f4f4f3]">
       <Hero />
-      <Pillars />
+      <Steps />
+      <Hub />
+      <TrustStrip />
+      <SeeItWorking />
       <Platform />
       <Audiences />
-      <Numbers />
       <Standards />
-      <ClosingCta />
-      <Footer />
+      <Forward />
+      <DarkFooter />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { ChevronLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { LogoMark } from '@/components/brand/Logo'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { PhoneFrame } from '@/components/phone/PhoneFrame'
 import { shortHash, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -57,8 +58,7 @@ export function AppBar({ stage, onBack, hideProgress }: { stage: number; onBack?
         </button>
       ) : (
         <span className="ml-1 flex items-center gap-2">
-          <LogoMark className="size-7 p-1.5" />
-          {hideProgress && <span className="text-base font-semibold text-ink">Evidence One</span>}
+          {hideProgress ? <Wordmark tagline={false} className="[&>span:first-child]:text-[1.375rem]" /> : <LogoMark className="size-8" />}
         </span>
       )}
       {!hideProgress && (

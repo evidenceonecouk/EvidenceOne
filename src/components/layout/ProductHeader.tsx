@@ -1,5 +1,7 @@
 import { NavLink, Link } from 'react-router'
+import { ArrowRight } from 'lucide-react'
 import { Logo } from '@/components/brand/Logo'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getAcsp, getAgent } from '@/store/selectors'
@@ -30,9 +32,10 @@ const navByPersona: Record<PersonaId, NavItem[]> = {
 }
 
 const publicLinks = [
-  ['How it works', '#product-verify'],
+  ['For ACSPs', '#for-acsps'],
+  ['For partners', '#for-partners'],
+  ['How it works', '#how-it-works'],
   ['Platform', '#platform-title'],
-  ['Who it is for', '#audiences-title'],
   ['Standards', '#standards-title'],
 ] as const
 
@@ -72,10 +75,10 @@ function OrgBadge({ persona }: { persona: PersonaId }) {
 export function ProductHeader({ persona, publicNav = false, className }: { persona: PersonaId; publicNav?: boolean; className?: string }) {
   const items = publicNav ? [] : navByPersona[persona]
   return (
-    <header className={cn('sticky top-0 z-30 print:hidden border-b border-line/80 bg-white/[0.92] backdrop-blur-xl backdrop-saturate-150', className)}>
-      <div className="relative mx-auto flex h-16 max-w-[88rem] items-center gap-6 px-4 sm:px-6">
+    <header className={cn('sticky top-14 z-30 print:hidden border-b border-line/80 backdrop-blur-xl backdrop-saturate-150', publicNav ? 'bg-[#f4f4f3]/[0.92]' : 'bg-white/[0.92]', className)}>
+      <div className={cn('relative mx-auto flex max-w-[88rem] items-center gap-6 px-4 sm:px-6', publicNav ? 'h-20' : 'h-16')}>
         <Link to="/" className="rounded-lg" aria-label="Evidence One home">
-          <Logo suffix={publicNav ? undefined : suffixByPersona[persona]} />
+          {publicNav ? <Wordmark /> : <Logo suffix={suffixByPersona[persona]} />}
         </Link>
         {items.length > 0 && (
           <nav aria-label="Main" className="-mx-1 flex min-w-0 items-center gap-1 overflow-x-auto">
@@ -99,15 +102,21 @@ export function ProductHeader({ persona, publicNav = false, className }: { perso
         <div className="ml-auto flex items-center gap-3">
           {publicNav ? (
             <>
-              <nav aria-label="Main" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
+              <nav aria-label="Main" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 xl:flex">
                 {publicLinks.map(([label, href]) => (
-                  <a key={label} href={href} className="rounded-lg px-4 py-2 text-base text-ink transition-colors duration-150 hover:bg-ink/[0.05]">
+                  <a key={label} href={href} className="rounded-lg px-3 py-2 text-[0.9375rem] text-ink transition-colors duration-150 hover:bg-ink/[0.05]">
                     {label}
                   </a>
                 ))}
               </nav>
-              <Button asChild size="sm">
-                <Link to="/verify">Verify my identity</Link>
+              <Link to="/acsp/queue" className="hidden rounded-lg px-3 py-2 text-base text-ink hover:bg-ink/[0.05] sm:inline-block">
+                Log in
+              </Link>
+              <Button asChild size="sm" className="rounded-full px-5">
+                <Link to="/verify">
+                  Get started
+                  <ArrowRight aria-hidden="true" />
+                </Link>
               </Button>
             </>
           ) : (

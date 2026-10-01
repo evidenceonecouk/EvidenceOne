@@ -88,8 +88,8 @@ export function AgentDashboard() {
         <StatTile label="Need an invite" value={needAction} icon={RefreshCw} tone="info" detail={needAction ? 'Not started, expired or due again' : 'Everyone is covered'} />
       </dl>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_24rem]">
-        <div className="space-y-6">
+      <div className="grid items-start gap-6 2xl:grid-cols-[1fr_24rem]">
+        <div className="min-w-0 space-y-6">
           {companies.length === 0 && (
             <Panel className="flex flex-col items-center p-10 text-center">
               <VerifyIllustration className="h-36 w-auto" />
@@ -108,7 +108,7 @@ export function AgentDashboard() {
           ))}
         </div>
 
-        <div className="space-y-6 xl:sticky xl:top-24">
+        <div className="grid items-start gap-6 lg:grid-cols-2 2xl:sticky 2xl:top-24 2xl:grid-cols-1">
           <FlagsPanel flags={flags} />
           <ActivityPanel />
         </div>
@@ -138,11 +138,12 @@ function CompanyBlock({ company }: { company: Company }) {
             </Link>
           </h2>
           <p className="mt-0.5 text-[0.9375rem] text-slate">
-            <span className="font-mono tabular">{company.number}</span> · {company.sicDescription}
+            <span className="font-mono tabular">{company.number}</span>
+            <span className="hidden 2xl:inline"> · {company.sicDescription}</span>
             {company.connectedAt && <> · Connected {formatShortDate(company.connectedAt)}</>}
           </p>
         </div>
-        <div className="w-44">
+        <div className="w-full sm:w-44">
           <div className="flex justify-between text-[0.9375rem]">
             <span className="text-slate">Verified</span>
             <span className="font-medium text-ink tabular">
@@ -182,7 +183,7 @@ function CompanyBlock({ company }: { company: Company }) {
             <th scope="col" className={cn('py-2.5 pr-4 font-normal', !anyInvitable && 'pl-5 sm:pl-6')}>
               Person
             </th>
-            <th scope="col" className="py-2.5 pr-4 font-normal">Status</th>
+            <th scope="col" className="hidden py-2.5 pr-4 font-normal sm:table-cell">Status</th>
             <th scope="col" className="hidden py-2.5 pr-6 font-normal lg:table-cell">Latest</th>
           </tr>
         </thead>
@@ -200,11 +201,12 @@ function CompanyBlock({ company }: { company: Company }) {
                   <div className="min-w-0">
                     <p className="text-base font-medium text-ink">{r.name}</p>
                     <p className="text-[0.9375rem] text-slate">{roleLabel[r.role]}</p>
+                    <PersonStatusChip status={r.status} className="mt-1.5 sm:hidden" />
                     <p className="mt-1 text-[0.9375rem] text-slate lg:hidden">{r.detail}</p>
                   </div>
                 </div>
               </td>
-              <td className="py-4 pr-4 align-middle">
+              <td className="hidden py-4 pr-4 align-middle sm:table-cell">
                 <PersonStatusChip status={r.status} />
               </td>
               <td className="hidden py-4 pr-6 align-middle text-[0.9375rem] text-graphite lg:table-cell">

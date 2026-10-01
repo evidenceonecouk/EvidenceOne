@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 /* Layout primitives shared by every product screen. */
 
 export function Page({ children, className, width = 'wide' }: { children: ReactNode; className?: string; width?: 'wide' | 'narrow' }) {
   return (
-    <div className={cn('mx-auto px-4 pt-8 pb-20 sm:px-6 lg:pt-10', width === 'wide' ? 'max-w-[88rem]' : 'max-w-[60rem]', className)}>
+    <div className={cn('stagger mx-auto px-4 pt-8 pb-20 sm:px-6 lg:px-10 lg:pt-10', width === 'wide' ? 'max-w-[92rem]' : 'max-w-[60rem]', className)}>
       {children}
     </div>
   )
@@ -39,7 +40,7 @@ export function PageHeader({
 
 export function Panel({ children, className, as: Tag = 'section', ...rest }: { children: ReactNode; className?: string; as?: 'section' | 'div' | 'article' } & Record<string, unknown>) {
   return (
-    <Tag className={cn('rounded-[20px] border border-line/80 bg-white shadow-[0_1px_2px_rgb(22_24_27/0.04)]', className)} {...rest}>
+    <Tag className={cn('min-w-0 rounded-[20px] border border-line/80 bg-white shadow-[0_1px_2px_rgb(22_24_27/0.04)]', className)} {...rest}>
       {children}
     </Tag>
   )
@@ -71,19 +72,20 @@ export function MonoLabel({ children, className }: { children: ReactNode; classN
   return <span className={cn('font-mono text-[0.8125rem] tracking-[0.12em] text-slate uppercase', className)}>{children}</span>
 }
 
-/** A native checkbox styled to the brand, with a large hit area. */
+/** A native checkbox styled to the brand. The real input stays focusable; the box and tick are drawn from its state. */
 export function Checkbox({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <input
-      type="checkbox"
-      className={cn(
-        'size-5 shrink-0 cursor-pointer appearance-none rounded-[6px] border-[1.5px] border-slate bg-white transition-colors duration-150',
-        "checked:border-ink checked:bg-ink checked:bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fafaf9' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E\")] checked:bg-[length:80%] checked:bg-center checked:bg-no-repeat",
-        'disabled:cursor-not-allowed disabled:opacity-40',
-        className,
-      )}
-      {...props}
-    />
+    <span className={cn('relative inline-flex size-[1.375rem] shrink-0', className)}>
+      <input type="checkbox" className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0 disabled:cursor-not-allowed" {...props} />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none flex size-full items-center justify-center rounded-[7px] border-[1.5px] border-slate bg-white text-transparent transition-[background-color,border-color,color,transform] duration-150 ease-out peer-hover:border-ink peer-checked:border-ink peer-checked:bg-ink peer-checked:text-highlight peer-focus-visible:ring-[3px] peer-focus-visible:ring-ink peer-focus-visible:ring-offset-2 peer-active:scale-90 peer-disabled:opacity-40"
+      >
+        <svg viewBox="0 0 24 24" className="size-[0.95rem]" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m5 12.5 4.5 4.5L19 7.5" />
+        </svg>
+      </span>
+    </span>
   )
 }
 
@@ -144,15 +146,40 @@ export function StatTile({
   tone?: keyof typeof statTones
 }) {
   return (
-    <div className="flex items-start gap-4 rounded-[20px] border border-line/80 bg-white p-5 shadow-[0_1px_2px_rgb(22_24_27/0.04)]">
+    <div className="lift flex items-start gap-4 rounded-[20px] border border-line/80 bg-white p-5 shadow-[0_1px_2px_rgb(22_24_27/0.04)]">
       <span className={cn('flex size-11 shrink-0 items-center justify-center rounded-[14px]', statTones[tone])}>
         <Icon className="size-5" aria-hidden="true" />
       </span>
       <div className="min-w-0">
         <dt className="text-[0.9375rem] text-slate">{label}</dt>
-        <dd className="mt-1 text-[2rem] leading-none font-light tracking-[-0.04em] text-ink tabular">{value}</dd>
+        <dd className="mt-1 text-[2rem] leading-none font-light tracking-[-0.04em] text-ink tabular">{typeof value === 'number' ? <CountUp value={value} /> : value}</dd>
         {detail && <dd className="mt-1.5 text-[0.875rem] leading-snug text-slate">{detail}</dd>}
       </div>
     </div>
   )
+}
+
+/** Counts up to a number on first render; jumps straight there when motion is reduced. */
+export function CountUp({ value, duration = 700 }: { value: number; duration?: number }) {
+  const [shown, setShown] = useState(0)
+  const from = useRef(0)
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(value)
+      return
+    }
+    const start = performance.now()
+    const begin = from.current
+    let frame = 0
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / duration)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setShown(Math.round(begin + (value - begin) * eased))
+      if (p < 1) frame = requestAnimationFrame(tick)
+      else from.current = value
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [value, duration])
+  return <>{shown}</>
 }

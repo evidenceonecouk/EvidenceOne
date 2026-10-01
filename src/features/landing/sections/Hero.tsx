@@ -1,77 +1,77 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { formatMoney, VERIFICATION_FEE } from '@/lib/format'
+import { EyeVisual } from '@/components/visual/EyeVisual'
 import { useDemoStore } from '@/store/DemoStore'
-import { Kicker, container } from '../parts'
-import { ProductStage } from '../stage/ProductStage'
+import { container } from '../parts'
 
-const capabilities = [
-  'Companies House identity standard',
-  'Option 1 certified IDVT',
-  'Passport chip read in the app',
-  'Liveness and face match',
-  'PEP and sanctions screening',
-  'Exact register match',
-  'ACSP04 corrections',
-  'GOV.UK One Login handoff',
-  'Seven-year records',
-  'Hash-chained audit trail',
-]
+/** Kicker with a trailing rule, as in the client's design. */
+export function RuleKicker({ children, className = '', tone = 'light' }: { children: React.ReactNode; className?: string; tone?: 'light' | 'dark' }) {
+  return (
+    <p className={`flex items-center gap-4 text-[0.8125rem] font-medium tracking-[0.28em] uppercase ${tone === 'light' ? 'text-graphite' : 'text-paper/70'} ${className}`}>
+      {children}
+      <span aria-hidden="true" className={`h-px w-12 ${tone === 'light' ? 'bg-silver' : 'bg-white/30'}`} />
+    </p>
+  )
+}
 
 export function Hero() {
   const { setPersona } = useDemoStore()
   return (
-    <section aria-labelledby="hero-title" className="bg-white">
-      <div className={`${container} pt-16 pb-14 text-center sm:pt-24 lg:pt-28 lg:pb-16`}>
-        <Kicker className="animate-rise">Companies House identity verification</Kicker>
-        <h1
-          id="hero-title"
-          className="animate-rise mt-6 text-[3.25rem] leading-[0.98] font-normal tracking-[-0.05em] text-ink [animation-delay:60ms] sm:text-[4.75rem] lg:text-[6rem]"
-        >
-          One identity. One record.
-          <br />
-          <span className="text-[#7b8188]">Proof that lasts.</span>
-        </h1>
-        <p className="animate-rise mx-auto mt-7 max-w-[42rem] text-lg leading-relaxed text-graphite [animation-delay:120ms] sm:text-xl">
-          The platform ACSPs and Agents use to prepare, evidence and record identity verification for company directors
-          and PSCs. Every decision is made by a qualified person.
-        </p>
-        <div className="animate-rise mt-9 flex flex-col items-center justify-center gap-3 [animation-delay:180ms] sm:flex-row">
-          <Button asChild size="lg" className="w-full sm:w-auto">
-            <Link to="/verify" onClick={() => setPersona('b2c')}>
-              Verify my identity
-              <ArrowRight aria-hidden="true" />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
-            <Link to="/agent" onClick={() => setPersona('agent')}>
-              Open the Agent portal
-            </Link>
-          </Button>
+    <section aria-labelledby="hero-title" className="relative overflow-hidden bg-[#f4f4f3]">
+      {/* Macro eye, full bleed on the right */}
+      <div className="relative h-72 sm:h-96 lg:absolute lg:inset-y-0 lg:right-0 lg:h-auto lg:w-[52%]">
+        <EyeVisual className="absolute inset-0" />
+        <div aria-hidden="true" className="absolute inset-0 hidden bg-gradient-to-r from-[#f4f4f3] via-[#f4f4f3]/30 to-transparent lg:block lg:w-1/3" />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#f4f4f3] to-transparent lg:hidden" />
+        <div className="absolute top-1/2 right-6 hidden -translate-y-1/2 text-[0.8125rem] leading-[2] font-medium tracking-[0.32em] text-white uppercase [text-shadow:0_1px_8px_rgb(0_0_0/0.35)] xl:block">
+          <p>Clearer</p>
+          <p>practice.</p>
+          <p>Stronger</p>
+          <p>businesses.</p>
+          <span aria-hidden="true" className="my-5 block h-px w-12 bg-white/70" />
+          <p>A more</p>
+          <p>transparent</p>
+          <p>tomorrow.</p>
         </div>
-        <p className="animate-rise mt-5 text-base text-slate [animation-delay:240ms]">
-          {formatMoney(VERIFICATION_FEE)} per verification, or nothing to pay with an Agent Payment Code
-        </p>
       </div>
 
-      <div className="animate-rise [animation-delay:200ms]">
-        <ProductStage />
-      </div>
+      <div className={`${container} relative pt-10 pb-16 lg:pt-24 lg:pb-28`}>
+        <div className="max-w-[40rem]">
+          <RuleKicker className="animate-rise">Infrastructure for Companies House</RuleKicker>
+          <h1
+            id="hero-title"
+            className="animate-rise mt-7 text-[2.75rem] leading-[1.02] font-normal tracking-[-0.045em] text-ink [animation-delay:60ms] sm:text-[3.75rem] lg:text-[4.25rem]"
+          >
+            Companies House.
+            <br />
+            One simpler connection.
+          </h1>
+          <p className="animate-rise mt-5 text-[1.5rem] leading-[1.25] font-normal tracking-[-0.02em] text-[#6d7279] [animation-delay:120ms] sm:text-[1.875rem]">
+            Infrastructure connecting businesses with ACSPs to verify, submit and file.
+          </p>
 
-      <div className="mask-fade-x mx-auto max-w-[88rem] overflow-hidden py-12" aria-label="Capabilities">
-        <ul className="animate-marquee flex w-max gap-12">
-          {[...capabilities, ...capabilities].map((c, i) => (
-            <li
-              key={`${c}-${i}`}
-              aria-hidden={i >= capabilities.length}
-              className="flex items-center gap-12 font-mono text-[0.875rem] tracking-[0.14em] whitespace-nowrap text-slate uppercase"
-            >
-              {c}
-              <span aria-hidden="true" className="size-1.5 rotate-45 bg-silver" />
-            </li>
-          ))}
-        </ul>
+          <div className="animate-rise mt-10 grid gap-6 [animation-delay:180ms] sm:grid-cols-2">
+            <div>
+              <Button asChild size="lg" className="h-14 w-full rounded-full text-lg">
+                <Link to="/acsp/queue" onClick={() => setPersona('reviewer')}>
+                  I'm an ACSP
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+              <p className="mt-3 px-2 text-base leading-snug text-graphite">Bring your clients and manage everything in one place.</p>
+            </div>
+            <div>
+              <Button asChild size="lg" variant="outline" className="h-14 w-full rounded-full border-ink/25 bg-white/70 text-lg">
+                <Link to="/verify" onClick={() => setPersona('b2c')}>
+                  I need an ACSP
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+              <p className="mt-3 px-2 text-base leading-snug text-graphite">Get connected with a regulated ACSP and complete your verification.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   )

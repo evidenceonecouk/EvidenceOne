@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router'
 import { personaForPath } from '@/store/personas'
 import { useDemoStore } from '@/store/DemoStore'
 import { PresenterBar } from './PresenterBar'
+import { PortalShell } from './PortalShell'
 import { ProductHeader } from './ProductHeader'
 
 export function AppShell() {
@@ -10,6 +11,8 @@ export function AppShell() {
   const { state, setPersona } = useDemoStore()
   const isLanding = pathname === '/'
   const isApp = pathname.startsWith('/app/')
+  const portalPersona = personaForPath(pathname)
+  const isPortal = portalPersona === 'agent' || portalPersona === 'reviewer' || portalPersona === 'admin'
 
   // Deep links and the back button keep the persona switcher in step with the screen.
   const pathPersona = personaForPath(pathname)
@@ -30,12 +33,24 @@ export function AppShell() {
         Skip to main content
       </a>
       <PresenterBar />
-      <ProductHeader persona={pathPersona ?? state.persona} publicNav={isLanding} className={isApp ? 'hidden sm:block' : undefined} />
-      <main id="main" className="flex-1">
-        <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
-          <Outlet />
-        </Suspense>
-      </main>
+      {isPortal ? (
+        <PortalShell persona={portalPersona}>
+          <main id="main">
+            <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
+              <Outlet />
+            </Suspense>
+          </main>
+        </PortalShell>
+      ) : (
+        <>
+          <ProductHeader persona={pathPersona ?? state.persona} publicNav={isLanding} className={isApp ? 'hidden sm:block' : undefined} />
+          <main id="main" className="flex-1">
+            <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
+              <Outlet />
+            </Suspense>
+          </main>
+        </>
+      )}
     </div>
   )
 }

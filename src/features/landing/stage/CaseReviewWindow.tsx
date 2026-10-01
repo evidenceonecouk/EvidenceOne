@@ -1,6 +1,6 @@
 import { ArrowRight, CircleCheck, CirclePause, CircleX, FileWarning, Lock, MessageSquareMore, Sparkles } from 'lucide-react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
-import { LogoMark } from '@/components/brand/Logo'
+import { Wordmark } from '@/components/brand/Wordmark'
 
 /*
   A static, high-fidelity rendering of the ACSP case review screen for the
@@ -47,8 +47,7 @@ export function CaseReviewWindow() {
         {/* Sidebar */}
         <aside className="flex w-[176px] shrink-0 flex-col border-r border-line bg-[#f7f8f8] px-3 py-4">
           <div className="flex items-center gap-2 px-2">
-            <LogoMark className="size-6 p-[5px]" />
-            <span className="text-[13px] font-semibold">Evidence One</span>
+            <Wordmark tagline={false} className="[&>span:first-child]:text-[17px]" />
           </div>
           <p className="mt-6 px-2 font-mono text-[10px] tracking-[0.12em] text-slate uppercase">Compliance</p>
           <ul className="mt-2 space-y-0.5 text-[13px]">
