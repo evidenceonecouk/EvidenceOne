@@ -32,12 +32,12 @@
   --decline-wash: #fdecea;
 
   /* Supporting accents for the portal: each passes AA as text on its wash */
-  --progress: #1f56c4;
-  --progress-wash: #e9f0fd;
-  --ai: #6b3bd4;
-  --ai-wash: #f1ecfd;
-  --teal: #0b6e66;
-  --teal-wash: #e2f4f1;
+  --progress: #2b2f36;
+  --progress-wash: #f1f2f3;
+  --ai: #3d4248;
+  --ai-wash: #f1f2f3;
+  --teal: #3d4248;
+  --teal-wash: #f1f2f3;
 
   /* shadcn semantic tokens */
   --radius: 0.625rem;
@@ -62,8 +62,8 @@
 }
 
 @theme inline {
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Google Sans Code", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --color-ink: var(--ink);
   --color-graphite: var(--graphite);

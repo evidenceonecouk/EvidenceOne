@@ -43,7 +43,7 @@ export function AppShell() {
         </PortalShell>
       ) : (
         <>
-          <ProductHeader persona={pathPersona ?? state.persona} publicNav={isLanding} className={isApp ? 'hidden sm:block' : undefined} />
+          <ProductHeader persona={pathPersona ?? state.persona} publicNav={isLanding} className={isApp ? 'hidden' : undefined} />
           <main id="main" className="flex-1">
             <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
               <Outlet />

@@ -165,9 +165,11 @@ export function PortalShell({ persona, children }: { persona: PersonaId; childre
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)]">
-      <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-[17.5rem] shrink-0 border-r border-line/80 bg-[#fbfbfa] lg:block print:hidden">
-        <Sidebar persona={persona} />
-      </aside>
+      <div className="hidden w-[17.5rem] shrink-0 border-r border-line/80 bg-[#fbfbfa] lg:block print:hidden">
+        <aside className="sticky top-14 h-[calc(100dvh-3.5rem)]">
+          <Sidebar persona={persona} />
+        </aside>
+      </div>
 
       <div className="min-w-0 flex-1">
         <div className="sticky top-14 z-30 flex h-16 items-center justify-between border-b border-line/80 bg-white/90 px-4 backdrop-blur-xl lg:hidden print:hidden">

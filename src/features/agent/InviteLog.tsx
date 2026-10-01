@@ -57,7 +57,7 @@ export function InviteLog() {
                 const s = inviteStatus[inv.status]
                 const isNew = idx < fresh
                 return (
-                  <tr key={inv.id} className={cn('border-t border-line/70 align-top', isNew && 'bg-highlight-wash/45')}>
+                  <tr key={inv.id} className={cn('border-t border-line/70 align-top', isNew && 'bg-mist')}>
                     <td className="py-4 pr-4 pl-5 sm:pl-6">
                       <p className="font-mono text-[0.9375rem] text-ink tabular">{inv.id}</p>
                       {isNew && <p className="mt-1 text-sm font-medium text-ink">Just sent</p>}

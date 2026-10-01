@@ -1,5 +1,5 @@
 import { ChevronLeft } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { LogoMark } from '@/components/brand/Logo'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { PhoneFrame } from '@/components/phone/PhoneFrame'
@@ -11,11 +11,12 @@ import { stageLabels, type StepSpec } from './journey'
 /* Desktop layout: presenter caption, the phone, and the live audit feed for this case. */
 export function JourneyShell({ step, caseId, children }: { step: StepSpec; caseId: string; children: ReactNode }) {
   return (
-    <div className="mx-auto grid max-w-[88rem] items-start gap-10 px-0 sm:px-6 sm:py-10 lg:grid-cols-[1fr_auto_1fr]">
-      <aside className="hidden lg:sticky lg:top-28 lg:block lg:pt-16">
+    <div className="mx-auto grid max-w-[92rem] items-start gap-12 px-0 sm:px-8 sm:py-5 lg:grid-cols-[1fr_auto_1fr]">
+      <aside className="hidden lg:sticky lg:top-24 lg:block lg:pt-24">
         <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">{step.caption.kicker}</p>
         <h2 className="mt-3 max-w-sm text-[2rem] leading-[1.1] font-normal tracking-[-0.03em] text-ink">{step.caption.title}</h2>
         <p className="mt-4 max-w-sm text-lg leading-relaxed text-graphite">{step.caption.body}</p>
+        <p className="mt-10 max-w-sm border-t border-line pt-4 text-[0.9375rem] text-slate">Shown as it will appear in the Evidence One app.</p>
       </aside>
       <PhoneFrame>{children}</PhoneFrame>
       <LiveFeed caseId={caseId} />
@@ -27,7 +28,7 @@ function LiveFeed({ caseId }: { caseId: string }) {
   const { data } = useDemoStore()
   const events = data.audit.filter((e) => e.caseId === caseId).slice(-4).reverse()
   return (
-    <aside className="hidden lg:sticky lg:top-28 lg:block lg:pt-16" aria-label="Audit trail for this case">
+    <aside className="hidden lg:sticky lg:top-24 lg:block lg:pt-24" aria-label="Audit trail for this case">
       <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">Live on the platform</p>
       <p className="mt-3 max-w-xs text-base text-graphite">
         Every step is written to the audit trail for case <span className="font-mono text-ink">{caseId}</span>.
@@ -72,10 +73,45 @@ export function AppBar({ stage, onBack, hideProgress }: { stage: number; onBack?
   )
 }
 
+/*
+  A phone screen: scrolling content plus a fixed action footer. Whenever something on the
+  screen changes (a check completes, a result appears), the content scrolls down just enough
+  to bring it into view. It only ever scrolls down, so live counters cannot make it jitter.
+*/
 export function Screen({ children, footer, className }: { children: ReactNode; footer?: ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const box = ref.current
+    if (!box) return
+    let frame = 0
+    let target: Element | null = null
+    const reveal = () => {
+      frame = 0
+      if (!target || !box.contains(target)) return
+      const b = box.getBoundingClientRect()
+      const t = target.getBoundingClientRect()
+      const overflow = t.bottom - b.bottom + 20
+      if (overflow > 0) box.scrollBy({ top: overflow, behavior: 'smooth' })
+    }
+    const mo = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        const node = m.type === 'characterData' ? m.target.parentElement : (m.addedNodes[0] as Element | undefined) ?? (m.target as Element)
+        const el = node instanceof Element ? (node.closest('li, p, [data-follow]') ?? node) : null
+        if (el) target = el
+      }
+      if (!frame) frame = requestAnimationFrame(reveal)
+    })
+    mo.observe(box, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'data-state'] })
+    return () => {
+      mo.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [])
   return (
     <>
-      <div className={cn('flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pt-2 pb-6', className)}>{children}</div>
+      <div ref={ref} className={cn('flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-smooth px-5 pt-2 pb-6', className)}>
+        {children}
+      </div>
       {footer && <div className="shrink-0 space-y-2.5 border-t border-line/70 bg-paper px-5 pt-4 pb-5">{footer}</div>}
     </>
   )

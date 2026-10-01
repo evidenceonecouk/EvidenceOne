@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 export function Page({ children, className, width = 'wide' }: { children: ReactNode; className?: string; width?: 'wide' | 'narrow' }) {
   return (
-    <div className={cn('stagger mx-auto px-4 pt-8 pb-20 sm:px-6 lg:px-10 lg:pt-10', width === 'wide' ? 'max-w-[92rem]' : 'max-w-[60rem]', className)}>
+    <div className={cn('stagger mx-auto px-4 pt-8 pb-20 sm:px-8 lg:pt-10', width === 'wide' ? 'max-w-[92rem]' : 'max-w-[60rem]', className)}>
       {children}
     </div>
   )
@@ -29,8 +29,8 @@ export function PageHeader({
     <header className="flex flex-col gap-6 pb-8 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
         {kicker && <div className="mb-3 font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">{kicker}</div>}
-        <h1 className="text-[2.25rem] leading-[1.08] font-normal tracking-[-0.035em] text-ink sm:text-[2.75rem]">{title}</h1>
-        {description && <p className="mt-3 max-w-2xl text-lg leading-relaxed text-graphite">{description}</p>}
+        <h1 className="text-[2rem] leading-[1.1] font-medium tracking-[-0.025em] text-ink sm:text-[2.25rem]">{title}</h1>
+        {description && <p className="mt-2 max-w-2xl text-base leading-relaxed text-slate sm:text-[1.0625rem]">{description}</p>}
         {meta && <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.9375rem] text-slate">{meta}</div>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
@@ -40,7 +40,7 @@ export function PageHeader({
 
 export function Panel({ children, className, as: Tag = 'section', ...rest }: { children: ReactNode; className?: string; as?: 'section' | 'div' | 'article' } & Record<string, unknown>) {
   return (
-    <Tag className={cn('min-w-0 rounded-[20px] border border-line/80 bg-white shadow-[0_1px_2px_rgb(22_24_27/0.04)]', className)} {...rest}>
+    <Tag className={cn('min-w-0 rounded-2xl border border-line/80 bg-white shadow-[0_1px_2px_rgb(22_24_27/0.04)]', className)} {...rest}>
       {children}
     </Tag>
   )
@@ -48,9 +48,9 @@ export function Panel({ children, className, as: Tag = 'section', ...rest }: { c
 
 export function PanelHeader({ title, description, actions, id }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; id?: string }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line/80 px-5 py-4 sm:px-6">
+    <div className="flex min-h-[4.25rem] flex-wrap items-center justify-between gap-3 border-b border-line/80 px-5 py-4 sm:px-6">
       <div className="min-w-0">
-        <h2 id={id} className="text-lg font-medium text-ink">{title}</h2>
+        <h2 id={id} className="text-[1.0625rem] font-medium text-ink">{title}</h2>
         {description && <p className="mt-0.5 text-[0.9375rem] text-slate">{description}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
@@ -89,13 +89,12 @@ export function Checkbox({ className, ...props }: React.InputHTMLAttributes<HTML
   )
 }
 
-/** Colourful page hero for portal home screens: mesh gradient, copy, actions and an illustration. */
+/** Page header for portal home screens. Kept calm: title, context and actions on one baseline. */
 export function HeroBanner({
   kicker,
   title,
   description,
   actions,
-  illustration,
   meta,
 }: {
   kicker?: ReactNode
@@ -106,55 +105,39 @@ export function HeroBanner({
   meta?: ReactNode
 }) {
   return (
-    <section className="mesh relative mb-6 overflow-hidden rounded-[28px] border border-line/70 px-6 py-8 sm:px-10 sm:py-10">
-      <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_20rem]">
-        <div className="min-w-0">
-          {kicker && <div className="mb-3 font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">{kicker}</div>}
-          <h1 className="text-[2.25rem] leading-[1.06] font-normal tracking-[-0.035em] text-ink sm:text-[2.875rem]">{title}</h1>
-          {description && <p className="mt-3 max-w-2xl text-lg leading-relaxed text-graphite">{description}</p>}
-          {meta && <div className="mt-4 flex flex-wrap items-center gap-2">{meta}</div>}
-          {actions && <div className="mt-6 flex flex-wrap items-center gap-3">{actions}</div>}
-        </div>
-        {illustration && <div className="hidden justify-self-end lg:block">{illustration}</div>}
+    <header className="mb-8 flex flex-col gap-5 border-b border-line/80 pb-8 lg:flex-row lg:items-end lg:justify-between">
+      <div className="min-w-0">
+        {kicker && <div className="mb-2.5 font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">{kicker}</div>}
+        <h1 className="text-[2rem] leading-[1.1] font-medium tracking-[-0.025em] text-ink sm:text-[2.25rem]">{title}</h1>
+        {description && <p className="mt-2 max-w-3xl text-base leading-relaxed text-slate sm:text-[1.0625rem]">{description}</p>}
+        {meta && <div className="mt-4 flex flex-wrap items-center gap-2">{meta}</div>}
       </div>
-    </section>
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
+    </header>
   )
 }
 
-const statTones = {
-  ink: 'bg-ink text-paper',
-  progress: 'bg-progress-wash text-progress',
-  approve: 'bg-approve-wash text-approve',
-  info: 'bg-info-wash text-info',
-  ai: 'bg-ai-wash text-ai',
-  teal: 'bg-teal-wash text-teal',
-  decline: 'bg-decline-wash text-decline',
-} as const
-
-/** A stat with a coloured icon tile. */
+/** A stat card: label and icon on top, the figure below. Neutral by design; colour is reserved for decisions. */
 export function StatTile({
   label,
   value,
   detail,
   icon: Icon,
-  tone = 'ink',
 }: {
   label: string
   value: ReactNode
   detail?: ReactNode
   icon: React.ComponentType<{ className?: string }>
-  tone?: keyof typeof statTones
+  tone?: string
 }) {
   return (
-    <div className="lift flex items-start gap-4 rounded-[20px] border border-line/80 bg-white p-5 shadow-[0_1px_2px_rgb(22_24_27/0.04)]">
-      <span className={cn('flex size-11 shrink-0 items-center justify-center rounded-[14px]', statTones[tone])}>
-        <Icon className="size-5" aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <dt className="text-[0.9375rem] text-slate">{label}</dt>
-        <dd className="mt-1 text-[2rem] leading-none font-light tracking-[-0.04em] text-ink tabular">{typeof value === 'number' ? <CountUp value={value} /> : value}</dd>
-        {detail && <dd className="mt-1.5 text-[0.875rem] leading-snug text-slate">{detail}</dd>}
+    <div className="flex h-full flex-col rounded-2xl border border-line/80 bg-white px-5 py-5 shadow-[0_1px_2px_rgb(22_24_27/0.04)]">
+      <div className="flex items-center justify-between gap-3">
+        <dt className="truncate text-[0.9375rem] text-slate">{label}</dt>
+        <Icon className="size-[1.125rem] shrink-0 text-silver" aria-hidden="true" />
       </div>
+      <dd className="mt-3 text-[2.25rem] leading-none font-medium tracking-[-0.03em] text-ink tabular">{typeof value === 'number' ? <CountUp value={value} /> : value}</dd>
+      <dd className="mt-2 min-h-[1.25rem] text-[0.875rem] leading-snug text-slate">{detail}</dd>
     </div>
   )
 }

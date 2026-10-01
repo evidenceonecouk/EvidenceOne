@@ -246,7 +246,7 @@ export function EyeHero({ className }: { className?: string }) {
   }, [])
 
   return (
-    <div ref={rootRef} aria-hidden="true" className={cn('relative overflow-hidden bg-[#9a9da0]', className)}>
+    <div ref={rootRef} aria-hidden="true" className={cn('relative overflow-hidden bg-[#a8998f]', className)}>
       <svg ref={svgRef} viewBox={`40 -70 ${W - 60} ${H + 140}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full cursor-crosshair">
         <defs>
           {/* Skin: noise lit from the top left, for pores and relief */}
@@ -261,28 +261,29 @@ export function EyeHero({ className }: { className?: string }) {
             </feComponentTransfer>
           </filter>
           <radialGradient id="skinTone" cx="56%" cy="46%" r="75%">
-            <stop offset="0" stopColor="#e3e3e2" />
-            <stop offset="0.35" stopColor="#c7c9ca" />
-            <stop offset="0.7" stopColor="#8e9194" />
-            <stop offset="1" stopColor="#56595c" />
+            <stop offset="0" stopColor="#efe7e1" />
+            <stop offset="0.35" stopColor="#d9cbc1" />
+            <stop offset="0.7" stopColor="#a8958a" />
+            <stop offset="1" stopColor="#6c5b52" />
           </radialGradient>
           <radialGradient id="socket" cx="50%" cy="50%" r="50%">
-            <stop offset="0.55" stopColor="#3a3d40" stopOpacity="0.55" />
-            <stop offset="1" stopColor="#3a3d40" stopOpacity="0" />
+            <stop offset="0.55" stopColor="#4a3a33" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#4a3a33" stopOpacity="0" />
           </radialGradient>
           <radialGradient id="sclera" cx="50%" cy="54%" r="62%">
-            <stop offset="0" stopColor="#f7f7f6" />
-            <stop offset="0.5" stopColor="#e6e6e5" />
-            <stop offset="0.82" stopColor="#b6b9bb" />
-            <stop offset="1" stopColor="#7f8285" />
+            <stop offset="0" stopColor="#fbf9f7" />
+            <stop offset="0.5" stopColor="#efe8e3" />
+            <stop offset="0.82" stopColor="#d2bdb4" />
+            <stop offset="1" stopColor="#a6857c" />
           </radialGradient>
           <radialGradient id="irisBase" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stopColor="#2a2c2e" />
-            <stop offset="0.3" stopColor="#8d9195" />
-            <stop offset="0.5" stopColor="#c3c7ca" />
-            <stop offset="0.72" stopColor="#7d8185" />
-            <stop offset="0.9" stopColor="#3d4043" />
-            <stop offset="1" stopColor="#151617" />
+            <stop offset="0" stopColor="#2b1d10" />
+            <stop offset="0.26" stopColor="#9a5f1f" />
+            <stop offset="0.4" stopColor="#d39a45" />
+            <stop offset="0.56" stopColor="#8f9a6f" />
+            <stop offset="0.74" stopColor="#5f7584" />
+            <stop offset="0.9" stopColor="#33424d" />
+            <stop offset="1" stopColor="#141a1f" />
           </radialGradient>
           <radialGradient id="pupilSoft" cx="50%" cy="50%" r="50%">
             <stop offset="0.6" stopColor="#060607" stopOpacity="0.85" />
@@ -315,14 +316,14 @@ export function EyeHero({ className }: { className?: string }) {
         <rect y={-150} width={W} height={H + 300} filter="url(#skin)" />
         <ellipse cx={C.x - 10} cy={C.y - 10} rx="440" ry="250" fill="url(#socket)" filter="url(#blur10)" />
         {/* Brow hairs */}
-        <g opacity="0.28" stroke="#3b3e41" strokeLinecap="round" filter="url(#blur1)">
+        <g opacity="0.3" stroke="#3a2c24" strokeLinecap="round" filter="url(#blur1)">
           {Array.from({ length: 110 }, (_, i) => {
             const x = 140 + i * 6.6 + rand(i) * 6
             const y = -20 - Math.sin((i / 110) * Math.PI) * 46 + rand(i + 1) * 16
             return <path key={i} d={`M ${x} ${y + 22} q ${10 + rand(i + 2) * 8} -${12 + rand(i + 3) * 6} ${22 + rand(i + 4) * 10} -${6 + rand(i + 5) * 6}`} strokeWidth={1.2 + rand(i + 6)} fill="none" />
           })}
         </g>
-        <path ref={set('crease')} d={OPEN.crease} fill="none" stroke="#45484b" strokeOpacity="0.55" strokeWidth="9" filter="url(#blur4)" />
+        <path ref={set('crease')} d={OPEN.crease} fill="none" stroke="#5a463c" strokeOpacity="0.5" strokeWidth="9" filter="url(#blur4)" />
 
         {/* The eyeball, clipped to the opening */}
         <g clipPath="url(#eyeClip)">
@@ -338,14 +339,14 @@ export function EyeHero({ className }: { className?: string }) {
             <circle r={IRIS_R} fill="url(#irisBase)" />
             <g filter="url(#organic)">
               {FIBRES.map((f, i) => (
-                <path key={i} d={f.d} fill="none" stroke={f.light ? '#eceef0' : '#151617'} strokeOpacity={f.o} strokeWidth={f.w} strokeLinecap="round" />
+                <path key={i} d={f.d} fill="none" stroke={f.light ? '#f3e3c4' : '#1d1610'} strokeOpacity={f.o} strokeWidth={f.w} strokeLinecap="round" />
               ))}
               {CRYPTS.map((c, i) => (
-                <ellipse key={i} cx={c.x} cy={c.y} rx={c.rx} ry={c.ry} transform={`rotate(${c.rot} ${c.x} ${c.y})`} fill="#1a1b1d" opacity={c.o} />
+                <ellipse key={i} cx={c.x} cy={c.y} rx={c.rx} ry={c.ry} transform={`rotate(${c.rot} ${c.x} ${c.y})`} fill="#2a1d12" opacity={c.o} />
               ))}
-              <path d={COLLARETTE} fill="none" stroke="#e2e4e6" strokeOpacity="0.45" strokeWidth="3" />
+              <path d={COLLARETTE} fill="none" stroke="#f0c77e" strokeOpacity="0.55" strokeWidth="3.5" />
             </g>
-            <circle r={IRIS_R - 4} fill="none" stroke="#0d0e0f" strokeOpacity="0.85" strokeWidth="14" filter="url(#blur1)" />
+            <circle r={IRIS_R - 4} fill="none" stroke="#121a20" strokeOpacity="0.85" strokeWidth="14" filter="url(#blur1)" />
             <circle ref={set('pupilHalo')} r="58" fill="url(#pupilSoft)" />
             <circle ref={set('pupil')} r="40" fill="#040405" />
           </g>
@@ -356,10 +357,10 @@ export function EyeHero({ className }: { className?: string }) {
             <circle cx={C.x + 46} cy={C.y + 40} r="5" fill="#ffffff" opacity="0.6" />
           </g>
           {/* Shadow cast by the upper lid */}
-          <path ref={set('lidShadow')} d={OPEN.upper} fill="none" stroke="#2a2c2e" strokeOpacity="0.5" strokeWidth="46" filter="url(#blur10)" />
+          <path ref={set('lidShadow')} d={OPEN.upper} fill="none" stroke="#3a2b24" strokeOpacity="0.5" strokeWidth="46" filter="url(#blur10)" />
         </g>
-        <path ref={set('outline')} d={OPEN.almond} fill="none" stroke="#3a3d40" strokeOpacity="0.5" strokeWidth="3" filter="url(#blur1)" />
-        <path ref={set('lidEdge')} d={OPEN.upper} fill="none" stroke="#1f2123" strokeOpacity="0.85" strokeWidth="7" strokeLinecap="round" />
+        <path ref={set('outline')} d={OPEN.almond} fill="none" stroke="#6d4f45" strokeOpacity="0.55" strokeWidth="3" filter="url(#blur1)" />
+        <path ref={set('lidEdge')} d={OPEN.upper} fill="none" stroke="#22181a" strokeOpacity="0.85" strokeWidth="7" strokeLinecap="round" />
 
         {/* Lashes */}
         <g stroke="#141516" fill="none" strokeLinecap="round">
@@ -391,13 +392,13 @@ export function EyeHero({ className }: { className?: string }) {
           <g transform="translate(-230 -212)">
             <rect width="186" height="30" rx="15" fill="#16181b" fillOpacity="0.88" />
             <circle cx="16" cy="15" r="4" fill="#ffd84d" />
-            <text x="28" y="20" fill="#fafaf9" fontFamily="Geist Mono, monospace" fontSize="13" letterSpacing="1.5">
+            <text x="28" y="20" fill="#fafaf9" fontFamily="Google Sans Code, monospace" fontSize="13" letterSpacing="1.5">
               IRIS LOCKED
             </text>
           </g>
           <g transform="translate(64 186)">
             <rect width="230" height="30" rx="15" fill="#16181b" fillOpacity="0.88" />
-            <text ref={set('readout')} x="16" y="20" fill="#fafaf9" fontFamily="Geist Mono, monospace" fontSize="13" letterSpacing="1">
+            <text ref={set('readout')} x="16" y="20" fill="#fafaf9" fontFamily="Google Sans Code, monospace" fontSize="13" letterSpacing="1">
               GAZE  X +0.00  Y +0.00
             </text>
           </g>

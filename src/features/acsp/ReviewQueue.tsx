@@ -97,6 +97,13 @@ export function ReviewQueue() {
       </div>
 
       <Panel className="overflow-hidden" role="tabpanel">
+        <div aria-hidden="true" className={cn(QROW, 'hidden h-10 border-b border-line/80 bg-[#f8f8f7] text-[0.8125rem] font-medium tracking-[0.04em] text-slate uppercase sm:grid')}>
+          <span>Person</span>
+          <span className="hidden lg:block">Company</span>
+          <span>Status</span>
+          <span>SLA</span>
+          <span />
+        </div>
         <ul className="divide-y divide-line/70">
           {shown.map((c) => (
             <QueueRow key={c.id} vc={c} onOpen={() => navigate(`/acsp/cases/${c.id}`)} />
@@ -114,6 +121,9 @@ export function ReviewQueue() {
   )
 }
 
+/* Shared columns for the queue header and rows. */
+const QROW = 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 px-6 sm:grid-cols-[minmax(0,1.5fr)_14rem_9rem_6rem] lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_14rem_9rem_6rem]'
+
 function QueueRow({ vc, onOpen }: { vc: VerificationCase; onOpen: () => void }) {
   const { data } = useDemoStore()
   const person = getPerson(data, vc.personId)!
@@ -123,63 +133,55 @@ function QueueRow({ vc, onOpen }: { vc: VerificationCase; onOpen: () => void }) 
   const mismatch = vc.comparison.some((r) => r.result === 'mismatch')
   const name = fullName(person)
 
+  const origin = vc.origin === 'b2c' ? 'Direct client, allocated by rota' : `Referred by ${agent?.name}`
+  const waiting =
+    vc.status === 'info_requested' ? 'Waiting on the individual' : vc.status === 'halted_register_mismatch' ? 'Waiting on the register' : vc.decision ? `Decided ${formatShortDate(vc.decision.decidedAt)}` : ''
+
   return (
-    <li className="group relative grid items-center gap-x-6 gap-y-3 px-5 py-5 transition-colors duration-150 hover:bg-mist/50 sm:px-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_auto_auto]">
-      <div className="flex min-w-0 items-center gap-3.5">
-        <Avatar seed={vc.personId} name={name} size={44} />
+    <li className={cn(QROW, 'group relative min-h-[5rem] py-4 transition-colors duration-150 hover:bg-[#fafaf9]')}>
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar seed={vc.personId} name={name} size={40} />
         <div className="min-w-0">
-          <p className="text-base font-medium text-ink">
+          <p className="truncate text-[0.9375rem] font-medium text-ink">
             <Link to={`/acsp/cases/${vc.id}`} className="after:absolute after:inset-0 focus-visible:outline-none">
               {name}
             </Link>
           </p>
-          <p className="flex flex-wrap items-center gap-x-2 text-[0.9375rem] text-slate">
-            <span className="font-mono">{vc.id}</span>
-            <span>·</span>
-            <span>Route A</span>
-            <span>·</span>
-            <span>{vc.origin === 'b2c' ? 'Direct client, allocated by rota' : `Referred by ${agent?.name}`}</span>
+          <p className="truncate text-[0.875rem] text-slate">
+            <span className="font-mono">{vc.id}</span> · {origin}
           </p>
         </div>
       </div>
-      <div className="flex min-w-0 items-center gap-3">
-        <CompanyMark name={company.name} size={32} />
+      <div className="hidden min-w-0 items-center gap-2.5 lg:flex">
+        <CompanyMark name={company.name} size={28} />
         <span className="min-w-0 truncate text-[0.9375rem] text-graphite">{company.name}</span>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-col items-start gap-1.5">
         <CaseStatusChip status={vc.status} />
-        {mismatch && vc.status === 'in_review' && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-info-wash px-2.5 py-1 text-sm font-medium text-info">
-            <FileWarning className="size-4" aria-hidden="true" />
+        {mismatch && vc.status === 'in_review' ? (
+          <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-info">
+            <FileWarning className="size-3.5" aria-hidden="true" />
             Register mismatch
           </span>
-        )}
-        {flags.length > 0 && !mismatch && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-ai-wash px-2.5 py-1 text-sm font-medium text-ai">
-            <Sparkles className="size-4" aria-hidden="true" />
-            {flags.length} AI flag{flags.length === 1 ? '' : 's'}
+        ) : flags.length > 0 ? (
+          <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-graphite">
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            {flags.length} AI flag{flags.length === 1 ? '' : 's'} · advisory
           </span>
-        )}
-        {vc.idvt.pepSanctionsDetail?.includes('possible') && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-mist px-2.5 py-1 text-sm font-medium text-graphite">
-            <CircleAlert className="size-4" aria-hidden="true" />
+        ) : vc.idvt.pepSanctionsDetail?.includes('possible') ? (
+          <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-graphite">
+            <CircleAlert className="size-3.5" aria-hidden="true" />
             PEP name match discounted
           </span>
-        )}
+        ) : null}
       </div>
-      <div className="flex items-center justify-between gap-3 lg:justify-end">
-        {vc.status === 'in_review' && vc.slaDueAt ? (
-          <SlaPill due={vc.slaDueAt} />
-        ) : (
-          <span className="text-[0.9375rem] text-slate">{vc.status === 'info_requested' ? 'Waiting on the individual' : vc.status === 'halted_register_mismatch' ? 'Waiting on the register' : vc.decision ? `Decided ${formatShortDate(vc.decision.decidedAt)}` : ''}</span>
-        )}
-        <span className="relative z-10 hidden sm:block">
-          <Button size="sm" variant="outline" onClick={onOpen} tabIndex={-1} aria-hidden="true">
-            Open
-            <ArrowRight aria-hidden="true" />
-          </Button>
-        </span>
-      </div>
+      <div className="hidden sm:block">{vc.status === 'in_review' && vc.slaDueAt ? <SlaPill due={vc.slaDueAt} /> : <span className="text-[0.875rem] text-slate">{waiting}</span>}</div>
+      <span className="relative z-10 hidden justify-end sm:flex">
+        <Button size="sm" variant="outline" onClick={onOpen} tabIndex={-1} aria-hidden="true">
+          Open
+          <ArrowRight aria-hidden="true" />
+        </Button>
+      </span>
     </li>
   )
 }

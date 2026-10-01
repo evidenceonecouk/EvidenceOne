@@ -26,7 +26,7 @@ export function PhoneFrame({
           // Phone sized screens: no device chrome, fills the space below the presenter bar
           'h-[calc(100dvh-3.5rem)]',
           // Larger screens: device chrome, scaled to fit the viewport height
-          'sm:h-auto sm:w-[min(390px,calc((100dvh-11rem)*0.4621))] sm:aspect-[390/844] sm:rounded-[3rem] sm:border-[10px] sm:border-ink sm:shadow-[0_40px_80px_-30px_rgb(22_24_27/0.45),0_0_0_1px_rgb(22_24_27/0.08)]',
+          'sm:h-auto sm:w-[min(440px,calc((100dvh-6rem)*0.4621))] sm:aspect-[390/844] sm:rounded-[3rem] sm:border-[10px] sm:border-ink sm:shadow-[0_40px_80px_-30px_rgb(22_24_27/0.45),0_0_0_1px_rgb(22_24_27/0.08)]',
         )}
       >
         <StatusBar />
@@ -35,7 +35,6 @@ export function PhoneFrame({
           <span className="h-[5px] w-32 rounded-full bg-ink/85" />
         </div>
       </div>
-      <p className="mt-4 hidden text-sm text-slate sm:block">Shown as it will appear in the Evidence One app</p>
     </div>
   )
 }

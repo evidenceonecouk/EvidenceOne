@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
-const tints = ['#ffe9a3', '#dcd3fb', '#cfe0fd', '#cdeee8', '#fde0cc', '#f6d2df']
+const tints = ['#eceeef', '#e4e6e8', '#f1f1ef', '#e8e9e6']
 
 function hash(s: string) {
   let h = 0
@@ -46,14 +46,7 @@ export function Avatar({ seed, name, size = 40, className }: { seed: string; nam
   )
 }
 
-const marks = [
-  ['#16181b', '#ffd84d'],
-  ['#1f56c4', '#ffffff'],
-  ['#0b6e66', '#ffffff'],
-  ['#6b3bd4', '#ffffff'],
-  ['#b4541a', '#ffffff'],
-  ['#2b2f36', '#a8f0dc'],
-] as const
+const marks = [['#1d1f23', '#fafaf9']] as const
 
 /** Monogram tile standing in for a client company's logo. */
 export function CompanyMark({ name, size = 44, className }: { name: string; size?: number; className?: string }) {
@@ -68,7 +61,7 @@ export function CompanyMark({ name, size = 44, className }: { name: string; size
   return (
     <span
       aria-hidden="true"
-      className={cn('inline-flex shrink-0 items-center justify-center rounded-[14px] font-semibold tracking-[-0.02em] shadow-[inset_0_-2px_0_rgb(0_0_0/0.15)]', className)}
+      className={cn('inline-flex shrink-0 items-center justify-center rounded-[10px] font-medium tracking-[-0.01em]', className)}
       style={{ width: size, height: size, background: bg, color: fg, fontSize: size * 0.36 }}
     >
       {letters}
