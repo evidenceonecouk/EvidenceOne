@@ -413,3 +413,15 @@ export function examplePersonalCode(seed: string): string {
   }
   return out
 }
+
+/* Admin */
+
+export function setAllocationShare(data: DemoData, acspId: string, share: number): ActionResult {
+  const acsp = data.acsps.find((a) => a.id === acspId)
+  if (!acsp) return { data, audit: [] }
+  const next = Math.max(5, Math.min(80, share))
+  return {
+    data: { ...data, acsps: data.acsps.map((a) => (a.id === acspId ? { ...a, b2cAllocationShare: next } : a)) },
+    audit: [{ at: new Date().toISOString(), actor: 'Platform administrator', actorType: 'person', action: 'admin.allocation.updated', detail: `B2C allocation weight for ${acsp.name} set to ${next}.` }],
+  }
+}

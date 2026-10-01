@@ -6,8 +6,6 @@ import { ToastProvider } from '@/components/app/Toaster'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { NotFound } from '@/features/placeholders/NotFound'
-import { ScreenPlaceholder } from '@/features/placeholders/ScreenPlaceholder'
-import { placeholderSpecs as s } from '@/features/placeholders/specs'
 import { DemoStoreProvider } from '@/store/DemoStore'
 
 // Screens load on demand so the landing page stays light.
@@ -23,6 +21,7 @@ const Filings = lazy(() => import('@/features/acsp/Filings').then((m) => ({ defa
 const Submission = lazy(() => import('@/features/acsp/Submission').then((m) => ({ default: m.Submission })))
 const RecordsIndex = lazy(() => import('@/features/records/RecordsIndex').then((m) => ({ default: m.RecordsIndex })))
 const VerificationRecord = lazy(() => import('@/features/records/VerificationRecord').then((m) => ({ default: m.VerificationRecord })))
+const AdminConsole = lazy(() => import('@/features/admin/AdminConsole').then((m) => ({ default: m.AdminConsole })))
 const InviteLog = lazy(() => import('@/features/agent/InviteLog').then((m) => ({ default: m.InviteLog })))
 
 export default function App() {
@@ -62,7 +61,7 @@ export default function App() {
                 <Route path="records/:caseId" element={<VerificationRecord />} />
 
                 {/* Admin */}
-                <Route path="admin" element={<ScreenPlaceholder spec={s.admin} />} />
+                <Route path="admin" element={<AdminConsole />} />
 
                 <Route path="*" element={<NotFound />} />
               </Route>
