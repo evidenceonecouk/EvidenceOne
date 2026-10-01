@@ -16,6 +16,8 @@ const C = { x: 540, y: 330 }
 const L = { x: 175, y: 345 }
 const R = { x: 885, y: 318 }
 const IRIS_R = 150
+
+const CHECKS = ['CHIP SIGNATURE VALID', 'LIVENESS PASSED', 'FACE MATCH 98.6%', 'PEP AND SANCTIONS CLEAR', 'REGISTER MATCH', 'READY FOR ACSP REVIEW']
 const OPEN_UP = 112
 const CLOSED_UP = 470
 const LOW_Y = 512
@@ -171,7 +173,9 @@ export function EyeHero({ className }: { className?: string }) {
       g.pupilHalo?.setAttribute('r', (58 * s.pupil).toFixed(2))
       g.spec?.setAttribute('transform', `translate(${(s.x * 0.45).toFixed(1)} ${(s.y * 0.45).toFixed(1)})`)
       g.hud?.setAttribute('transform', `translate(${(C.x + s.bx).toFixed(1)} ${(C.y + s.by).toFixed(1)})`)
-      if (g.readout) g.readout.textContent = `GAZE  X ${(s.x / MAX_X >= 0 ? '+' : '') + (s.x / MAX_X).toFixed(2)}  Y ${(s.y / MAX_Y >= 0 ? '+' : '') + (s.y / MAX_Y).toFixed(2)}`
+      // Step through the checks a case goes through, about two seconds each
+      const step = CHECKS[Math.floor(performance.now() / 2200) % CHECKS.length]
+      if (g.readout && g.readout.textContent !== step) g.readout.textContent = step
     }
 
     const applyLids = () => {
@@ -390,16 +394,17 @@ export function EyeHero({ className }: { className?: string }) {
           ))}
           <line className="eye-scan" x1="-200" x2="200" y1="0" y2="0" stroke="#ffffff" strokeOpacity="0.8" strokeWidth="1.5" />
           <g transform="translate(-230 -212)">
-            <rect width="186" height="30" rx="15" fill="#16181b" fillOpacity="0.88" />
+            <rect width="282" height="30" rx="15" fill="#16181b" fillOpacity="0.88" />
             <circle cx="16" cy="15" r="4" fill="#ffd84d" />
             <text x="28" y="20" fill="#fafaf9" fontFamily="Google Sans Code, monospace" fontSize="13" letterSpacing="1.5">
-              IRIS LOCKED
+              IDENTITY CHECK · OPTION 1
             </text>
           </g>
-          <g transform="translate(64 186)">
-            <rect width="230" height="30" rx="15" fill="#16181b" fillOpacity="0.88" />
-            <text ref={set('readout')} x="16" y="20" fill="#fafaf9" fontFamily="Google Sans Code, monospace" fontSize="13" letterSpacing="1">
-              GAZE  X +0.00  Y +0.00
+          <g transform="translate(-230 186)">
+            <rect width="250" height="30" rx="15" fill="#16181b" fillOpacity="0.88" />
+            <circle cx="16" cy="15" r="4" fill="#5fd38d" />
+            <text ref={set('readout')} x="28" y="20" fill="#fafaf9" fontFamily="Google Sans Code, monospace" fontSize="13" letterSpacing="1">
+              CHIP SIGNATURE VALID
             </text>
           </g>
         </g>

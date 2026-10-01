@@ -41,7 +41,7 @@ export function Hero() {
           <p>tomorrow.</p>
         </div>
         <p className="pointer-events-none absolute top-6 left-[42%] hidden rounded-full bg-ink/70 px-3.5 py-1.5 font-mono text-[0.75rem] tracking-[0.14em] text-paper/90 uppercase backdrop-blur lg:block">
-          Move your cursor · it follows
+          Evidenced by Evidence One · decided by an ACSP
         </p>
       </div>
 
