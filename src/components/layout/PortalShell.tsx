@@ -225,21 +225,26 @@ function Sidebar({
       : user.name
 
   return (
-    <div className="flex h-full flex-col gap-6 p-4">
+    <div className="flex h-full flex-col gap-5 p-4 short:gap-3 short:py-3">
       <Link
         to="/"
         onClick={onNavigate}
-        className="px-2 pt-2"
+        className="shrink-0 px-2 pt-2 short:pt-1"
         aria-label="Evidence One home"
       >
         <Logo />
       </Link>
-      <OrgSwitcher persona={persona} />
-      <nav aria-label={section}>
+      <div className="shrink-0">
+        <OrgSwitcher persona={persona} />
+      </div>
+      <nav
+        aria-label={section}
+        className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 [scrollbar-width:thin]"
+      >
         <p className="px-3 font-mono text-[0.75rem] tracking-[0.16em] text-slate uppercase">
           {section}
         </p>
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-2 space-y-1 short:space-y-0.5 shorter:space-y-0">
           {items.map((item) => (
             <li key={item.to}>
               <NavLink
@@ -248,7 +253,7 @@ function Sidebar({
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
-                    'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.9375rem] transition-[background-color,color] duration-150',
+                    'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.9375rem] short:py-2 shorter:py-1.5 transition-[background-color,color] duration-150',
                     isActive
                       ? 'bg-ink text-paper shadow-[0_8px_20px_-12px_rgb(22_24_27/0.7)]'
                       : 'text-graphite hover:bg-ink/[0.05] hover:text-ink',
@@ -287,7 +292,7 @@ function Sidebar({
         </ul>
       </nav>
 
-      <div className="mt-auto space-y-3">
+      <div className="shrink-0 space-y-3 short:space-y-2">
         {persona === 'admin' && (
           <NotificationsPreview onNavigate={onNavigate} />
         )}
@@ -295,6 +300,7 @@ function Sidebar({
           className={cn(
             'rounded-2xl bg-[linear-gradient(140deg,#16181b,#2b2f36)] p-4 text-paper',
             persona === 'admin' && 'hidden',
+            'short:hidden',
           )}
         >
           <ShieldCheck className="size-5 text-highlight" aria-hidden="true" />

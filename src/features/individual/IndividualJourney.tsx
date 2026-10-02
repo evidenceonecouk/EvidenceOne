@@ -62,7 +62,7 @@ export function IndividualJourney() {
 
   if (!vc || !person || !company || !entry || !spec) {
     return (
-      <div className="mx-auto max-w-[88rem] sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-[88rem] sm:px-6">
         <PhoneFrame>
           <AppBar stage={0} hideProgress />
           <Screen>

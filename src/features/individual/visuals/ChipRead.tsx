@@ -150,11 +150,11 @@ function ChipData({
   ]
   return (
     <div className="flex h-full flex-col rounded-2xl border border-line bg-white px-3.5 pt-3 pb-2.5 shadow-[0_16px_36px_-24px_rgb(22_24_27/0.45)]">
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-[0.6875rem] tracking-[0.14em] text-slate uppercase">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate font-mono text-[0.6875rem] tracking-[0.14em] whitespace-nowrap text-slate uppercase">
           From the chip
         </span>
-        <span className="flex gap-1">
+        <span className="flex shrink-0 gap-1">
           <Tag
             label="SIG"
             from={CHIP_AT.connected}
@@ -198,7 +198,7 @@ function ChipData({
                 key={f.label}
                 className={cn('min-w-0', f.wide && 'col-span-2')}
               >
-                <dt className="text-[0.625rem] leading-tight text-slate">
+                <dt className="truncate text-[0.625rem] leading-tight text-slate">
                   {f.label}
                 </dt>
                 <dd className="mt-0.5 h-4 truncate text-[0.75rem] leading-4 font-medium tracking-[0.02em] text-ink">
@@ -218,8 +218,8 @@ function ChipData({
         {p < CHIP_AT.signature ? (
           <>
             <Loader2 className="size-3 animate-spin" />
-            <span>Checking signature</span>
-            <span className="ml-auto font-mono tracking-[0.08em]">
+            <span className="whitespace-nowrap">Checking signature</span>
+            <span className="ml-auto truncate font-mono tracking-[0.08em]">
               {hex(facts.number + Math.floor(p * 2), 12).replace(
                 /(.{4})/g,
                 '$1 ',
@@ -229,7 +229,7 @@ function ChipData({
         ) : (
           <>
             <ShieldCheck className="size-3.5 text-ink" />
-            <span className="text-ink">Signature valid</span>
+            <span className="whitespace-nowrap text-ink">Signature valid</span>
             <span className="ml-auto truncate">
               Issued by {facts.issuingCountry}
             </span>

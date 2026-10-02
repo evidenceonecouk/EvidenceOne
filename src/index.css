@@ -1,6 +1,10 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* Short laptop viewports: the portal sidebar tightens in two steps. `shorter` is registered last so it wins. */
+@custom-variant short (@media (max-height: 820px));
+@custom-variant shorter (@media (max-height: 680px));
+
 /*
   Evidence One design tokens.
   Brand: monochrome graphite, grey, soft silver and near-white, with layered

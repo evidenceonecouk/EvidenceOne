@@ -19,8 +19,8 @@ export function JourneyShell({
   children: ReactNode
 }) {
   return (
-    <div className="mx-auto grid max-w-[92rem] items-start gap-12 px-0 sm:px-8 sm:py-5 lg:grid-cols-[1fr_auto_1fr]">
-      <aside className="hidden lg:sticky lg:top-24 lg:block lg:pt-24">
+    <div className="mx-auto grid max-w-[92rem] items-center gap-12 px-0 sm:px-8 lg:grid-cols-[1fr_auto_1fr]">
+      <aside className="hidden lg:block">
         <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
           {step.caption.kicker}
         </p>
@@ -48,7 +48,7 @@ function LiveFeed({ caseId }: { caseId: string }) {
     .reverse()
   return (
     <aside
-      className="hidden lg:sticky lg:top-24 lg:block lg:pt-24"
+      className="hidden lg:block"
       aria-label="Audit trail for this case"
     >
       <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
