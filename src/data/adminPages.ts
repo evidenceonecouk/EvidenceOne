@@ -17,7 +17,8 @@ export interface PlatformMessage {
   id: string
   at: string
   recipient: string
-  audience: 'Individual' | 'Agent' | 'ACSP reviewer' | 'Administrator'
+  audience:
+    'Individual' | 'Referral Partner' | 'ACSP reviewer' | 'Administrator'
   channel: MessageChannel
   template: string
   subject: string
@@ -68,11 +69,11 @@ export function buildMessages(now = Date.now()): PlatformMessage[] {
       caseId: 'EO-2026-000129',
     },
     {
-      audience: 'Agent',
+      audience: 'Referral Partner',
       channel: 'email',
       recipient: 'rachel@fenwickshaw.example',
-      template: 'agent_digest',
-      subject: 'Weekly summary: 3 people still to start',
+      template: 'partner_digest',
+      subject: 'Weekly status summary: 3 people still to start',
       state: 'opened',
     },
     {
@@ -88,8 +89,9 @@ export function buildMessages(now = Date.now()): PlatformMessage[] {
       audience: 'Individual',
       channel: 'email',
       recipient: 'aidan@corriganmarine.example',
-      template: 'register_correction',
-      subject: 'Your verification is paused while the register is corrected',
+      template: 'register_difference',
+      subject:
+        'Harcourt Lane Solicitors LLP is reviewing a difference with the register',
       state: 'opened',
       caseId: 'EO-2026-000127',
     },
@@ -128,7 +130,7 @@ export function buildMessages(now = Date.now()): PlatformMessage[] {
       state: 'delivered',
     },
     {
-      audience: 'Agent',
+      audience: 'Referral Partner',
       channel: 'email',
       recipient: 'rachel@fenwickshaw.example',
       template: 'status_change',
@@ -178,9 +180,9 @@ export const messageTemplates = [
     sent: 60,
   },
   {
-    id: 'agent_digest',
-    label: 'Agent weekly summary',
-    audience: 'Agent',
+    id: 'partner_digest',
+    label: 'Referral Partner status summary (status only)',
+    audience: 'Referral Partner',
     sent: 124,
   },
 ]
@@ -204,49 +206,84 @@ export interface PlatformUser {
 }
 
 export type RoleId =
-  'acsp_reviewer' | 'agent_acsp' | 'agent' | 'admin' | 'admin2' | 'ai' | 'rules'
+  | 'platform_admin'
+  | 'super_admin'
+  | 'acsp_admin'
+  | 'acsp_reviewer'
+  | 'partner_admin'
+  | 'referrer'
+  | 'portfolio_viewer'
+  | 'individual'
+  | 'ai'
+  | 'rules'
 
 export const roles: {
   id: RoleId
   label: string
   note: string
+  group: 'Platform' | 'ACSP' | 'Referral Partner' | 'Individual' | 'Service'
   service?: boolean
 }[] = [
   {
+    id: 'platform_admin',
+    label: 'Platform Administrator',
+    note: 'Approves ACSPs and Referral Partners, manages allocation and monitoring, reads platform events',
+    group: 'Platform',
+  },
+  {
+    id: 'super_admin',
+    label: 'Super Administrator',
+    note: 'Fees, plans, commissions and rule publication, each with a second approver',
+    group: 'Platform',
+  },
+  {
+    id: 'acsp_admin',
+    label: 'ACSP Administrator',
+    note: 'Manages the ACSP firm, its profile and billing',
+    group: 'ACSP',
+  },
+  {
     id: 'acsp_reviewer',
-    label: 'ACSP reviewer',
-    note: 'Decides cases for an ACSP firm',
+    label: 'ACSP Reviewer',
+    note: 'Approves, requests information or declines',
+    group: 'ACSP',
   },
   {
-    id: 'agent_acsp',
-    label: 'Agent with ACSP status',
-    note: 'May review in-house, or refer',
+    id: 'partner_admin',
+    label: 'Partner Administrator',
+    note: 'Manages the Referral Partner and its team',
+    group: 'Referral Partner',
   },
   {
-    id: 'agent',
-    label: 'Agent without ACSP status',
-    note: 'Refers to an ACSP; sees status only',
+    id: 'referrer',
+    label: 'Referrer',
+    note: 'Sends invites; sees status and check results',
+    group: 'Referral Partner',
   },
   {
-    id: 'admin',
-    label: 'Administrator',
-    note: 'Runs the platform; proposes rule changes',
+    id: 'portfolio_viewer',
+    label: 'Portfolio Viewer',
+    note: 'Reads status and check results only',
+    group: 'Referral Partner',
   },
   {
-    id: 'admin2',
-    label: 'Second approver',
-    note: 'Publishes rule set versions',
+    id: 'individual',
+    label: 'Individual',
+    note: 'A director or PSC, or a B2C client',
+    group: 'Individual',
   },
   {
     id: 'ai',
     label: 'Evidence One Intelligence',
     note: 'Service account; writes observations only',
+    group: 'Service',
     service: true,
   },
   {
     id: 'rules',
     label: 'Rules engine',
     note: 'Service account; evaluates rules',
+    group: 'Service',
     service: true,
   },
 ]
@@ -254,37 +291,89 @@ export const roles: {
 export const capabilities: {
   label: string
   grants: RoleId[]
+  /** Roles that hold the permission only with step-up (passkey or authenticator code, never SMS). */
+  stepUp?: RoleId[]
   note?: string
 }[] = [
   {
-    label: 'See case status',
-    grants: ['acsp_reviewer', 'agent_acsp', 'agent', 'admin'],
+    label: 'See case status and check results',
+    grants: [
+      'acsp_admin',
+      'acsp_reviewer',
+      'partner_admin',
+      'referrer',
+      'portfolio_viewer',
+      'individual',
+    ],
+    note: 'Referral Partners see status and check results only, never documents or messages',
   },
   {
-    label: 'Open documents and evidence',
-    grants: ['acsp_reviewer', 'agent_acsp'],
-    note: 'Agents without ACSP status never see evidence',
+    label: 'Open identity documents and evidence',
+    grants: ['acsp_reviewer', 'individual'],
+    note: 'An individual sees only their own. Neither administrator role can read evidence',
   },
   {
-    label: 'Approve or decline',
-    grants: ['acsp_reviewer', 'agent_acsp'],
-    note: 'With step-up every time',
+    label: 'Approve a case',
+    grants: ['acsp_reviewer'],
+    stepUp: ['acsp_reviewer'],
   },
-  { label: 'Request information', grants: ['acsp_reviewer', 'agent_acsp'] },
-  { label: 'Refer to an ACSP', grants: ['agent_acsp', 'agent'] },
   {
-    label: 'Submit to Companies House',
-    grants: ['acsp_reviewer', 'agent_acsp'],
-    note: 'With their own GOV.UK One Login',
+    label: 'Decline a case',
+    grants: ['acsp_reviewer'],
+    stepUp: ['acsp_reviewer'],
+  },
+  { label: 'Request information', grants: ['acsp_reviewer'] },
+  {
+    label: 'Start a submission to Companies House',
+    grants: ['acsp_admin', 'acsp_reviewer'],
+    stepUp: ['acsp_admin', 'acsp_reviewer'],
+    note: 'Signed in with the ACSP’s own One Login at Companies House',
   },
   {
     label: 'Export a verification record',
-    grants: ['acsp_reviewer', 'admin'],
-    note: 'With step-up',
+    grants: ['acsp_admin', 'acsp_reviewer'],
+    stepUp: ['acsp_admin', 'acsp_reviewer'],
   },
-  { label: 'Propose a rule set change', grants: ['admin'] },
-  { label: 'Publish a rule set version', grants: ['admin2'] },
-  { label: 'Place or lift a retention hold', grants: ['admin'] },
+  {
+    label: 'Send invites',
+    grants: ['acsp_admin', 'partner_admin', 'referrer'],
+  },
+  {
+    label: 'Approve an ACSP or Referral Partner at onboarding',
+    grants: ['platform_admin'],
+  },
+  {
+    label: 'Allocate a B2C client and run ACSP monitoring',
+    grants: ['platform_admin'],
+  },
+  {
+    label: 'Read platform events in the audit trail',
+    grants: ['platform_admin', 'super_admin'],
+    note: 'Platform chain only. Each ACSP chain belongs to that ACSP',
+  },
+  {
+    label: 'Set fees and subscription plans',
+    grants: ['super_admin'],
+    stepUp: ['super_admin'],
+    note: 'Super Administrator only, with a second approver',
+  },
+  {
+    label: 'Switch referral commissions on',
+    grants: ['super_admin'],
+    stepUp: ['super_admin'],
+    note: 'Super Administrator only, with a second approver',
+  },
+  {
+    label: 'Publish a rule set',
+    grants: ['super_admin'],
+    stepUp: ['super_admin'],
+    note: 'Super Administrator only, with a second approver',
+  },
+  {
+    label: 'Place or lift a retention hold',
+    grants: ['platform_admin', 'super_admin'],
+    stepUp: ['platform_admin', 'super_admin'],
+  },
   { label: 'Write an AI observation', grants: ['ai'] },
   { label: 'Record a rule result', grants: ['rules'] },
   {
@@ -294,98 +383,142 @@ export const capabilities: {
   },
 ]
 
+/** Sign-in and step-up, shown on the Users and roles page. Step-up channels are Pending your decision (H2). */
+export const signIn = {
+  individuals: 'One-time code or passkey',
+  professionals: 'Passkey or authenticator app',
+  stepUp: 'Passkey or authenticator code, never SMS',
+  idleProfessionalMinutes: 15,
+  idleIndividualMinutes: 30,
+}
+
 export function buildUsers(now = Date.now()): PlatformUser[] {
+  const u = (
+    id: string,
+    name: string,
+    org: string,
+    role: RoleId,
+    factor: SecondFactor,
+    ageMs: number,
+    service = false,
+  ): PlatformUser => ({
+    id,
+    name,
+    org,
+    role,
+    factor,
+    lastSeen: ago(ageMs, now),
+    ...(service ? { service: true } : {}),
+  })
+  const harcourt = 'Harcourt Lane Solicitors LLP'
+  const fenwick = 'Fenwick & Shaw Chartered Accountants'
   return [
-    {
-      id: 'rev-marsh',
-      name: 'Eleanor Marsh',
-      org: 'Harcourt Lane Solicitors LLP',
-      role: 'acsp_reviewer',
-      factor: 'Passkey',
-      lastSeen: ago(0.2 * HOUR, now),
-    },
-    {
-      id: 'rev-okoro',
-      name: 'James Okoro',
-      org: 'Harcourt Lane Solicitors LLP',
-      role: 'acsp_reviewer',
-      factor: 'Passkey and authenticator app',
-      lastSeen: ago(3 * HOUR, now),
-    },
-    {
-      id: 'rev-hartley',
-      name: 'Philippa Hartley',
-      org: 'Harcourt Lane Solicitors LLP',
-      role: 'acsp_reviewer',
-      factor: 'Passkey',
-      lastSeen: ago(1.2 * DAY, now),
-    },
-    {
-      id: 'rev-basu',
-      name: 'Anjali Basu',
-      org: 'Northbank Compliance Ltd',
-      role: 'acsp_reviewer',
-      factor: 'Authenticator app',
-      lastSeen: ago(5 * HOUR, now),
-    },
-    {
-      id: 'rev-dunmore',
-      name: 'Callum Dunmore',
-      org: 'Pell & Rowe Chartered Accountants',
-      role: 'acsp_reviewer',
-      factor: 'Passkey',
-      lastSeen: ago(2 * DAY, now),
-    },
-    {
-      id: 'agent-contact',
-      name: 'Rachel Fenwick',
-      org: 'Fenwick & Shaw Chartered Accountants',
-      role: 'agent_acsp',
-      factor: 'Passkey',
-      lastSeen: ago(0.6 * HOUR, now),
-    },
-    {
-      id: 'partner-belgrave',
-      name: 'Oliver Grant',
-      org: 'Belgrave Family Office',
-      role: 'agent',
-      factor: 'Authenticator app',
-      lastSeen: ago(4 * DAY, now),
-    },
-    {
-      id: 'admin-1',
-      name: 'Helen Carver',
-      org: 'Evidence One',
-      role: 'admin',
-      factor: 'Passkey and authenticator app',
-      lastSeen: ago(0.05 * HOUR, now),
-    },
-    {
-      id: 'admin-2',
-      name: 'Daniel Achebe',
-      org: 'Evidence One',
-      role: 'admin2',
-      factor: 'Passkey',
-      lastSeen: ago(6 * HOUR, now),
-    },
-    {
-      id: 'svc-ai',
-      name: 'Evidence One Intelligence',
-      org: 'Service account',
-      role: 'ai',
-      factor: 'Not applicable',
-      lastSeen: ago(0.4 * HOUR, now),
-      service: true,
-    },
-    {
-      id: 'svc-rules',
-      name: 'Rules engine',
-      org: 'Service account',
-      role: 'rules',
-      factor: 'Not applicable',
-      lastSeen: ago(0.4 * HOUR, now),
-      service: true,
-    },
+    u(
+      'rev-marsh',
+      'Eleanor Marsh',
+      harcourt,
+      'acsp_reviewer',
+      'Passkey',
+      0.2 * HOUR,
+    ),
+    u(
+      'rev-okoro',
+      'James Okoro',
+      harcourt,
+      'acsp_reviewer',
+      'Passkey and authenticator app',
+      3 * HOUR,
+    ),
+    u(
+      'rev-hartley',
+      'Philippa Hartley',
+      harcourt,
+      'acsp_reviewer',
+      'Passkey',
+      1.2 * DAY,
+    ),
+    u(
+      'rev-pell',
+      'Alison Pell',
+      'Alison Pell, Chartered Accountant',
+      'acsp_admin',
+      'Authenticator app',
+      2 * DAY,
+    ),
+    u(
+      'rev-basu',
+      'Anjali Basu',
+      'Northbank Compliance Ltd',
+      'acsp_admin',
+      'Authenticator app',
+      5 * HOUR,
+    ),
+    u(
+      'pu-fenwick-1',
+      'Rachel Fenwick',
+      fenwick,
+      'partner_admin',
+      'Passkey',
+      0.6 * HOUR,
+    ),
+    u(
+      'pu-fenwick-2',
+      'Tariq Mahmood',
+      fenwick,
+      'referrer',
+      'Passkey',
+      1.5 * HOUR,
+    ),
+    u(
+      'pu-fenwick-3',
+      'Beth Lowry',
+      fenwick,
+      'portfolio_viewer',
+      'Authenticator app',
+      4 * DAY,
+    ),
+    u(
+      'platform-admin',
+      'Marcus Adeyemi',
+      'Evidence One',
+      'platform_admin',
+      'Passkey and authenticator app',
+      0.05 * HOUR,
+    ),
+    u(
+      'super-1',
+      'Helen Carver',
+      'Evidence One',
+      'super_admin',
+      'Passkey and authenticator app',
+      0.5 * HOUR,
+    ),
+    u(
+      'super-2',
+      'Daniel Achebe',
+      'Evidence One',
+      'super_admin',
+      'Passkey',
+      6 * HOUR,
+    ),
+    u(
+      'svc-ai',
+      'Evidence One Intelligence',
+      'Service account',
+      'ai',
+      'Not applicable',
+      0.4 * HOUR,
+      true,
+    ),
+    u(
+      'svc-rules',
+      'Rules engine',
+      'Service account',
+      'rules',
+      'Not applicable',
+      0.4 * HOUR,
+      true,
+    ),
   ]
 }
 
@@ -420,17 +553,17 @@ export const deployments: Deployment[] = [
     brand: '#1f4d3a',
     ink: '#ffffff',
     state: 'live',
-    note: 'Partner brand on the journey. Harcourt Lane remains the ACSP.',
+    note: 'Referral Partner brand on the journey. The instructed ACSP remains the service provider.',
     journeys: 312,
   },
   {
-    id: 'belgrave',
-    name: 'Belgrave Family Office',
-    address: 'id.belgrave.example',
+    id: 'meridian',
+    name: 'Meridian Gulf Corporate Services',
+    address: 'id.meridiangulf.example',
     brand: '#5b2a3c',
     ink: '#ffffff',
     state: 'configuring',
-    note: 'Brand set, sender domain awaiting DNS records.',
+    note: 'Brand set, sender domain awaiting DNS records. The ACSP is named on every screen.',
     journeys: 0,
   },
   {
@@ -440,7 +573,7 @@ export const deployments: Deployment[] = [
     brand: '#1e3a5f',
     ink: '#ffffff',
     state: 'planned',
-    note: 'Same platform, different surface. No duplicated rules.',
+    note: 'An ACSP brand on its own clients’ journey. Same platform, no duplicated rules.',
     journeys: 0,
   },
 ]

@@ -6,10 +6,9 @@ import {
   CircleAlert,
   CircleCheck,
   CircleX,
-  Minus,
-  Plus,
   Shuffle,
 } from 'lucide-react'
+import { Link } from 'react-router'
 import {
   CountUp,
   MonoLabel,
@@ -17,12 +16,12 @@ import {
   Panel,
   PanelHeader,
 } from '@/components/app/Page'
-import { Avatar, CompanyMark } from '@/components/visual/Avatar'
+import { CompanyMark } from '@/components/visual/Avatar'
 import {
   activity,
+  casesBySource,
   decisions,
   decisionTimes,
-  fees,
   funnel,
   headline,
   hourSlots,
@@ -35,15 +34,19 @@ import {
 } from '@/data/operations'
 import type { OpsPeriod } from '@/data/operations'
 import { ruleById } from '@/data/rules'
-import { formatMoney, VERIFICATION_FEE } from '@/lib/format'
+import { AcspStatusChip } from '@/components/StatusChip'
+import { formatMoney } from '@/lib/format'
+import { currentRuleSet } from '@/lib/rules'
+import {
+  allocationState,
+  casesAwaitingAllocation,
+} from '@/store/platformActions'
 import { cn } from '@/lib/utils'
-import { nextB2cAcsp, setAllocationShare } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import type { CaseStatus } from '@/types/domain'
 import { Bars, Donut, Meter, Sparkline, TrendChart } from './charts'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
-const MONTH_MS = 30 * 24 * 60 * 60 * 1000
 
 const outcomeLabel = {
   pass: 'Pass',
@@ -54,15 +57,11 @@ const outcomeLabel = {
   block: 'Block',
 } as const
 
-/** Live case stages, in journey order, grouped the way an Agent would read them. */
+/** Live case stages, in journey order, grouped by where each case stands. */
 const pipelineStages: { label: string; statuses: CaseStatus[] }[] = [
   { label: 'Invited or in progress', statuses: ['invited', 'in_progress'] },
   { label: 'With the ACSP', statuses: ['in_review'] },
   { label: 'Awaiting information', statuses: ['info_requested'] },
-  {
-    label: 'Halted for a register correction',
-    statuses: ['halted_register_mismatch'],
-  },
   {
     label: 'Approved, ready to submit',
     statuses: ['approved', 'submission_started'],
@@ -75,7 +74,7 @@ const pipelineStages: { label: string; statuses: CaseStatus[] }[] = [
 ]
 
 export function AdminConsole() {
-  const { data, apply } = useDemoStore()
+  const { data } = useDemoStore()
   const [period, setPeriod] = useState<OpsPeriod>('months')
   const now = Date.now()
 
@@ -98,26 +97,29 @@ export function AdminConsole() {
     ((decidedNow - head.previous) / head.previous) * 100,
   )
 
-  const recentDecided = data.cases.filter(
-    (c) =>
-      within(c.decision?.decidedAt, MONTH_MS) &&
-      c.decision?.outcome !== 'request_info',
+  const bySource = {
+    referred: data.cases.filter((c) => c.source === 'referred').length,
+    b2c: data.cases.filter((c) => c.source === 'b2c').length,
+    own_client: data.cases.filter((c) => c.source === 'own_client').length,
+  }
+  const feeCases = data.cases.filter(
+    (c) => c.source !== 'own_client' && c.payment?.platformFee,
   )
-  const next = nextB2cAcsp(data)
-  const totalShare = data.acsps.reduce((s, a) => s + a.b2cAllocationShare, 0)
-  const rows = data.acsps.map((a) => {
-    const casesThisMonth =
-      a.b2cAllocatedThisMonth +
-      recentDecided.filter((c) => c.acspId === a.id).length
-    return {
-      a,
-      casesThisMonth,
-      remuneration: casesThisMonth * a.remunerationPerCase,
-      fees: casesThisMonth * VERIFICATION_FEE,
-    }
-  })
-  const totalFees = rows.reduce((s, r) => s + r.fees, 0)
-  const totalRem = rows.reduce((s, r) => s + r.remuneration, 0)
+  const feeNet = feeCases.reduce((n, c) => n + (c.payment?.platformFee ?? 0), 0)
+  const feeVat = feeCases.reduce(
+    (n, c) => n + (c.payment?.platformFeeVat ?? 0),
+    0,
+  )
+  const settings = data.billing.settings
+  const commissionsOn = currentRuleSet(data).settings.referral_commissions
+  const capacityLeft = data.acsps
+    .filter((a) => allocationState(a, now).open)
+    .reduce(
+      (n, a) =>
+        n + Math.max(0, a.profile.capacity.perDay - a.profile.usedToday),
+      0,
+    )
+  const waiting = casesAwaitingAllocation(data).length
 
   const pipeline = pipelineStages.map((s) => ({
     ...s,
@@ -133,11 +135,11 @@ export function AdminConsole() {
             Platform administration
           </div>
           <h1 className="text-[2rem] leading-[1.1] font-medium tracking-[-0.025em] text-ink sm:text-[2.25rem]">
-            Evidence One operations
+            Platform operations
           </h1>
           <p className="mt-2 max-w-3xl text-base leading-relaxed text-slate sm:text-[1.0625rem]">
-            Volume, review performance and fees across every ACSP on the
-            platform, with direct client allocation and what each ACSP is owed.
+            ACSPs, Referral Partners, cases by source and the platform fee
+            collected. Case contents and identity evidence are not shown here.
           </p>
           <p className="mt-4 inline-flex items-center gap-2.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-[0.875rem] text-graphite">
             <span className="relative flex size-2.5" aria-hidden="true">
@@ -149,6 +151,72 @@ export function AdminConsole() {
         </div>
         <PeriodSwitch value={period} onChange={setPeriod} />
       </header>
+
+      {/* Platform summary */}
+      <dl className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-line/80 bg-white px-5 py-5">
+          <dt className="text-[0.9375rem] text-slate">ACSPs</dt>
+          <dd className="mt-2 flex flex-wrap gap-2">
+            {(
+              [
+                'pending_approval',
+                'active',
+                'not_yet_listed',
+                'suspended',
+                'ceased',
+                'withdrawn',
+              ] as const
+            )
+              .map((st) => ({
+                st,
+                n: data.acsps.filter((a) => a.status === st).length,
+              }))
+              .filter((x) => x.n > 0)
+              .map((x) => (
+                <span key={x.st} className="inline-flex items-center gap-1.5">
+                  <AcspStatusChip status={x.st} />
+                  <span className="text-[0.9375rem] font-medium text-ink tabular">
+                    {x.n}
+                  </span>
+                </span>
+              ))}
+          </dd>
+        </div>
+        <div className="rounded-2xl border border-line/80 bg-white px-5 py-5">
+          <dt className="text-[0.9375rem] text-slate">Referral Partners</dt>
+          <dd className="mt-2 text-[2rem] leading-none font-medium text-ink tabular">
+            {data.partners.filter((p) => p.approval === 'approved').length}
+          </dd>
+          <dd className="mt-2 text-[0.875rem] text-slate">
+            {data.partners.filter((p) => p.approval !== 'approved').length}{' '}
+            waiting for approval. They see status and check results only.
+          </dd>
+        </div>
+        <div className="rounded-2xl border border-line/80 bg-white px-5 py-5">
+          <dt className="text-[0.9375rem] text-slate">
+            Platform fee collected
+          </dt>
+          <dd className="mt-2 text-[2rem] leading-none font-medium text-ink tabular">
+            {formatMoney(feeNet)}
+          </dd>
+          <dd className="mt-2 text-[0.875rem] text-slate">
+            Referred and B2C only, plus {formatMoney(feeVat)} VAT, from{' '}
+            {feeCases.length} cases
+          </dd>
+        </div>
+        <div className="rounded-2xl border border-line/80 bg-white px-5 py-5">
+          <dt className="text-[0.9375rem] text-slate">Capacity left today</dt>
+          <dd className="mt-2 text-[2rem] leading-none font-medium text-ink tabular">
+            {capacityLeft}
+          </dd>
+          <dd className="mt-2 text-[0.875rem] text-slate">
+            Across ACSPs open for allocation. Referral commissions:{' '}
+            <span className="font-medium text-ink">
+              {commissionsOn ? 'On' : 'Off'}
+            </span>
+          </dd>
+        </div>
+      </dl>
 
       {/* Headline: decisions over time */}
       <section
@@ -183,18 +251,12 @@ export function AdminConsole() {
                 {period === 'weeks' ? 'week' : 'month'}
               </span>
             </p>
-            <dl className="mt-8 grid grid-cols-3 gap-4 border-t border-white/12 pt-6 lg:grid-cols-1 lg:gap-5">
+            <dl className="mt-8 grid grid-cols-2 gap-4 border-t border-white/12 pt-6 lg:grid-cols-1 lg:gap-5">
               <HeroStat
                 label="Median time to decision"
                 value={`${head.medianHours} h`}
-                note={<>Target 36 h</>}
-                fill={head.medianHours / 36}
-              />
-              <HeroStat
-                label="Within review target"
-                value={`${head.withinTarget}%`}
-                note="Decided inside 36 hours"
-                fill={head.withinTarget / 100}
+                note="Submission to decision"
+                fill={Math.min(1, head.medianHours / 36)}
               />
               <HeroStat
                 label="Approved first time"
@@ -429,25 +491,14 @@ export function AdminConsole() {
           <div className="p-5 pt-8 sm:p-6 sm:pt-9">
             <Bars
               height={168}
-              ariaLabel={`Decisions by hours taken: ${decisionTimes.map((d) => `up to ${d.label} hours, ${d.count}`).join('; ')}. Two decisions took longer than the 36 hour target.`}
-              marker={{
-                before: decisionTimes.length - 1,
-                label: '36 h target',
-              }}
+              ariaLabel={`Decisions by hours taken: ${decisionTimes.map((d) => `up to ${d.label} hours, ${d.count}`).join('; ')}.`}
               data={decisionTimes.map((d) => ({
                 label: d.label,
                 value: d.count,
-                tone: d.overTarget ? 'warn' : 'ink',
+                tone: 'ink',
                 tip: `${d.count} decisions`,
               }))}
             />
-            <p className="mt-4 flex items-center gap-2 text-[0.9375rem] text-graphite">
-              <CircleAlert
-                className="size-4 shrink-0 text-info"
-                aria-hidden="true"
-              />
-              2 decisions passed the 36 hour review target this month.
-            </p>
           </div>
         </Panel>
 
@@ -527,12 +578,12 @@ export function AdminConsole() {
 
       {/* Fees and activity */}
       <div className="mb-6 grid items-stretch gap-6 xl:grid-cols-[1.15fr_1fr]">
-        <FeesPanel />
+        <CasesBySourcePanel />
         <ActivityPanel />
       </div>
 
       {/* Live cases and ACSPs */}
-      <div className="mb-6 grid items-start gap-6 xl:grid-cols-[1fr_1.4fr]">
+      <div className="mb-6 grid items-start gap-6 xl:grid-cols-[1fr_1.6fr]">
         <Panel aria-labelledby="pipeline-title" className="overflow-hidden">
           <PanelHeader
             id="pipeline-title"
@@ -564,30 +615,52 @@ export function AdminConsole() {
               </li>
             ))}
           </ul>
+          <dl className="grid grid-cols-3 divide-x divide-line/70 border-t border-line/70">
+            {(
+              [
+                ['Referred', bySource.referred],
+                ['B2C', bySource.b2c],
+                ['Own client', bySource.own_client],
+              ] as const
+            ).map(([l, n]) => (
+              <div key={l} className="px-4 py-3.5 text-center">
+                <dt className="text-[0.875rem] text-slate">{l}</dt>
+                <dd className="text-[1.25rem] font-medium text-ink tabular">
+                  {n}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </Panel>
 
         <Panel aria-labelledby="acsp-title" className="overflow-hidden">
           <PanelHeader
             id="acsp-title"
             title="ACSPs"
-            description="Each is supervised for AML and registered with Companies House"
+            description="Each is supervised for AML and listed by Companies House"
+            actions={
+              <Link
+                to="/admin/monitoring"
+                className="text-[0.9375rem] text-ink underline underline-offset-2"
+              >
+                ACSP monitoring
+              </Link>
+            }
           />
           <ul className="divide-y divide-line/70">
             {data.acsps.map((a) => {
               const open = data.cases.filter(
                 (c) =>
                   c.acspId === a.id &&
-                  [
-                    'in_review',
-                    'info_requested',
-                    'halted_register_mismatch',
-                    'approved',
-                  ].includes(c.status),
+                  ['in_review', 'info_requested', 'approved'].includes(
+                    c.status,
+                  ),
               ).length
+              const al = allocationState(a, now)
               return (
                 <li
                   key={a.id}
-                  className="flex flex-wrap items-center gap-4 px-5 py-5 sm:px-6"
+                  className="flex flex-wrap items-center gap-4 px-5 py-4 sm:px-6"
                 >
                   <CompanyMark name={a.name} />
                   <div className="min-w-0 flex-1">
@@ -596,15 +669,17 @@ export function AdminConsole() {
                       {a.kind} · {a.supervisor} ·{' '}
                       <span className="font-mono">{a.acspNumber}</span>
                     </p>
+                    <p className="text-[0.875rem] text-slate">
+                      Allocation {al.open ? 'Open' : 'Paused'}. Capacity left
+                      today{' '}
+                      {Math.max(
+                        0,
+                        a.profile.capacity.perDay - a.profile.usedToday,
+                      )}
+                      .
+                    </p>
                   </div>
-                  <div
-                    className="flex -space-x-2"
-                    aria-label={`${a.reviewers.length} reviewers`}
-                  >
-                    {a.reviewers.map((r) => (
-                      <Avatar key={r.id} seed={r.id} name={r.name} size={34} />
-                    ))}
-                  </div>
+                  <AcspStatusChip status={a.status} />
                   <span className="rounded-full bg-progress-wash px-3 py-1 text-[0.875rem] font-medium text-progress tabular">
                     {open} open
                   </span>
@@ -615,154 +690,80 @@ export function AdminConsole() {
         </Panel>
       </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_1.4fr]">
+      <div className="grid items-start gap-6 xl:grid-cols-[1fr_1fr_1fr]">
         <Panel aria-labelledby="rota-title" className="overflow-hidden">
           <PanelHeader
             id="rota-title"
             title="B2C allocation rota"
-            description="Direct clients go to the ACSP furthest below its share"
             actions={
               <Shuffle className="size-5 text-slate" aria-hidden="true" />
             }
           />
-          <ul className="space-y-5 p-5 sm:p-6">
-            {data.acsps.map((a) => {
-              const pct = Math.round((a.b2cAllocationShare / totalShare) * 100)
-              return (
-                <li key={a.id}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-[0.9375rem] font-medium text-ink">
-                      {a.name}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        aria-label={`Lower share for ${a.name}`}
-                        onClick={() =>
-                          apply((d) =>
-                            setAllocationShare(
-                              d,
-                              a.id,
-                              a.b2cAllocationShare - 5,
-                            ),
-                          )
-                        }
-                        className="flex size-8 cursor-pointer items-center justify-center rounded-lg border border-line bg-white text-ink hover:bg-mist"
-                      >
-                        <Minus className="size-4" />
-                      </button>
-                      <span className="w-12 text-center font-mono text-[0.9375rem] text-ink tabular">
-                        {pct}%
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={`Raise share for ${a.name}`}
-                        onClick={() =>
-                          apply((d) =>
-                            setAllocationShare(
-                              d,
-                              a.id,
-                              a.b2cAllocationShare + 5,
-                            ),
-                          )
-                        }
-                        className="flex size-8 cursor-pointer items-center justify-center rounded-lg border border-line bg-white text-ink hover:bg-mist"
-                      >
-                        <Plus className="size-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-mist">
-                    <div
-                      className="h-full rounded-full bg-ink transition-[width] duration-300 ease-out"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <p className="mt-1.5 text-[0.875rem] text-slate tabular">
-                    {a.b2cAllocatedThisMonth} direct clients this month
-                  </p>
-                </li>
-              )
-            })}
-          </ul>
+          <div className="space-y-3 p-5 sm:p-6">
+            <p className="text-[0.9375rem] text-ink">
+              An administrator confirms the allocation at launch.
+            </p>
+            <p className="text-[0.9375rem] text-slate">
+              {waiting === 0
+                ? 'No B2C client is waiting.'
+                : `${waiting} B2C client${waiting === 1 ? ' is' : 's are'} waiting for confirmation.`}{' '}
+              Clients are suggested ACSPs ranked by clear criteria. Not AI.
+            </p>
+            <Link
+              to="/admin/matching"
+              className="inline-block text-[0.9375rem] font-medium text-ink underline underline-offset-2"
+            >
+              Matching and allocation
+            </Link>
+          </div>
+        </Panel>
+
+        <Panel aria-labelledby="fee-title" className="overflow-hidden">
+          <PanelHeader id="fee-title" title="Platform fee" />
+          <dl className="space-y-3 p-5 sm:p-6">
+            <div className="flex justify-between gap-3 text-[0.9375rem]">
+              <dt className="text-slate">Fee per referred or B2C case</dt>
+              <dd className="font-medium text-ink tabular">
+                {formatMoney(settings.platformFee)} plus VAT
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 text-[0.9375rem]">
+              <dt className="text-slate">Deducted from each payment</dt>
+              <dd className="font-medium text-ink">Automatically</dd>
+            </div>
+            <div className="flex justify-between gap-3 text-[0.9375rem]">
+              <dt className="text-slate">An ACSP&rsquo;s own clients</dt>
+              <dd className="font-medium text-ink">No platform fee</dd>
+            </div>
+            <div className="flex justify-between gap-3 text-[0.9375rem]">
+              <dt className="text-slate">Referral commissions</dt>
+              <dd className="font-medium text-ink">
+                {commissionsOn ? 'On' : 'Off'}
+              </dd>
+            </div>
+          </dl>
           <p className="border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
-            Next direct client goes to{' '}
-            <span className="font-medium text-ink">{next.name}</span>
+            Fees, plans and commissions are set by a Super Administrator only,
+            with a second approver.
           </p>
         </Panel>
 
-        <Panel aria-labelledby="rem-title" className="overflow-hidden">
-          <PanelHeader
-            id="rem-title"
-            title="Remuneration this month"
-            description={`Direct clients, ${formatMoney(VERIFICATION_FEE)} flat fee per verification`}
-          />
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[36rem] text-left">
-              <thead className="bg-mist/50 text-[0.875rem] text-slate">
-                <tr>
-                  <th
-                    scope="col"
-                    className="py-2.5 pr-4 pl-5 font-normal sm:pl-6"
-                  >
-                    ACSP
-                  </th>
-                  <th
-                    scope="col"
-                    className="py-2.5 pr-4 text-right font-normal"
-                  >
-                    Verifications
-                  </th>
-                  <th
-                    scope="col"
-                    className="py-2.5 pr-4 text-right font-normal"
-                  >
-                    Rate
-                  </th>
-                  <th
-                    scope="col"
-                    className="py-2.5 pr-6 text-right font-normal"
-                  >
-                    Owed
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ a, casesThisMonth, remuneration }) => (
-                  <tr key={a.id} className="border-t border-line/70">
-                    <td className="py-3.5 pr-4 pl-5 text-[0.9375rem] text-ink sm:pl-6">
-                      {a.name}
-                    </td>
-                    <td className="py-3.5 pr-4 text-right text-[0.9375rem] text-ink tabular">
-                      {casesThisMonth}
-                    </td>
-                    <td className="py-3.5 pr-4 text-right text-[0.9375rem] text-slate tabular">
-                      {formatMoney(a.remunerationPerCase)}
-                    </td>
-                    <td className="py-3.5 pr-6 text-right text-[0.9375rem] font-medium text-ink tabular">
-                      {formatMoney(remuneration)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-line bg-mist/40">
-                  <td className="py-3.5 pr-4 pl-5 text-[0.9375rem] font-medium text-ink sm:pl-6">
-                    Total
-                  </td>
-                  <td
-                    colSpan={2}
-                    className="py-3.5 pr-4 text-right text-[0.9375rem] text-slate"
-                  >
-                    Fees {formatMoney(totalFees)}
-                  </td>
-                  <td className="py-3.5 pr-6 text-right text-[0.9375rem] font-medium text-ink tabular">
-                    {formatMoney(totalRem)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+        <Panel aria-labelledby="rp-title" className="overflow-hidden">
+          <PanelHeader id="rp-title" title="Referral Partners" />
+          <ul className="divide-y divide-line/70">
+            {data.partners.map((p) => (
+              <li key={p.id} className="px-5 py-3.5 sm:px-6">
+                <p className="text-[0.9375rem] font-medium text-ink">
+                  {p.name}
+                </p>
+                <p className="text-[0.875rem] text-slate">
+                  {p.kind}, {p.country}
+                  {p.country !== 'United Kingdom' && ', status only'}
+                  {p.approval !== 'approved' && ', pending approval'}
+                </p>
+              </li>
+            ))}
+          </ul>
         </Panel>
       </div>
     </Page>
@@ -868,102 +869,88 @@ function DecisionRow({
   )
 }
 
-function FeesPanel() {
-  const max = Math.max(...fees.map((f) => f.agentCode + f.payMyself))
-  const latest = fees[fees.length - 1]
-  const latestTotal = (latest.agentCode + latest.payMyself) * VERIFICATION_FEE
-  const prior = fees[fees.length - 2]
-  const change = Math.round(
-    ((latest.agentCode + latest.payMyself) /
-      (prior.agentCode + prior.payMyself) -
-      1) *
-      100,
-  )
+function CasesBySourcePanel() {
+  const max = Math.max(...casesBySource.map((f) => f.referred + f.b2c + f.own))
+  const latest = casesBySource[casesBySource.length - 1]
   return (
-    <Panel aria-labelledby="fees-title" className="overflow-hidden">
+    <Panel aria-labelledby="src-title" className="overflow-hidden">
       <PanelHeader
-        id="fees-title"
-        title="Verification fees"
-        description="By payment route, last six months"
+        id="src-title"
+        title="Cases by source"
+        description="Last six months. Illustrative history for the demo."
         actions={
-          <div className="text-right">
-            <p className="text-[1.5rem] leading-none font-medium tracking-[-0.02em] text-ink tabular">
-              {formatMoney(latestTotal)}
-            </p>
-            <p className="mt-1 text-[0.8125rem] text-slate">
-              September, up {change}%
-            </p>
-          </div>
+          <p className="text-right text-[0.875rem] text-slate">
+            September: {latest.referred + latest.b2c + latest.own} cases
+          </p>
         }
       />
       <div className="p-5 sm:p-6">
         <ul className="mb-5 flex flex-wrap gap-5 text-[0.875rem] text-graphite">
           <li className="flex items-center gap-2">
             <span className="size-3 rounded-[3px] bg-ink" aria-hidden="true" />
-            Agent Payment Code
+            Referred
+          </li>
+          <li className="flex items-center gap-2">
+            <span
+              className="size-3 rounded-[3px] bg-slate"
+              aria-hidden="true"
+            />
+            B2C
           </li>
           <li className="flex items-center gap-2">
             <span
               className="size-3 rounded-[3px] bg-silver"
               aria-hidden="true"
             />
-            Pay myself
+            Own client
           </li>
         </ul>
-        <StackedFees max={max} />
+        <div
+          role="img"
+          aria-label={`Cases by month: ${casesBySource.map((f) => `${f.month} ${f.referred} referred, ${f.b2c} B2C, ${f.own} own client`).join('; ')}`}
+        >
+          <div className="flex h-52 items-end gap-3 border-b border-line sm:gap-5">
+            {casesBySource.map((f, i) => {
+              const total = f.referred + f.b2c + f.own
+              return (
+                <div
+                  key={f.month}
+                  className="relative flex h-full flex-1 flex-col justify-end"
+                >
+                  <span className="mb-1.5 text-center text-[0.8125rem] font-medium text-ink tabular">
+                    {total}
+                  </span>
+                  <div
+                    className="animate-grow-y flex origin-bottom flex-col gap-[2px]"
+                    style={{
+                      height: `${(total / max) * 82}%`,
+                      animationDelay: `${i * 60}ms`,
+                    }}
+                  >
+                    <div
+                      className="rounded-t-[4px] bg-silver"
+                      style={{ flex: f.own }}
+                    />
+                    <div className="bg-slate" style={{ flex: f.b2c }} />
+                    <div className="bg-ink" style={{ flex: f.referred }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-2 flex gap-3 sm:gap-5">
+            {casesBySource.map((f) => (
+              <span
+                key={f.month}
+                className="flex-1 text-center font-mono text-[0.75rem] text-slate"
+              >
+                {f.month}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     </Panel>
-  )
-}
-
-function StackedFees({ max }: { max: number }) {
-  return (
-    <div
-      role="img"
-      aria-label={`Fees by month: ${fees.map((f) => `${f.month} ${formatMoney((f.agentCode + f.payMyself) * VERIFICATION_FEE)}`).join(', ')}`}
-    >
-      <div className="flex h-52 items-end gap-3 border-b border-line sm:gap-5">
-        {fees.map((f, i) => {
-          const total = f.agentCode + f.payMyself
-          return (
-            <div
-              key={f.month}
-              className="group relative flex h-full flex-1 flex-col justify-end"
-            >
-              <span className="mb-1.5 text-center text-[0.8125rem] font-medium text-ink tabular opacity-80 group-hover:opacity-100">
-                {formatMoney(total * VERIFICATION_FEE)}
-              </span>
-              <div
-                className="animate-grow-y flex origin-bottom flex-col gap-[2px]"
-                style={{
-                  height: `${(total / max) * 82}%`,
-                  animationDelay: `${i * 60}ms`,
-                }}
-              >
-                <div
-                  className="rounded-t-[4px] bg-silver transition-colors group-hover:bg-slate"
-                  style={{ flex: f.payMyself }}
-                />
-                <div className="bg-ink" style={{ flex: f.agentCode }} />
-              </div>
-              <div className="pointer-events-none absolute -top-14 left-1/2 z-10 w-max -translate-x-1/2 rounded-lg bg-ink px-3 py-2 text-[0.8125rem] text-paper opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 tabular">
-                {f.agentCode} by code · {f.payMyself} paid directly
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      <div className="mt-2 flex gap-3 sm:gap-5">
-        {fees.map((f) => (
-          <span
-            key={f.month}
-            className="flex-1 text-center font-mono text-[0.75rem] text-slate"
-          >
-            {f.month}
-          </span>
-        ))}
-      </div>
-    </div>
   )
 }
 

@@ -29,13 +29,13 @@ import { formatDate, fullName, retentionExpiry } from '@/lib/format'
 import { currentRuleSet } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { liftHold, placeHold } from '@/store/adminActions'
-import { useDemoStore } from '@/store/DemoStore'
+import { SUPER_ADMINS, useDemoStore } from '@/store/DemoStore'
+import { PLATFORM_ADMIN } from '@/store/platformActions'
 import { getPerson } from '@/store/selectors'
 import type { VerificationCase } from '@/types/domain'
 import { AdminHeader, Figure, StateBadge } from './kit'
 
 const DAY = 86_400_000
-const ACTOR = 'Helen Carver, Super Administrator'
 const holdReasons = [
   'Regulatory information request',
   'Litigation hold',
@@ -52,7 +52,11 @@ function retentionStart(c: VerificationCase) {
 }
 
 export function RetentionPage() {
-  const { data, apply } = useDemoStore()
+  const { data, state, apply } = useDemoStore()
+  const ACTOR =
+    state.persona === 'superAdmin'
+      ? `${SUPER_ADMINS.find((x) => x.seat === state.superAdminSeat)!.name}, Super Administrator`
+      : PLATFORM_ADMIN
   const toast = useToast()
   const [holdFor, setHoldFor] = useState<string | null>(null)
   const [reason, setReason] = useState(holdReasons[0])
@@ -86,8 +90,8 @@ export function RetentionPage() {
   return (
     <Page>
       <AdminHeader
-        title="Retention"
-        description={`Every verification record is kept for ${rs.params.retention_years} years from the reviewer decision, approvals, declines and abandoned cases alike. Nothing is ever deleted automatically.`}
+        title="Retention holds"
+        description={`Every verification record is kept for ${rs.params.retention_years} years from the reviewer decision (decided_at), approvals, declines, failed and abandoned cases alike. Each ACSP controls its own verification records and Evidence One processes them on its behalf. Nothing is deleted automatically. Where records are stored is on the Storage and retention page.`}
       />
 
       <Panel aria-label="Retention summary" className="mb-6 overflow-hidden">

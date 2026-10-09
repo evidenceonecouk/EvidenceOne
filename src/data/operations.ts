@@ -54,7 +54,6 @@ export const headline: Record<
     decided: number
     previous: number
     medianHours: number
-    withinTarget: number
     firstPass: number
     caption: string
   }
@@ -63,7 +62,6 @@ export const headline: Record<
     decided: 47,
     previous: 43,
     medianHours: 9.6,
-    withinTarget: 98.8,
     firstPass: 84,
     caption: 'Week to 28 September',
   },
@@ -71,7 +69,6 @@ export const headline: Record<
     decided: 154,
     previous: 130,
     medianHours: 10.2,
-    withinTarget: 98.1,
     firstPass: 82,
     caption: 'September 2026',
   },
@@ -94,11 +91,11 @@ export const kpis: {
     delta: '+18%',
     trend: [11, 14, 12, 16, 15, 19, 18, 22, 21, 24, 26, 29],
     goodWhen: 'up',
-    detail: 'From 31 Agents this month',
+    detail: 'From 31 Referral Partners and ACSPs this month',
   },
   {
     id: 'journey',
-    label: 'Median app journey',
+    label: 'Median browser journey',
     value: '7m 40s',
     delta: '-1m 10s',
     trend: [11.2, 10.8, 10.1, 9.9, 9.4, 9.1, 8.8, 8.6, 8.3, 8.1, 7.9, 7.7],
@@ -106,15 +103,13 @@ export const kpis: {
     detail: 'Invite opened to submitted',
   },
   {
-    id: 'chip',
-    label: 'Passport chip reads',
-    value: '97.8%',
-    delta: '+0.6 pts',
-    trend: [
-      96.1, 96.4, 96.2, 96.9, 97.0, 96.8, 97.3, 97.2, 97.5, 97.4, 97.7, 97.8,
-    ],
-    goodWhen: 'up',
-    detail: 'Read on the first attempt',
+    id: 'flagged',
+    label: 'Register differences flagged',
+    value: '23',
+    delta: '+2',
+    trend: [9, 11, 10, 12, 13, 14, 15, 16, 18, 19, 21, 23],
+    goodWhen: 'down',
+    detail: 'Flagged to the reviewer, never halted',
   },
   {
     id: 'codes',
@@ -132,7 +127,7 @@ export const kpis: {
     delta: '+16',
     trend: [228, 236, 241, 249, 255, 262, 270, 279, 287, 296, 304, 312],
     goodWhen: 'up',
-    detail: 'Lodged by Agents from the register',
+    detail: 'Lodged by Referral Partners from the register',
   },
   {
     id: 'mismatch',
@@ -141,7 +136,7 @@ export const kpis: {
     delta: '-3',
     trend: [6, 5, 5, 6, 4, 5, 4, 4, 3, 4, 3, 3],
     goodWhen: 'down',
-    detail: 'Route B, form ACSP04',
+    detail: 'Route B filings',
   },
   {
     id: 'evidence',
@@ -150,7 +145,7 @@ export const kpis: {
     delta: '-2 pts',
     trend: [14, 13, 13, 12, 12, 11, 11, 11, 10, 10, 9, 9],
     goodWhen: 'down',
-    detail: 'Rules ADDL-01 to ADDL-03',
+    detail: 'Rules ADDL-01 and ADDL-03',
   },
   {
     id: 'filed',
@@ -168,7 +163,7 @@ export const funnel: { step: string; count: number }[] = [
   { step: 'Invite opened', count: 194 },
   { step: 'Email and mobile confirmed', count: 186 },
   { step: 'Register details confirmed', count: 179 },
-  { step: 'Payment made', count: 171 },
+  { step: 'ACSP instructed and paid', count: 171 },
   { step: 'Identity checks complete', count: 163 },
   { step: 'With the ACSP', count: 158 },
   { step: 'Approved by the ACSP', count: 141 },
@@ -178,11 +173,10 @@ export const invitesSent = 212
 
 export const decisions = { approve: 141, request_info: 22, decline: 4 }
 
-/** Hours from submission for review to the reviewer decision. The last bucket is past the 36 hour review target. */
+/** Hours from submission for review to the reviewer decision. */
 export const decisionTimes: {
   label: string
   count: number
-  overTarget?: boolean
 }[] = [
   { label: '<4', count: 38 },
   { label: '8', count: 29 },
@@ -191,7 +185,7 @@ export const decisionTimes: {
   { label: '24', count: 17 },
   { label: '30', count: 9 },
   { label: '36', count: 5 },
-  { label: '36+', count: 2, overTarget: true },
+  { label: '36+', count: 2 },
 ]
 
 /** First-attempt results from the certified identity provider. */
@@ -202,29 +196,37 @@ export const identityChecks: {
 }[] = [
   { label: 'Document authenticity', rate: 99.1, referred: 2 },
   { label: 'Liveness', rate: 98.4, referred: 3 },
-  { label: 'Passport chip read', rate: 97.8, referred: 4 },
   { label: 'Face match', rate: 97.2, referred: 5 },
-  { label: 'PEP and sanctions screening', rate: 98.8, referred: 2 },
+  {
+    label: 'PEP and sanctions screening (where switched on)',
+    rate: 98.8,
+    referred: 2,
+  },
 ]
 
 /** Rules that fired most often this month. Counts are cases, not decisions. */
 export const rulesFired: { id: string; count: number }[] = [
-  { id: 'ADDL-02', count: 15 },
-  { id: 'REG-11', count: 14 },
-  { id: 'ADDL-11', count: 7 },
+  { id: 'REG-11', count: 23 },
+  { id: 'ADDL-03', count: 9 },
   { id: 'DOC-03', count: 5 },
   { id: 'IDVT-04', count: 4 },
   { id: 'REG-04', count: 3 },
+  { id: 'AML-02', count: 2 },
 ]
 
-/** Fees by payment route, last six months. */
-export const fees: { month: string; agentCode: number; payMyself: number }[] = [
-  { month: 'Apr', agentCode: 52, payMyself: 32 },
-  { month: 'May', agentCode: 61, payMyself: 36 },
-  { month: 'Jun', agentCode: 70, payMyself: 39 },
-  { month: 'Jul', agentCode: 80, payMyself: 46 },
-  { month: 'Aug', agentCode: 89, payMyself: 52 },
-  { month: 'Sep', agentCode: 104, payMyself: 64 },
+/** Cases by source, last six months. Referred and B2C carry the platform fee; an ACSP's own client does not. */
+export const casesBySource: {
+  month: string
+  referred: number
+  b2c: number
+  own: number
+}[] = [
+  { month: 'Apr', referred: 41, b2c: 6, own: 12 },
+  { month: 'May', referred: 49, b2c: 8, own: 16 },
+  { month: 'Jun', referred: 57, b2c: 9, own: 19 },
+  { month: 'Jul', referred: 66, b2c: 12, own: 23 },
+  { month: 'Aug', referred: 76, b2c: 14, own: 27 },
+  { month: 'Sep', referred: 89, b2c: 17, own: 33 },
 ]
 
 export const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
