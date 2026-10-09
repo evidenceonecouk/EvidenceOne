@@ -16,7 +16,6 @@ import {
 import { PROVIDER_FEE_FIXED, PROVIDER_FEE_RATE, splitPayment } from '@/lib/fees'
 import { formatDate, formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { newStepUpRef } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import {
   feeText,
