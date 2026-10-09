@@ -8,13 +8,16 @@ import type {
 } from '@/types/domain'
 
 /*
-  The Route A rule set, from Gate 1 deliverable EO-G1-D7. Each rule is data: an
-  ID, a plain-English condition, one outcome and its source. The platform
-  evaluates them the same way every time (src/lib/rules.ts). No rule is ever
-  evaluated by AI, and no rule declines a case.
+  The Route A rule set, from Gate 1 deliverable EO-G1-D7, with the client's
+  determinations of 6, 7 and 9 October applied. Each rule is data: an ID, a
+  plain-English condition, one outcome and its source. The platform evaluates
+  them the same way every time (src/lib/rules.ts). No rule is ever evaluated by
+  AI, and no rule declines a case.
 
   Rule text is fixed. Parameters and decision settings live in a rule set
   version, so changing one publishes a new version and never edits the old one.
+  Where the client has not decided, the rule carries a `pending` call-agenda
+  code and the decision is built as a setting.
 */
 
 export const RULE_SET_NAME = 'Companies House Identity Verification, Route A'
@@ -28,7 +31,9 @@ export type RuleGroupId =
   | 'evidence'
   | 'option'
   | 'decision'
+  | 'acsp'
   | 'records'
+  | 'messages'
 
 export const ruleGroups: { id: RuleGroupId; label: string; step: CaseStep }[] =
   [
@@ -44,7 +49,13 @@ export const ruleGroups: { id: RuleGroupId; label: string; step: CaseStep }[] =
     { id: 'evidence', label: 'Supporting evidence', step: 'evidence' },
     { id: 'option', label: 'Option 1 and Option 2', step: 'option' },
     { id: 'decision', label: 'Decision', step: 'decision' },
+    {
+      id: 'acsp',
+      label: 'ACSPs, allocation and Referral Partners',
+      step: 'decision',
+    },
     { id: 'records', label: 'Submission and records', step: 'submission' },
+    { id: 'messages', label: 'Case messages', step: 'decision' },
   ]
 
 export type SourceCode = 'S' | 'R' | 'CA' | 'ICO' | 'C' | 'Design'
@@ -71,6 +82,8 @@ export interface RuleDef {
   param?: ParamKey
   /** A decision setting that changes this rule's outcome. */
   setting?: SettingKey
+  /** Call-agenda code (for example "P3" or "H1") where the client has not decided. Shows "Pending your decision". */
+  pending?: string
 }
 
 const r = (
@@ -92,6 +105,12 @@ const r = (
   inputs,
   ...extra,
 })
+
+/** Source labels for determinations made by the client on a given date, and for design proposals. */
+const C6 = 'C, 6 October'
+const C7 = 'C, 7 October'
+const C9 = 'C, 9 October'
+const PROPOSED = 'Design, proposed'
 
 export const rules: RuleDef[] = [
   // 1 Personal information, Step 1
@@ -128,11 +147,11 @@ export const rules: RuleDef[] = [
   r(
     'INFO-04',
     'info',
-    'Email address confirmed by one-time code',
+    'Email address confirmed by one-time code, and mobile number confirmed by SMS code',
     'request',
     'IDV Standard, Step 1; Design',
     ['S', 'Design'],
-    ['contact.email_confirmed'],
+    ['contact.email_confirmed', 'contact.mobile_confirmed'],
     { outcomeNote: 'Request until confirmed' },
   ),
   r(
@@ -158,11 +177,11 @@ export const rules: RuleDef[] = [
   r(
     'INFO-07',
     'info',
-    'Email and mobile not already registered to another individual, and not an Agent’s own contact details on an invite they sent',
+    'Email and mobile not already registered to another individual, and not a Referral Partner’s own contact details on an invite they sent',
     'request',
     'Design, kept by the client on 1 October',
     ['Design'],
-    ['contact.email', 'contact.mobile', 'invite.agent_contact'],
+    ['contact.email', 'contact.mobile', 'invite.partner_contact'],
     { outcomeNote: 'Request a different contact detail' },
   ),
 
@@ -205,7 +224,10 @@ export const rules: RuleDef[] = [
     'Client determination, V4 Step 7; Design',
     ['C', 'Design'],
     ['register.identity_verified'],
-    { outcomeNote: 'Shown to the Agent and the individual before payment' },
+    {
+      outcomeNote:
+        'Said calmly to the individual before payment, who may continue or stop. The person who sent the invite is told too',
+    },
   ),
   r(
     'REG-10',
@@ -219,32 +241,41 @@ export const rules: RuleDef[] = [
   r(
     'REG-11',
     'register',
-    'Name on the document differs from the register after normalisation',
-    'halt',
-    'Client determination, 28 September',
+    'Name on the document differs from the register after normalisation of case, spacing, hyphens and apostrophes',
+    'mandatory',
+    C7,
     ['C'],
     ['document.name', 'register.name'],
-    { outcomeNote: 'Halt, and a register correction task is raised' },
+    {
+      outcomeNote:
+        'Flag and Mandatory decision, with a prompt to report the difference to Companies House. Route A is not halted',
+    },
   ),
   r(
     'REG-12',
     'register',
     'Month and year of birth on the document differ from the register',
-    'halt',
-    'Client determination, 28 September',
+    'mandatory',
+    C7,
     ['C'],
     ['document.date_of_birth', 'register.month_year_of_birth'],
-    { outcomeNote: 'Halt, and a correction task is raised' },
+    {
+      outcomeNote:
+        'Flag and Mandatory decision, with a prompt to report the difference to Companies House. Route A is not halted',
+    },
   ),
   r(
     'REG-13',
     'register',
-    'Nationality differs from the register',
-    'halt',
-    'Client determination, 28 September',
+    'Nationality on the document differs from the register',
+    'mandatory',
+    C7,
     ['C'],
     ['document.nationality', 'register.nationality'],
-    { setting: 'nationality_difference' },
+    {
+      outcomeNote:
+        'Flag and Mandatory decision, with a prompt to report the difference to Companies House. Route A is not halted',
+    },
   ),
   r(
     'REG-14',
@@ -285,6 +316,32 @@ export const rules: RuleDef[] = [
     ['register.active_appointments'],
     { param: 'many_appointments' },
   ),
+  r(
+    'REG-18',
+    'register',
+    'Name on the document differs from the register only by transliteration of a non-Latin script',
+    'mandatory',
+    C7,
+    ['C'],
+    ['document.name', 'document.non_latin_name', 'register.name'],
+    {
+      outcomeNote:
+        'Flag and Mandatory decision, with a prompt to report the difference to Companies House. Route A is not halted',
+    },
+  ),
+  r(
+    'REG-19',
+    'register',
+    'Any difference in name, date of birth, nationality or transliteration is flagged to the reviewer for a final decision, with the prompt "Report this difference to Companies House"',
+    'flag',
+    C7,
+    ['C'],
+    ['case.discrepancy_report'],
+    {
+      outcomeNote:
+        'The prompt and the reviewer’s choice are logged on the case. Filing a report through an API is not in scope',
+    },
+  ),
 
   // 3 Identity document
   r(
@@ -300,19 +357,17 @@ export const rules: RuleDef[] = [
   r(
     'DOC-EXP-01',
     'document',
-    'Passport or Irish passport card expired beyond its tolerance, or expired at all without a validated chip',
+    'Passport or Irish passport card is expired. The standard allows up to six months expired only where the chip is validated, so until Companies House replies another document is asked for',
     'request',
-    'IDV Standard, Step 2, Option 1',
-    ['S'],
-    [
-      'document.type',
-      'document.expiry_date',
-      'idvt.chip_result',
-      'check.completed_at',
-    ],
+    'IDV Standard, Step 2, Option 1; C, 9 October',
+    ['S', 'C'],
+    ['document.type', 'document.expiry_date', 'check.completed_at'],
     {
-      outcomeNote: 'Request another document',
+      outcomeNote:
+        'Ask for another document. Where an expired document triggers ADDL-01 it is a Request, never a Halt',
       param: 'passport_expiry_option1',
+      setting: 'expired_passport_handling',
+      pending: 'H1',
     },
   ),
   r(
@@ -373,25 +428,41 @@ export const rules: RuleDef[] = [
     ['S'],
     ['idvt.document_flags'],
   ),
+  r(
+    'DOC-06',
+    'document',
+    'The person holds an eVisa. Until the provider confirms how it checks an eVisa in the browser, the person provides their passport plus any one document from Group B',
+    'request',
+    C9,
+    ['C'],
+    ['document.type', 'option2.documents'],
+    { outcomeNote: 'Request the passport and one Group B document' },
+  ),
 
   // 4 IDVT checks
   r(
     'IDVT-01',
     'idvt',
-    'Document has a chip and the chip’s cryptographic features are not validated',
-    'block',
-    'IDV Standard, Option 1',
-    ['S'],
+    'Document has a chip and the chip is not read on the case. Outcome set by chip_not_read_fallback.',
+    'request',
+    'IDV Standard, Option 1; C, 9 October',
+    ['S', 'C'],
     ['document.has_chip', 'idvt.chip_result'],
+    {
+      outcomeNote:
+        'Accepted while the Companies House answer is awaited, or another Option 1 document requested, then Option 2',
+      setting: 'chip_not_read_fallback',
+      pending: 'P1',
+    },
   ),
   r(
     'IDVT-02',
     'idvt',
-    'Document has no chip and its physical security features are not validated',
+    'The document’s authenticity is not validated by the certified identity provider on the browser route',
     'block',
     'IDV Standard, Option 1',
     ['S'],
-    ['document.has_chip', 'idvt.authenticity_result'],
+    ['idvt.authenticity_result'],
   ),
   r(
     'IDVT-03',
@@ -423,7 +494,7 @@ export const rules: RuleDef[] = [
   r(
     'IDVT-06',
     'idvt',
-    'Name or date of birth from the chip or document differs from what the individual entered at Step 1',
+    'Name or date of birth from the document differs from what the individual entered at Step 1',
     'mandatory',
     'IDV Standard, Step 4; D6 Step 4',
     ['S'],
@@ -437,10 +508,10 @@ export const rules: RuleDef[] = [
   r(
     'IDVT-07',
     'idvt',
-    'A check fails, and attempts so far are fewer than the attempts allowed',
+    'A check fails, and attempts so far are fewer than the three attempts allowed',
     'request',
-    'Design',
-    ['Design'],
+    C7,
+    ['C'],
     ['idvt.attempts'],
     { outcomeNote: 'The individual may try again', param: 'idvt_attempts' },
   ),
@@ -459,12 +530,17 @@ export const rules: RuleDef[] = [
   r(
     'AML-01',
     'aml',
-    'Screening has not yet run on the individual',
+    'Screening has not yet run on the individual, where screening is switched on for the ACSP',
     'block',
-    'Client determination, 28 September',
+    'Client determination, 28 September; C, 9 October',
     ['C'],
-    ['screening.completed_at'],
-    { outcomeNote: 'Block until it has' },
+    ['acsp.pep_screening', 'screening.completed_at'],
+    {
+      outcomeNote:
+        'Block until it has. Screening is a per-ACSP setting and ongoing monitoring is off',
+      setting: 'pep_screening_default',
+      pending: 'P6',
+    },
   ),
   r(
     'AML-02',
@@ -500,25 +576,27 @@ export const rules: RuleDef[] = [
     'evidence',
     'The identity document is expired beyond its exception',
     'request',
-    'Client determination, 30 September',
+    C7,
     ['C'],
     ['document.expiry_date'],
     {
       outcomeNote:
-        'Request another identity document, and flag it to the reviewer',
+        'Request: "We need one supporting document". Never a second identity document, never a Halt',
     },
   ),
   r(
     'ADDL-02',
     'evidence',
-    'The identity document does not confirm the current address',
+    'Every individual provides one proof of current address dated within the supporting evidence period, including people whose licence, identity card or BRP shows an address',
     'request',
-    'Client determination, 30 September; IDV Standard',
-    ['C', 'S'],
-    ['document.type', 'document.address', 'person.address_history'],
+    C7,
+    ['C'],
+    ['person.current_address', 'evidence.document_date'],
     {
-      outcomeNote: 'Request one supporting document for the current address',
-      setting: 'passport_address_evidence',
+      outcomeNote:
+        'Request until provided. The exact wording is to be confirmed',
+      param: 'supporting_evidence_months',
+      pending: 'P3',
     },
   ),
   r(
@@ -526,10 +604,13 @@ export const rules: RuleDef[] = [
     'evidence',
     'A former name is declared, or a name change is detected',
     'request',
-    'Client determination, 30 September; IDV Standard',
-    ['C', 'S'],
+    C7,
+    ['C'],
     ['person.former_names', 'document.name'],
-    { outcomeNote: 'Request evidence of the name change' },
+    {
+      outcomeNote:
+        'Request: "We need one supporting document", as evidence of the name change',
+    },
   ),
   r(
     'ADDL-10',
@@ -546,7 +627,7 @@ export const rules: RuleDef[] = [
     'evidence',
     'Supporting document is not dated within the supporting evidence period of upload',
     'request',
-    'Client determination, 28 September',
+    C7,
     ['C'],
     ['evidence.document_date', 'evidence.uploaded_at'],
     {
@@ -650,12 +731,16 @@ export const rules: RuleDef[] = [
   r(
     'DEC-01',
     'decision',
-    'Approval only by a user holding the ACSP Reviewer role, with a valid step-up authentication',
+    'Approval only by a user holding the ACSP Reviewer role, with a valid step-up authentication by passkey or authenticator code. SMS is never used for step-up',
     'block',
     'Client determination; Design',
     ['C', 'Design'],
     ['user.role', 'auth.step_up'],
-    { outcomeNote: 'Block otherwise' },
+    {
+      outcomeNote: 'Block otherwise',
+      setting: 'step_up_channels',
+      pending: 'H2',
+    },
   ),
   r(
     'DEC-02',
@@ -697,8 +782,321 @@ export const rules: RuleDef[] = [
     ['decision.confirmation'],
     { outcomeNote: 'Block otherwise' },
   ),
+  r(
+    'DEC-06',
+    'decision',
+    'The reviewer has three actions: Approve, Request information and Decline. Escalate appears only when escalate_enabled is on',
+    'pass',
+    C7,
+    ['C'],
+    ['setting.escalate_enabled'],
+    {
+      outcomeNote: 'Escalate is off for the launch',
+      setting: 'escalate_enabled',
+    },
+  ),
 
-  // 9 Submission and records
+  // 9 ACSPs, allocation and Referral Partners
+  r(
+    'ACSP-01',
+    'acsp',
+    'The individual has been shown the named ACSP, its fee and turnaround, and that Evidence One is its technology provider, and has confirmed they instruct that ACSP',
+    'block',
+    C6,
+    ['C'],
+    ['journey.instructed_at', 'case.acsp_id'],
+    { outcomeNote: 'Block payment until recorded' },
+  ),
+  r(
+    'ACSP-02',
+    'acsp',
+    'The payment goes to the named ACSP as merchant of record. Evidence One collects it only as the ACSP’s disclosed agent, by split payment, and the invoice is issued in the ACSP’s name',
+    'block',
+    C6,
+    ['C'],
+    ['payment.payee_acsp_id', 'payment.platform_fee'],
+    { outcomeNote: 'Block payment otherwise' },
+  ),
+  r(
+    'ACSP-10',
+    'acsp',
+    'The ACSP is Suspended, Ceased or Withdrawn on a Companies House published file. Both files are checked at the status check interval, there is no API, and an administrator confirms every name match',
+    'block',
+    C9,
+    ['C'],
+    ['acsp.status', 'acsp.monitoring.last_check_at'],
+    {
+      outcomeNote: 'Pauses new allocation (MATCH-01)',
+      param: 'acsp_status_check_days',
+    },
+  ),
+  r(
+    'ACSP-11',
+    'acsp',
+    'The ACSP’s reconfirmation of its regulatory information is overdue. Each ACSP reconfirms every 12 months',
+    'block',
+    PROPOSED,
+    ['Design'],
+    ['acsp.monitoring.next_reconfirmation_due'],
+    {
+      outcomeNote: 'Pauses new allocation (MATCH-01)',
+      param: 'acsp_reconfirmation_months',
+    },
+  ),
+  r(
+    'ACSP-12',
+    'acsp',
+    'Every case a lapsed ACSP verified is listed for follow-up. The list is visible to a Platform Administrator and to that ACSP only. Individuals are contacted only on the client’s instruction. Whether a Referral Partner may see its own affected clients is open, so it is not shown',
+    'flag',
+    C9,
+    ['C'],
+    ['acsp.status', 'case.verified_by'],
+    {
+      outcomeNote: 'Follow-up list. Referral Partner view pending',
+      pending: 'M3',
+    },
+  ),
+  r(
+    'ACSP-13',
+    'acsp',
+    'Open cases of a lapsed ACSP are offered to another ACSP, with the individual’s agreement',
+    'request',
+    'C, 9 October; Design, proposed',
+    ['C', 'Design'],
+    ['acsp.status', 'case.reallocation'],
+    {
+      outcomeNote:
+        'Waits for the individual to agree or decline. No case is moved without agreement',
+    },
+  ),
+  r(
+    'ACSP-14',
+    'acsp',
+    'An ACSP not on the Companies House published list is Not yet listed, given a reasonable time to register, and can still be allocated. It becomes Active when the listing arrives',
+    'flag',
+    PROPOSED,
+    ['Design'],
+    ['acsp.status', 'acsp.monitoring.not_yet_listed_since'],
+    {
+      outcomeNote:
+        'An administrator confirms every allocation to a Not yet listed ACSP',
+      setting: 'acsp_register_period',
+      pending: 'M4',
+    },
+  ),
+  r(
+    'ACSP-15',
+    'acsp',
+    'Every 12 months an administrator uploads the fresh Companies House ACSP list. The platform cross-checks it against the platform register and an administrator confirms each match',
+    'pass',
+    C9,
+    ['C'],
+    ['monitoring.yearly_upload'],
+    {
+      outcomeNote:
+        'Scheduled. Whether it replaces or sits beside the fortnightly check is open',
+      setting: 'yearly_upload_role',
+      pending: 'M4',
+    },
+  ),
+  r(
+    'MATCH-01',
+    'acsp',
+    'The ACSP is Active or Not yet listed, approved by the platform, and its reconfirmation is not overdue',
+    'block',
+    C6,
+    ['C'],
+    ['acsp.status', 'acsp.approval', 'acsp.monitoring.next_reconfirmation_due'],
+    {
+      outcomeNote:
+        'Not eligible otherwise. A Not yet listed ACSP stays eligible with a caveat',
+    },
+  ),
+  r(
+    'MATCH-02',
+    'acsp',
+    'The ACSP is accepting new cases',
+    'block',
+    C6,
+    ['C'],
+    ['acsp.profile.accepting_new_cases'],
+    { outcomeNote: 'Not eligible otherwise' },
+  ),
+  r(
+    'MATCH-03',
+    'acsp',
+    'The person’s country of residence is one the ACSP accepts and is not on its excluded jurisdictions',
+    'block',
+    C6,
+    ['C'],
+    [
+      'person.residence_country',
+      'acsp.profile.residence_countries',
+      'acsp.profile.excluded_jurisdictions',
+    ],
+    { outcomeNote: 'Not eligible otherwise' },
+  ),
+  r(
+    'MATCH-04',
+    'acsp',
+    'The ACSP accepts the document type and its issuing country',
+    'block',
+    C6,
+    ['C'],
+    [
+      'document.type',
+      'document.issuing_country',
+      'acsp.profile.document_types',
+      'acsp.profile.issuing_countries',
+    ],
+    { outcomeNote: 'Not eligible otherwise' },
+  ),
+  r(
+    'MATCH-05',
+    'acsp',
+    'The ACSP accepts the person’s role: director, PSC or proposed director',
+    'block',
+    C6,
+    ['C'],
+    ['register.role', 'acsp.profile.roles'],
+    { outcomeNote: 'Not eligible otherwise' },
+  ),
+  r(
+    'MATCH-06',
+    'acsp',
+    'The ACSP supports at least one of the languages the person needs',
+    'block',
+    C6,
+    ['C'],
+    ['person.languages', 'acsp.profile.languages'],
+    { outcomeNote: 'Not eligible otherwise' },
+  ),
+  r(
+    'MATCH-07',
+    'acsp',
+    'For a higher-risk case, the ACSP accepts higher-risk cases',
+    'block',
+    C6,
+    ['C'],
+    ['case.higher_risk', 'acsp.profile.accepts_higher_risk'],
+    { outcomeNote: 'Not eligible otherwise' },
+  ),
+  r(
+    'MATCH-08',
+    'acsp',
+    'The ACSP has capacity left today and its target turnaround is within the turnaround asked for',
+    'block',
+    C6,
+    ['C'],
+    [
+      'acsp.profile.capacity',
+      'acsp.profile.used_today',
+      'acsp.profile.target_turnaround_hours',
+    ],
+    {
+      outcomeNote:
+        'Not eligible otherwise. Matching is evaluated by rules. An administrator allocates',
+    },
+  ),
+  r(
+    'REF-01',
+    'acsp',
+    'Referral commissions are Off at launch. While referral_commissions is Off nothing is disclosed and no commission is credited',
+    'block',
+    C6,
+    ['C'],
+    ['setting.referral_commissions'],
+    {
+      outcomeNote:
+        'Switching on needs a draft rule version and a second approver',
+      setting: 'referral_commissions',
+    },
+  ),
+  r(
+    'REF-02',
+    'acsp',
+    'Where commissions are on and the Referral Partner answered Yes with a regulator, the client sees the referral arrangement disclosure before payment',
+    'block',
+    C6,
+    ['C'],
+    ['referral.disclosure_version', 'referral.disclosed_at'],
+    { outcomeNote: 'Block payment until disclosed' },
+  ),
+  r(
+    'REF-03',
+    'acsp',
+    'Where the regulator requires consent, the client’s consent is recorded before payment',
+    'block',
+    C6,
+    ['C'],
+    ['referral.consent_required', 'referral.consent_at'],
+    { outcomeNote: 'Block payment until recorded' },
+  ),
+  r(
+    'REF-04',
+    'acsp',
+    'A referral record stores exactly nine fields: referral_partner, regulator, commission_type, commission_amount, disclosure_version, disclosed_at, consent_required, consent_at, payment_at',
+    'pass',
+    C6,
+    ['C'],
+    ['referral.record'],
+    { outcomeNote: 'Recorded' },
+  ),
+  r(
+    'REF-05',
+    'acsp',
+    'The four fee types are never merged: ACSP Professional Fee, Referral Commission, Platform Fee and Marketplace Commission',
+    'block',
+    C6,
+    ['C'],
+    ['fee.kind'],
+    { outcomeNote: 'Block otherwise' },
+  ),
+  r(
+    'REF-06',
+    'acsp',
+    'An Agent Payment Code is single-use and tied to one invite',
+    'block',
+    C6,
+    ['C'],
+    ['invite.payment_code', 'invite.payment_code_used_at'],
+    { outcomeNote: 'Block a second use' },
+  ),
+  r(
+    'REF-10',
+    'acsp',
+    'A Referral Partner sees only the status Invited, In progress, Further information required, Completed or Declined. A Referral Partner is never presented as the verifying ACSP and never decides',
+    'block',
+    C7,
+    ['C'],
+    ['partner.status'],
+    { outcomeNote: 'Nothing beyond the status and check results is shown' },
+  ),
+  r(
+    'REF-11',
+    'acsp',
+    'A Referral Partner also sees the result of each check done (identity document, liveness and face match, register comparison) as passed, flagged or not passed, and never a document image, extracted document data, provider payload or case message',
+    'block',
+    C7,
+    ['C'],
+    ['partner.check_results'],
+    { outcomeNote: 'No grant, role or setting gives a path to documents' },
+  ),
+  r(
+    'REF-12',
+    'acsp',
+    'A Referral Partner outside the UK sees status only',
+    'block',
+    PROPOSED,
+    ['Design'],
+    ['partner.country'],
+    {
+      outcomeNote: 'Awaiting the client’s data protection assessment',
+      pending: 'P11',
+    },
+  ),
+
+  // 10 Submission and records
   r(
     'SUB-01',
     'records',
@@ -728,6 +1126,41 @@ export const rules: RuleDef[] = [
     ['C'],
     ['submission.verification_reference'],
     { outcomeNote: 'Block otherwise' },
+  ),
+  r(
+    'SUB-04',
+    'records',
+    'The Companies House verification reference is recorded on the case. There is no field for the personal code: Companies House emails it directly to the individual and Evidence One does not receive or keep it',
+    'block',
+    C7,
+    ['C'],
+    ['submission.verification_reference'],
+    { outcomeNote: 'Block completion until the reference is recorded' },
+  ),
+  r(
+    'SUB-05',
+    'records',
+    'A submission is started only by a user of the instructing ACSP holding the ACSP Reviewer role, with a valid step-up, who signs in to Companies House with the ACSP’s own One Login. Evidence One never holds the login',
+    'block',
+    PROPOSED,
+    ['Design'],
+    ['user.role', 'auth.step_up', 'case.acsp_id'],
+    { outcomeNote: 'Block otherwise' },
+  ),
+  r(
+    'SUB-06',
+    'records',
+    'The individual is asked to confirm that the personal code has arrived from Companies House. The timing is set by personal_code_prompt. The code itself is never collected',
+    'pass',
+    C9,
+    ['C'],
+    ['submission.confirmed_at', 'case.personal_code_receipt'],
+    {
+      outcomeNote:
+        'Scheduled. A prompt to the individual, answered Yes or Not yet',
+      setting: 'personal_code_prompt',
+      pending: 'M7',
+    },
   ),
   r(
     'RET-01',
@@ -769,6 +1202,41 @@ export const rules: RuleDef[] = [
     ['case.legal_hold'],
     { outcomeNote: 'Block destruction' },
   ),
+  r(
+    'RET-05',
+    'records',
+    'Each ACSP controls its own verification records. Evidence One processes them on its behalf, and each ACSP’s records and audit chain are kept separate',
+    'pass',
+    C6,
+    ['C'],
+    ['acsp.id', 'audit.chain'],
+    { outcomeNote: 'Enforced' },
+  ),
+
+  // 11 Case messages
+  r(
+    'MSG-01',
+    'messages',
+    'A case message that looks like a personal code or a company authentication code is refused with a warning and is not kept',
+    'block',
+    C9,
+    ['C'],
+    ['message.body'],
+    {
+      outcomeNote:
+        '"Please do not share codes here. Companies House sends the personal code directly to the person."',
+    },
+  ),
+  r(
+    'MSG-02',
+    'messages',
+    'Every case has a secure message thread between the ACSP reviewer and the individual. Each message sends an email notification and is logged in the audit trail. Referral Partners never see it',
+    'pass',
+    C7,
+    ['C'],
+    ['case.messages', 'audit.case_message'],
+    { outcomeNote: 'Enforced' },
+  ),
 ]
 
 export const ruleById = (id: string) => rules.find((x) => x.id === id)
@@ -793,15 +1261,16 @@ export const paramDefs: ParamDef[] = [
   },
   {
     key: 'supporting_evidence_months',
-    label: 'Supporting evidence dated within',
+    label: 'Proof of address and supporting evidence dated within',
     unit: 'months',
-    basis: 'Client determination, 28 September',
+    basis: C7,
     min: 1,
     max: 12,
   },
   {
     key: 'passport_expiry_option1',
-    label: 'Passport expiry tolerance, Option 1 (chip validated)',
+    label:
+      'Passport expiry tolerance, Option 1 (only where the chip is validated)',
     unit: 'months',
     basis: 'IDV Standard, Option 1',
     min: 0,
@@ -827,7 +1296,7 @@ export const paramDefs: ParamDef[] = [
     key: 'idvt_attempts',
     label: 'Attempts at the IDVT checks',
     unit: 'attempts',
-    basis: 'Design, proposed',
+    basis: C7,
     min: 1,
     max: 10,
   },
@@ -835,7 +1304,7 @@ export const paramDefs: ParamDef[] = [
     key: 'recent_appointment_days',
     label: 'Recent appointment flag',
     unit: 'days',
-    basis: 'Design, proposed',
+    basis: PROPOSED,
     min: 1,
     max: 365,
   },
@@ -843,7 +1312,7 @@ export const paramDefs: ParamDef[] = [
     key: 'many_appointments',
     label: 'Many appointments flag',
     unit: 'active appointments',
-    basis: 'Design, proposed',
+    basis: PROPOSED,
     min: 2,
     max: 100,
   },
@@ -871,69 +1340,229 @@ export const paramDefs: ParamDef[] = [
     min: 1,
     max: 120,
   },
+  {
+    key: 'reminder_day_1',
+    label: 'First reminder to the individual',
+    unit: 'days after the invite',
+    basis: C7,
+    min: 1,
+    max: 30,
+  },
+  {
+    key: 'reminder_day_2',
+    label: 'Second reminder',
+    unit: 'days after the invite',
+    basis: C7,
+    min: 1,
+    max: 30,
+  },
+  {
+    key: 'reminder_day_3',
+    label: 'Third reminder',
+    unit: 'days after the invite',
+    basis: C7,
+    min: 1,
+    max: 30,
+  },
+  {
+    key: 'abandon_after_days',
+    label: 'Case abandoned after',
+    unit: 'days',
+    basis: C7,
+    min: 7,
+    max: 90,
+  },
+  {
+    key: 'invite_valid_days',
+    label: 'Invite valid for',
+    unit: 'days',
+    basis: C7,
+    min: 1,
+    max: 60,
+  },
+  {
+    key: 'acsp_status_check_days',
+    label: 'ACSP status check against the published files',
+    unit: 'days',
+    basis: C9,
+    min: 1,
+    max: 31,
+  },
+  {
+    key: 'acsp_reconfirmation_months',
+    label: 'ACSP reconfirmation of regulatory information',
+    unit: 'months',
+    basis: PROPOSED,
+    min: 1,
+    max: 24,
+  },
 ]
+
+export interface SettingOption {
+  value: RuleSettings[SettingKey]
+  label: string
+  /** Shown beside the option when the platform recommends it. */
+  recommended?: boolean
+}
 
 export interface SettingDef {
   key: SettingKey
   label: string
   question: string
-  options: { value: RuleSettings[SettingKey]; label: string }[]
+  options: SettingOption[]
   rules: string[]
-  decisionPoint: string
+  /** Call-agenda code. Present where the client has not decided: shows "Pending your decision". */
+  pending?: string
+  /** Plain-English help shown under the setting. */
+  help: string
 }
 
 export const settingDefs: SettingDef[] = [
   {
-    key: 'nationality_difference',
-    label: 'Nationality difference',
-    question: 'When nationality on the document differs from the register',
+    key: 'chip_not_read_fallback',
+    label: 'Chip not read',
+    question: 'When a document has a chip and the chip is not read on the case',
     options: [
-      { value: 'halt', label: 'Halt' },
-      { value: 'mandatory', label: 'Mandatory decision' },
+      {
+        value: 'accept_web_result',
+        label:
+          'Accept a passing web-route result while the Companies House answer is awaited',
+      },
+      {
+        value: 'request_other_then_option2',
+        label: 'Request another Option 1 document, then Option 2',
+      },
     ],
-    rules: ['REG-13'],
-    decisionPoint: 'Point 2',
+    rules: ['IDVT-01'],
+    pending: 'P1',
+    help: 'Evidence One does not read passport chips. Companies House has not yet answered whether Option 1 requires the chip to be read. Chip reading in the identity provider’s own app is an optional later step that would exist only if the chosen provider needs it and Companies House requires it. It is not built into the journey.',
   },
   {
-    key: 'passport_address_evidence',
-    label: 'Current address evidence for passport holders',
+    key: 'expired_passport_handling',
+    label: 'Expired passports',
+    question: 'How to treat an expired passport (DOC-EXP-01)',
+    options: [
+      {
+        value: 'ask_other_document',
+        label: 'Ask for another document until Companies House replies',
+      },
+      {
+        value: 'accept_to_six_months_if_chip_validated',
+        label: 'Accept up to six months expired where the chip is validated',
+      },
+    ],
+    rules: ['DOC-EXP-01', 'ADDL-01'],
+    pending: 'H1',
+    help: 'The standard allows an expired passport up to six months only where the chip is validated. Evidence One does not read the chip, so for now an expired passport is asked for another document. Where it triggers ADDL-01 it is a Request, never a Halt.',
+  },
+  {
+    key: 'step_up_channels',
+    label: 'Step-up channels',
     question:
-      'When to ask a passport holder for one supporting document for their current address',
+      'Which channels confirm "Confirm it’s you" before approve, decline, export or starting a submission',
     options: [
-      { value: 'always', label: 'Always' },
-      { value: 'when_needed', label: 'Only when the case calls for it' },
+      {
+        value: 'passkey_or_authenticator',
+        label: 'Passkey or authenticator code only',
+        recommended: true,
+      },
+      {
+        value: 'passkey_authenticator_or_sms',
+        label: 'Also allow SMS (not recommended)',
+      },
     ],
-    rules: ['ADDL-02'],
-    decisionPoint: 'Point 3',
+    rules: ['DEC-01'],
+    pending: 'H2',
+    help: 'SMS is never used for step-up in the demo. Passkey or authenticator code only is recommended because of SIM swap. SMS stays for individuals’ one-time codes and for confirming mobile numbers.',
   },
   {
-    key: 'non_latin_difference',
-    label: 'Non-Latin name differences',
-    question: 'When a name differs from the register only by transliteration',
+    key: 'personal_code_prompt',
+    label: 'Personal code prompt',
+    question:
+      'When the individual is asked to confirm that the personal code has arrived from Companies House',
     options: [
-      { value: 'halt', label: 'Halt' },
-      { value: 'mandatory', label: 'Mandatory decision' },
+      {
+        value: 'day_after_confirmation',
+        label: 'The day after Companies House confirms the verification',
+      },
+      {
+        value: 'day_after_submission',
+        label: 'The day after submission',
+      },
     ],
-    rules: ['REG-11'],
-    decisionPoint: 'Point 4',
+    rules: ['SUB-06'],
+    pending: 'M7',
+    help: 'The earlier documents said the day after submission. The platform never collects the code itself: the individual answers Yes or Not yet.',
+  },
+  {
+    key: 'acsp_register_period',
+    label: 'ACSP time to register',
+    question:
+      'How long an ACSP that is Not yet listed has to appear on the Companies House published list',
+    options: [
+      { value: 'to_be_set', label: 'To be set' },
+      { value: '30_days', label: '30 days' },
+      { value: '60_days', label: '60 days' },
+      { value: '90_days', label: '90 days' },
+    ],
+    rules: ['ACSP-14'],
+    pending: 'M4',
+    help: 'A Not yet listed ACSP is not blocked. It can still be allocated, with an administrator confirming each allocation, and becomes Active when the listing arrives.',
+  },
+  {
+    key: 'yearly_upload_role',
+    label: 'Yearly list upload',
+    question:
+      'Whether the yearly upload of the Companies House ACSP list replaces the fortnightly check or sits beside it',
+    options: [
+      { value: 'sits_beside', label: 'Sits beside the fortnightly check' },
+      { value: 'replaces', label: 'Replaces the fortnightly check' },
+    ],
+    rules: ['ACSP-15', 'ACSP-10'],
+    pending: 'M4',
+    help: 'An administrator uploads the list and confirms each name match either way. Companies House publishes files and has no API.',
+  },
+  {
+    key: 'pep_screening_default',
+    label: 'PEP and sanctions screening default',
+    question:
+      'Whether screening is switched on by default for a new ACSP. Each ACSP can change it for itself',
+    options: [
+      { value: 'on', label: 'On by default' },
+      { value: 'off', label: 'Off by default' },
+    ],
+    rules: ['AML-01'],
+    pending: 'P6',
+    help: 'Screening is a per-ACSP setting. Ongoing monitoring is off. Where screening is switched off for an ACSP, AML-01 to AML-04 do not apply to its cases.',
   },
   {
     key: 'escalate_enabled',
     label: 'Escalate',
     question:
-      'A fifth reviewer action that routes a case to a named senior reviewer without deciding it',
+      'A fourth reviewer action that routes a case to a named senior reviewer without deciding it',
     options: [
       { value: true, label: 'On' },
       { value: false, label: 'Off' },
     ],
-    rules: ['DEC-02'],
-    decisionPoint: 'Point 8',
+    rules: ['DEC-06'],
+    help: 'Off for the launch: the reviewer has three actions, Approve, Request information and Decline.',
+  },
+  {
+    key: 'referral_commissions',
+    label: 'Referral commissions',
+    question: 'Whether Referral Partners may receive a commission',
+    options: [
+      { value: false, label: 'Off' },
+      { value: true, label: 'On' },
+    ],
+    rules: ['REF-01', 'REF-02', 'REF-03'],
+    help: 'Off at launch. Switching on needs a draft rule version and a second approver, and shows the referral arrangement disclosure and consent records to clients. A Super Administrator only.',
   },
 ]
 
 export const defaultParams: Record<ParamKey, number> = {
   address_history_months: 12,
-  supporting_evidence_months: 3,
+  supporting_evidence_months: 6,
   passport_expiry_option1: 6,
   passport_expiry_option2: 18,
   brp_expiry: 18,
@@ -943,17 +1572,33 @@ export const defaultParams: Record<ParamKey, number> = {
   biometric_deletion_days: 30,
   retention_years: 7,
   review_target_hours: 36,
+  reminder_day_1: 2,
+  reminder_day_2: 5,
+  reminder_day_3: 10,
+  abandon_after_days: 30,
+  invite_valid_days: 14,
+  acsp_status_check_days: 14,
+  acsp_reconfirmation_months: 12,
 }
 
 export const defaultSettings: RuleSettings = {
-  nationality_difference: 'halt',
-  passport_address_evidence: 'when_needed',
-  non_latin_difference: 'halt',
+  chip_not_read_fallback: 'accept_web_result',
+  expired_passport_handling: 'ask_other_document',
+  step_up_channels: 'passkey_or_authenticator',
+  personal_code_prompt: 'day_after_confirmation',
+  acsp_register_period: 'to_be_set',
+  yearly_upload_role: 'sits_beside',
+  pep_screening_default: 'on',
   escalate_enabled: false,
+  referral_commissions: false,
 }
 
 export const SUPER_ADMIN = 'Helen Carver, Super Administrator'
-export const SECOND_APPROVER = 'Daniel Achebe, Compliance Administrator'
+export const SECOND_APPROVER = 'Daniel Achebe, Super Administrator'
+
+/** The Super Administrator's seat names, as written in audit entries. Seat 2 is the second approver. */
+export const superAdminActor = (seat: 1 | 2) =>
+  seat === 1 ? SUPER_ADMIN : SECOND_APPROVER
 
 /**
   Version history. 2026.1 is the version in force. 2025.3 holds the same values
