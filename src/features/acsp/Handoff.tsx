@@ -2,9 +2,9 @@ import { ExternalLink, Undo2 } from 'lucide-react'
 import { useParams, useSearchParams } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
-import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
 import { recordCorrection, returnFromSubmission } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
+import { reviewerIdFor } from '@/store/reviewActions'
 
 export const SUBMIT_SERVICE =
   'Tell Companies House you’ve verified someone’s identity'
@@ -39,12 +39,14 @@ export function HandoffInterstitial({
 }) {
   const { data, apply } = useDemoStore()
   const vc = data.cases.find((c) => c.id === caseId)
+  const acspName = data.acsps.find((a) => a.id === vc?.acspId)?.name
+  const reviewerId = vc ? reviewerIdFor(data, vc) : ''
   const service = kind === 'submission' ? SUBMIT_SERVICE : CORRECT_SERVICE
   const back = () => {
     apply((d) =>
       kind === 'submission'
-        ? returnFromSubmission(d, caseId, PRIMARY_REVIEWER_ID)
-        : recordCorrection(d, caseId, correctionId ?? '', PRIMARY_REVIEWER_ID),
+        ? returnFromSubmission(d, caseId, reviewerId)
+        : recordCorrection(d, caseId, correctionId ?? '', reviewerId),
     )
     if (onDone) onDone()
     else window.setTimeout(() => window.close(), 150)
@@ -68,6 +70,12 @@ export function HandoffInterstitial({
         {kind === 'submission' ? 'submission pack' : 'correction pack'} into the
         service, then come back to record the outcome against case{' '}
         {vc?.id ?? caseId}.
+      </p>
+      <p className="mt-3 text-base leading-relaxed text-graphite">
+        Evidence One is {acspName ?? 'the ACSP'}'s technology provider. It never
+        sees or keeps your GOV.UK One Login details.
+        {kind === 'submission' &&
+          ' Companies House emails the personal code directly to the individual. Evidence One does not receive or keep it.'}
       </p>
       <div className="mt-6 rounded-2xl border border-line bg-mist/60 px-5 py-4 text-[0.9375rem] leading-relaxed text-graphite">
         <p className="flex items-center gap-2 font-medium text-ink">

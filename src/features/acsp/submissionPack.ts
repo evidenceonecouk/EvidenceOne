@@ -44,7 +44,7 @@ export function submissionPack(
     {
       key: 'email',
       group: 'The individual',
-      label: 'Email for the personal code',
+      label: 'Email address of the individual',
       value: person.email,
     },
   ]

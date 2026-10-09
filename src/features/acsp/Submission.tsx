@@ -25,7 +25,6 @@ import { OutcomeChip, RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Avatar } from '@/components/visual/Avatar'
-import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
 import { formatDateTime, fullName } from '@/lib/format'
 import {
   confirmSubmission,
@@ -34,7 +33,7 @@ import {
   startSubmission,
   toggleSubmissionField,
 } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
+import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import {
   getAcsp,
   getCase,
@@ -64,6 +63,8 @@ const stepFor: Record<string, number> = {
 export function Submission() {
   const { caseId = '' } = useParams()
   const { data, apply } = useDemoStore()
+  const { acsp: actingAcsp, reviewer } = useActingAcsp()
+  const reviewerId = reviewer.id
   const toast = useToast()
   const vc = getCase(data, caseId)
   const person = vc && getPerson(data, vc.personId)
@@ -79,6 +80,15 @@ export function Submission() {
   }, [vc?.status, vc?.id, reference])
 
   if (!vc || !person || !acsp) return <Page>Case not found.</Page>
+  if (acsp.id !== actingAcsp.id)
+    return (
+      <Page width="narrow">
+        <p className="text-lg text-ink">
+          This case is held by {acsp.name}. Each ACSP's records are kept
+          separate.
+        </p>
+      </Page>
+    )
   if (!isApprovedOrLater(vc.status)) {
     return (
       <Page width="narrow">
@@ -104,7 +114,7 @@ export function Submission() {
   const complete = pack.every((f) => f.value && f.value !== 'Not decided')
 
   const handoff = () => {
-    apply((d) => handOffSubmission(d, vc.id, PRIMARY_REVIEWER_ID))
+    apply((d) => handOffSubmission(d, vc.id, reviewerId))
     if (!openHandoff(vc.id, 'submission')) setInline(true)
   }
 
@@ -112,7 +122,7 @@ export function Submission() {
     source: 'entered' | 'forwarded_email',
     ref = reference.trim().toUpperCase(),
   ) => {
-    apply((d) => confirmSubmission(d, vc.id, ref, source, PRIMARY_REVIEWER_ID))
+    apply((d) => confirmSubmission(d, vc.id, ref, source, reviewerId))
     toast({
       title: 'Verification reference recorded',
       description: `Companies House will email the personal code directly to ${name}.`,
@@ -146,7 +156,7 @@ export function Submission() {
             Submit to Companies House
           </span>
         }
-        description="Every field in the order the Companies House service asks for it. Copy each one, tick it when it is entered, then record the verification reference Companies House gives you."
+        description={`Every field in the order the Companies House service asks for it. Copy each one, tick it when it is entered, then record the verification reference Companies House gives you. ${acsp.name} signs in with its own GOV.UK One Login. Evidence One is ${acsp.name}'s technology provider.`}
       />
       <div className="mb-8">
         <Stepper
@@ -208,8 +218,9 @@ export function Submission() {
                 Start the submission
               </p>
               <p className="mt-1 text-base text-graphite">
-                Starting needs a step-up. The case moves to SUBMISSION_STARTED
-                and the pack fields can be ticked off.
+                Starting needs a step-up (“Confirm it’s you”, passkey or
+                authenticator code). The case moves to SUBMISSION_STARTED and
+                the pack fields can be ticked off.
               </p>
             </div>
             <Button size="lg" onClick={() => setStepUp(true)}>
@@ -264,8 +275,14 @@ export function Submission() {
             </h2>
             <p className="mt-2 text-base text-graphite">
               Enter the verification reference from Companies House’s
-              confirmation, or forward the confirmation email to this case and
-              it is read for you.
+              confirmation, or forward the confirmation email to the case
+              address and the reference is read for you. This is the
+              verification reference, never the personal code. Companies House
+              will email the personal code directly to {name}. Evidence One does
+              not receive or keep it.
+            </p>
+            <p className="mt-4 rounded-xl bg-mist px-4 py-3 font-mono text-[0.875rem] text-graphite">
+              Case address: {vc.id.toLowerCase()}@cases.evidenceone.example
             </p>
             <label
               htmlFor="vref"
@@ -352,7 +369,7 @@ export function Submission() {
         onClose={() => setStepUp(false)}
         onConfirmed={(ref) => {
           setStepUp(false)
-          apply((d) => startSubmission(d, vc.id, PRIMARY_REVIEWER_ID, ref))
+          apply((d) => startSubmission(d, vc.id, reviewerId, ref))
         }}
       />
       <Dialog open={inline} onOpenChange={setInline}>
