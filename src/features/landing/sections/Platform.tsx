@@ -1,3 +1,4 @@
+import { auditEventKey } from '@/lib/audit'
 import { ArrowRight, CirclePause, Lock, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
@@ -332,7 +333,10 @@ function FilePanel() {
           </p>
           <ol className="mt-4 space-y-4">
             {events.map((e) => (
-              <li key={e.seq} className="grid grid-cols-[auto_1fr] gap-x-3">
+              <li
+                key={auditEventKey(e)}
+                className="grid grid-cols-[auto_1fr] gap-x-3"
+              >
                 <span className="font-mono text-[0.8125rem] text-paper/60 tabular">
                   #{String(e.seq).padStart(4, '0')}
                 </span>

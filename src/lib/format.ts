@@ -3,7 +3,6 @@ import type { Address, ISODate } from '@/types/domain'
 const HOUR = 60 * 60 * 1000
 const DAY = 24 * HOUR
 
-export const VERIFICATION_FEE = 49
 export const SLA_HOURS = 36
 export const RETENTION_YEARS = 7
 

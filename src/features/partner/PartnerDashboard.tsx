@@ -1,3 +1,4 @@
+import { auditEventKey } from '@/lib/audit'
 import {
   ArrowRight,
   BadgeCheck,
@@ -654,7 +655,7 @@ function ActivityPanel() {
       <ol className="divide-y divide-line/70">
         {events.map((e) => (
           <li
-            key={e.seq}
+            key={auditEventKey(e)}
             className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-6 py-3.5"
           >
             <p className="truncate text-[0.9375rem] text-ink">{e.detail}</p>

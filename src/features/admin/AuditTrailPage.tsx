@@ -1,3 +1,4 @@
+import { auditEventKey } from '@/lib/audit'
 import { useMemo, useState } from 'react'
 import {
   ArrowRight,
@@ -362,7 +363,7 @@ export function AuditTrailPage() {
                   tamper?.breakAt != null && e.seq >= tamper.breakAt
                 return (
                   <tr
-                    key={e.seq}
+                    key={auditEventKey(e)}
                     className={cn(
                       'border-t border-line/70 align-top',
                       e.actorType === 'ai' && 'bg-ai-wash/40',
@@ -450,7 +451,10 @@ function ChainStrip({
         {tail.map((e, i) => {
           const broken = brokenFrom != null && e.seq >= brokenFrom
           return (
-            <div key={e.seq} className="flex min-w-0 flex-1 items-center gap-1">
+            <div
+              key={auditEventKey(e)}
+              className="flex min-w-0 flex-1 items-center gap-1"
+            >
               <span
                 title={`#${e.seq} ${shortHash(e.hash)}`}
                 className={cn(

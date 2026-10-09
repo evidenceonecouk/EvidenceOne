@@ -1,3 +1,4 @@
+import { auditEventKey } from '@/lib/audit'
 import {
   ArrowLeft,
   ArrowRight,
@@ -702,7 +703,10 @@ function TimelinePanel({ caseId }: { caseId: string }) {
           className="absolute top-7 bottom-7 left-[2.05rem] w-px bg-line sm:left-[2.3rem]"
         />
         {events.map((e) => (
-          <li key={e.seq} className="relative flex gap-4 pb-5 last:pb-0">
+          <li
+            key={auditEventKey(e)}
+            className="relative flex gap-4 pb-5 last:pb-0"
+          >
             <span
               className={cn(
                 'relative z-10 mt-1 size-3 shrink-0 translate-x-[0.3rem] rounded-full ring-4 ring-white',

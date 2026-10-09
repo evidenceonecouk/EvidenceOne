@@ -1,3 +1,4 @@
+import { auditEventKey } from '@/lib/audit'
 import { ChevronLeft, Laptop, Smartphone } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
@@ -181,7 +182,7 @@ function LiveFeed({
       <ol className="mt-6 max-w-xs space-y-3">
         {events.map((e) => (
           <li
-            key={e.seq}
+            key={auditEventKey(e)}
             className="animate-rise rounded-2xl border border-line/80 bg-white px-4 py-3 [animation-duration:400ms]"
           >
             <p className="text-[0.9375rem] leading-snug text-ink">{e.detail}</p>

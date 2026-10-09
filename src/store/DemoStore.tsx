@@ -25,7 +25,7 @@ import type { ActionResult } from './actions'
 */
 
 const STORAGE_KEY = 'evidenceone.demo'
-const SCHEMA = 6
+const SCHEMA = 7
 /** A saved demo older than this is reseeded so SLA timers look live again. */
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000
 
