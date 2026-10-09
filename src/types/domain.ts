@@ -390,6 +390,8 @@ export interface Payment {
   providerFee?: number
   /** Platform fee deducted automatically, ex VAT. Zero for an ACSP's own client. */
   platformFee?: number
+  /** VAT on the platform fee. Zero for an ACSP's own client. */
+  platformFeeVat?: number
   /** Net paid out to the ACSP's own payment account. */
   netPayout?: number
   payoutAt?: ISODate
