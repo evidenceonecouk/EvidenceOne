@@ -1,53 +1,176 @@
-import { ChevronLeft } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { ChevronLeft, Laptop, Smartphone } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router'
 import { LogoMark } from '@/components/brand/Logo'
 import { Wordmark } from '@/components/brand/Wordmark'
-import { PhoneFrame } from '@/components/phone/PhoneFrame'
+import { DesktopBrowserChrome, PhoneFrame } from '@/components/phone/PhoneFrame'
+import { languageByCode } from '@/data/i18n'
 import { shortHash, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
+import { GuidanceBanner } from './language/GuidanceBanner'
+import { LanguageSwitch } from './language/LanguageSwitch'
 import { stageLabels, type StepSpec } from './journey'
+import {
+  initialMode,
+  JourneyViewContext,
+  rememberMode,
+  useJourneyView,
+  type JourneyMode,
+} from './JourneyView'
 
-/* Desktop layout: presenter caption, the phone, and the live audit feed for this case. */
+export { useJourneyView } from './JourneyView'
+
+/*
+  Layout on wide screens: presenter caption, the journey in a mobile browser
+  frame or in a desktop browser window (a toggle), and the live audit feed for
+  this case. On a real phone the frame falls away.
+*/
 export function JourneyShell({
   step,
   caseId,
   children,
 }: {
-  step: StepSpec
+  step?: StepSpec
   caseId: string
   children: ReactNode
 }) {
+  const { search } = useLocation()
+  const { state } = useDemoStore()
+  const [mode, setModeState] = useState<JourneyMode>(() => initialMode(search))
+  const setMode = (m: JourneyMode) => {
+    setModeState(m)
+    rememberMode(m)
+  }
+  const lang = languageByCode(state.language)
+  const value = useMemo(() => ({ mode, stepId: step?.id }), [mode, step?.id])
+  const content = (
+    <JourneyViewContext.Provider value={value}>
+      {children}
+    </JourneyViewContext.Provider>
+  )
+
+  const caption = step && (
+    <>
+      <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
+        {step.caption.kicker}
+      </p>
+      <h2 className="mt-3 max-w-sm text-[2rem] leading-[1.1] font-normal tracking-[-0.03em] text-ink">
+        {step.caption.title}
+      </h2>
+      <p className="mt-4 max-w-sm text-lg leading-relaxed text-graphite">
+        {step.caption.body}
+      </p>
+      <p className="mt-8 max-w-sm border-t border-line pt-4 text-[0.9375rem] text-slate">
+        {mode === 'mobile'
+          ? 'Shown as it appears in a mobile browser.'
+          : 'Shown as it appears in a desktop browser.'}
+      </p>
+    </>
+  )
+
+  if (mode === 'desktop')
+    return (
+      <div className="mx-auto grid max-w-[92rem] items-start gap-8 px-0 py-0 sm:px-8 sm:py-7 lg:grid-cols-[21rem_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <ViewToggle mode={mode} onChange={setMode} />
+          <div className="mt-8">{caption}</div>
+          <LiveFeed caseId={caseId} className="mt-10" />
+        </aside>
+        <div>
+          <div className="mb-4 flex justify-center lg:hidden">
+            <ViewToggle mode={mode} onChange={setMode} />
+          </div>
+          <div
+            role="region"
+            aria-label="Desktop browser"
+            className="overflow-hidden border-line bg-paper sm:rounded-2xl sm:border sm:shadow-[0_30px_60px_-30px_rgb(22_24_27/0.35)]"
+          >
+            <DesktopBrowserChrome
+              path={`/journey/${caseId}/${step?.id ?? ''}`}
+            />
+            <div
+              dir={lang.dir}
+              lang={lang.code}
+              className="flex min-h-[40rem] flex-col"
+            >
+              {content}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+
   return (
     <div className="mx-auto grid max-w-[92rem] items-center gap-12 px-0 sm:px-8 lg:grid-cols-[1fr_auto_1fr]">
       <aside className="hidden lg:block">
-        <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
-          {step.caption.kicker}
-        </p>
-        <h2 className="mt-3 max-w-sm text-[2rem] leading-[1.1] font-normal tracking-[-0.03em] text-ink">
-          {step.caption.title}
-        </h2>
-        <p className="mt-4 max-w-sm text-lg leading-relaxed text-graphite">
-          {step.caption.body}
-        </p>
-        <p className="mt-10 max-w-sm border-t border-line pt-4 text-[0.9375rem] text-slate">
-          Shown as it will appear in the Evidence One app.
-        </p>
+        <ViewToggle mode={mode} onChange={setMode} />
+        <div className="mt-8">{caption}</div>
       </aside>
-      <PhoneFrame>{children}</PhoneFrame>
-      <LiveFeed caseId={caseId} />
+      <div className="relative">
+        <div className="hidden justify-center pt-4 sm:flex lg:hidden">
+          <ViewToggle mode={mode} onChange={setMode} />
+        </div>
+        <PhoneFrame dir={lang.dir} lang={lang.code}>
+          {content}
+        </PhoneFrame>
+      </div>
+      <LiveFeed caseId={caseId} className="hidden lg:block" />
     </div>
   )
 }
 
-function LiveFeed({ caseId }: { caseId: string }) {
+/** "Mobile browser / Desktop browser": the same journey on a phone or a laptop. */
+export function ViewToggle({
+  mode,
+  onChange,
+}: {
+  mode: JourneyMode
+  onChange: (m: JourneyMode) => void
+}) {
+  const options = [
+    ['mobile', 'Mobile browser', Smartphone],
+    ['desktop', 'Desktop browser', Laptop],
+  ] as const
+  return (
+    <div
+      role="group"
+      aria-label="Show the journey in"
+      className="inline-flex rounded-xl border border-line bg-white p-1"
+    >
+      {options.map(([m, label, Icon]) => (
+        <button
+          key={m}
+          type="button"
+          aria-pressed={mode === m}
+          onClick={() => onChange(m)}
+          className={cn(
+            'flex min-h-10 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-[0.9375rem] font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ink',
+            mode === m ? 'bg-ink text-paper' : 'text-graphite hover:bg-mist',
+          )}
+        >
+          <Icon className="size-4" aria-hidden="true" />
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function LiveFeed({
+  caseId,
+  className,
+}: {
+  caseId: string
+  className?: string
+}) {
   const { data } = useDemoStore()
   const events = data.audit
     .filter((e) => e.caseId === caseId)
     .slice(-4)
     .reverse()
   return (
-    <aside className="hidden lg:block" aria-label="Audit trail for this case">
+    <aside className={className} aria-label="Audit trail for this case">
       <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
         Live on the platform
       </p>
@@ -76,7 +199,11 @@ function LiveFeed({ caseId }: { caseId: string }) {
   )
 }
 
-/* Phone chrome: back, progress across the four stages, then the screen. */
+/*
+  The top of every journey screen: back, progress across the stages, and the
+  language switch, which is visible at any time on every screen. On a mobile
+  browser it is a compact bar; on a desktop browser it is a page header.
+*/
 export function AppBar({
   stage,
   onBack,
@@ -86,19 +213,65 @@ export function AppBar({
   onBack?: () => void
   hideProgress?: boolean
 }) {
+  const { mode } = useJourneyView()
+  const desktop = mode === 'desktop'
+  const back = onBack && (
+    <button
+      type="button"
+      onClick={onBack}
+      className={cn(
+        'flex cursor-pointer items-center justify-center rounded-full text-ink outline-none hover:bg-mist focus-visible:ring-[3px] focus-visible:ring-ink',
+        desktop ? 'h-11 gap-1 px-3 text-base' : '-ms-1 size-11',
+      )}
+      aria-label="Back"
+    >
+      <ChevronLeft className="size-6 rtl:rotate-180" aria-hidden="true" />
+      {desktop && 'Back'}
+    </button>
+  )
+  const progress = !hideProgress && (
+    <div
+      className="ms-auto flex items-center gap-1.5 pe-1"
+      role="progressbar"
+      aria-label="Progress"
+      aria-valuemin={1}
+      aria-valuemax={stageLabels.length}
+      aria-valuenow={stage + 1}
+      aria-valuetext={stageLabels[stage]}
+    >
+      {stageLabels.map((l, i) => (
+        <span
+          key={l}
+          className={cn(
+            'h-1.5 rounded-full transition-colors duration-300',
+            desktop ? 'w-10' : 'w-5',
+            i <= stage ? 'bg-ink' : 'bg-line',
+          )}
+        />
+      ))}
+      {desktop && (
+        <span className="ms-3 text-[0.9375rem] text-slate">
+          {stageLabels[stage]}
+        </span>
+      )}
+    </div>
+  )
+  if (desktop)
+    return (
+      <header className="flex min-h-16 shrink-0 items-center gap-4 border-b border-line/70 px-6">
+        <Wordmark
+          tagline={false}
+          className="[&>span:first-child]:text-[1.5rem]"
+        />
+        {back}
+        {progress || <span className="ms-auto" />}
+        <LanguageSwitch />
+      </header>
+    )
   return (
-    <div className="flex h-12 shrink-0 items-center gap-3 px-3">
-      {onBack ? (
-        <button
-          type="button"
-          onClick={onBack}
-          className="-ml-1 flex size-10 cursor-pointer items-center justify-center rounded-full text-ink hover:bg-mist"
-          aria-label="Back"
-        >
-          <ChevronLeft className="size-6" />
-        </button>
-      ) : (
-        <span className="ml-1 flex items-center gap-2">
+    <div className="flex h-14 shrink-0 items-center gap-2 px-3">
+      {back ?? (
+        <span className="ms-1 flex items-center gap-2">
           {hideProgress ? (
             <Wordmark
               tagline={false}
@@ -109,35 +282,18 @@ export function AppBar({
           )}
         </span>
       )}
-      {!hideProgress && (
-        <div
-          className="ml-auto flex items-center gap-1.5 pr-2"
-          role="progressbar"
-          aria-label="Progress"
-          aria-valuemin={1}
-          aria-valuemax={4}
-          aria-valuenow={stage + 1}
-          aria-valuetext={stageLabels[stage]}
-        >
-          {stageLabels.map((l, i) => (
-            <span
-              key={l}
-              className={cn(
-                'h-1.5 w-7 rounded-full transition-colors duration-300',
-                i <= stage ? 'bg-ink' : 'bg-line',
-              )}
-            />
-          ))}
-        </div>
-      )}
+      {progress || <span className="ms-auto" />}
+      <LanguageSwitch />
     </div>
   )
 }
 
 /*
-  A phone screen: scrolling content plus a fixed action footer. Whenever something on the
-  screen changes (a check completes, a result appears), the content scrolls down just enough
-  to bring it into view. It only ever scrolls down, so live counters cannot make it jitter.
+  A journey screen. On a mobile browser: scrolling content plus a fixed action
+  footer. On a desktop browser: a centred page column with the actions below.
+  Whenever something changes (a check completes, a result appears), the screen
+  scrolls down just enough to bring it into view. It only ever scrolls down, so
+  live counters cannot make it jitter.
 */
 export function Screen({
   children,
@@ -148,6 +304,8 @@ export function Screen({
   footer?: ReactNode
   className?: string
 }) {
+  const { mode } = useJourneyView()
+  const desktop = mode === 'desktop'
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const box = ref.current
@@ -157,8 +315,13 @@ export function Screen({
     const reveal = () => {
       frame = 0
       if (!target || !box.contains(target)) return
-      const b = box.getBoundingClientRect()
       const t = target.getBoundingClientRect()
+      if (desktop) {
+        const overflow = t.bottom - window.innerHeight + 24
+        if (overflow > 0) window.scrollBy({ top: overflow, behavior: 'smooth' })
+        return
+      }
+      const b = box.getBoundingClientRect()
       const overflow = t.bottom - b.bottom + 20
       if (overflow > 0) box.scrollBy({ top: overflow, behavior: 'smooth' })
     }
@@ -188,7 +351,23 @@ export function Screen({
       mo.disconnect()
       cancelAnimationFrame(frame)
     }
-  }, [])
+  }, [desktop])
+
+  if (desktop)
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 pt-4 pb-12',
+          className,
+        )}
+      >
+        {children}
+        {footer && (
+          <div className="mt-8 flex max-w-md flex-col gap-3">{footer}</div>
+        )}
+      </div>
+    )
   return (
     <>
       <div
@@ -209,6 +388,7 @@ export function Screen({
   )
 }
 
+/** The step heading, with the pre-written guidance in the chosen language beneath it. */
 export function ScreenTitle({
   children,
   kicker,
@@ -216,16 +396,18 @@ export function ScreenTitle({
   children: ReactNode
   kicker?: string
 }) {
+  const { stepId } = useJourneyView()
   return (
     <div className="mt-3">
       {kicker && (
-        <p className="font-mono text-[0.75rem] tracking-[0.14em] text-slate uppercase">
+        <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
           {kicker}
         </p>
       )}
       <h1 className="mt-1.5 text-[1.625rem] leading-[1.15] font-normal tracking-[-0.03em] text-ink">
         {children}
       </h1>
+      {stepId && <GuidanceBanner step={stepId} />}
     </div>
   )
 }

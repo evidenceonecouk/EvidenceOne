@@ -1,4 +1,12 @@
-import { BatteryFull, Signal, Wifi } from 'lucide-react'
+import {
+  BatteryFull,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  RotateCw,
+  Signal,
+  Wifi,
+} from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +18,8 @@ const DEVICE_H = SCREEN_H + BEZEL * 2
 const RESERVED_H = 56 + 56
 /* Below this the type gets too small to read; the page scrolls instead. */
 const MIN_SCALE = 0.66
+
+export const BROWSER_HOST = 'verify.evidenceone.co.uk'
 
 /** Scale that fits the full-size device into the viewport height on sm and up; 1 on phones. */
 function useDeviceScale() {
@@ -37,20 +47,25 @@ function useDeviceScale() {
 }
 
 /*
-  Shows the individual's journey as it will look in the Evidence One app.
-  On wide screens it renders inside a device frame at a real phone's size and
-  aspect ratio (390 x 844), so content lays out exactly as on a phone, then the
-  whole device is zoomed down evenly to fit the viewport height and centred.
-  On a real phone the frame falls away and the screen fills the viewport.
+  A mobile browser. On wide screens it renders inside a device frame at a real
+  phone's size and aspect ratio (390 x 844), with the phone's status bar and the
+  browser's address bar, then the whole device is zoomed down evenly to fit the
+  viewport height. On a real phone the frame falls away and the page fills the
+  viewport. It is a browser, never an app: there is no app icon, no home-screen
+  launch and no notification.
 */
 export function PhoneFrame({
   children,
-  label = 'Evidence One app',
+  label = 'Mobile browser',
   className,
+  dir,
+  lang,
 }: {
   children: ReactNode
   label?: string
   className?: string
+  dir?: 'ltr' | 'rtl'
+  lang?: string
 }) {
   const scale = useDeviceScale()
   return (
@@ -73,7 +88,14 @@ export function PhoneFrame({
         )}
       >
         <StatusBar />
-        <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
+        <AddressBar />
+        <div
+          dir={dir}
+          lang={lang}
+          className="relative flex min-h-0 flex-1 flex-col"
+        >
+          {children}
+        </div>
         <div
           aria-hidden="true"
           className="hidden h-7 shrink-0 items-center justify-center sm:flex"
@@ -90,6 +112,7 @@ function StatusBar() {
     <div
       aria-hidden="true"
       className="relative hidden h-11 shrink-0 items-center justify-between px-7 text-[0.9375rem] font-semibold text-ink sm:flex"
+      dir="ltr"
     >
       <span className="tabular">9:41</span>
       <span className="absolute top-2.5 left-1/2 h-[1.6rem] w-[6.5rem] -translate-x-1/2 rounded-full bg-ink" />
@@ -98,6 +121,50 @@ function StatusBar() {
         <Wifi className="size-4" strokeWidth={2.5} />
         <BatteryFull className="size-5" strokeWidth={2} />
       </span>
+    </div>
+  )
+}
+
+/** The mobile browser's address bar. Decorative: the real browser supplies this on a phone. */
+function AddressBar() {
+  return (
+    <div
+      aria-hidden="true"
+      dir="ltr"
+      className="hidden shrink-0 items-center gap-2 border-b border-line/70 bg-mist px-4 py-2 sm:flex"
+    >
+      <span className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white text-[0.9375rem] text-graphite">
+        <Lock className="size-3.5" />
+        {BROWSER_HOST}
+      </span>
+      <RotateCw className="size-4 text-slate" />
+    </div>
+  )
+}
+
+/** Desktop browser chrome strip: window controls, back and forward, and an address bar. Decorative. */
+export function DesktopBrowserChrome({ path = '' }: { path?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      dir="ltr"
+      className="flex items-center gap-3 border-b border-line bg-mist px-4 py-2.5"
+    >
+      <span className="flex gap-1.5">
+        <span className="size-3 rounded-full bg-silver/70" />
+        <span className="size-3 rounded-full bg-silver/70" />
+        <span className="size-3 rounded-full bg-silver/70" />
+      </span>
+      <ChevronLeft className="size-4 text-slate" />
+      <ChevronRight className="size-4 text-slate" />
+      <span className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg bg-white px-3 text-[0.9375rem] text-graphite">
+        <Lock className="size-3.5 shrink-0" />
+        <span className="truncate">
+          {BROWSER_HOST}
+          {path}
+        </span>
+      </span>
+      <RotateCw className="size-4 text-slate" />
     </div>
   )
 }
