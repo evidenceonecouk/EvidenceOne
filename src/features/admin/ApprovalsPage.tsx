@@ -40,8 +40,12 @@ export function ApprovalsPage() {
   const { data, state, apply } = useDemoStore()
   const toast = useToast()
   const canAct = state.persona === 'platformAdmin'
-  const pending = data.applications.filter((a) => a.status === 'pending_approval')
-  const decided = data.applications.filter((a) => a.status !== 'pending_approval')
+  const pending = data.applications.filter(
+    (a) => a.status === 'pending_approval',
+  )
+  const decided = data.applications.filter(
+    (a) => a.status !== 'pending_approval',
+  )
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
@@ -220,7 +224,8 @@ export function ApprovalsPage() {
                           )
                           toast({
                             title: `${app.name} rejected`,
-                            description: 'Recorded on the platform audit chain.',
+                            description:
+                              'Recorded on the platform audit chain.',
                           })
                           setRejecting(false)
                           setReason('')

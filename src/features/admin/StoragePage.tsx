@@ -65,7 +65,10 @@ const decisions = [
   },
 ]
 
-const gb = (mb: number) => (mb >= 1000 ? `${(mb / 1000).toLocaleString('en-GB', { maximumFractionDigits: 1 })} GB` : `${mb} MB`)
+const gb = (mb: number) =>
+  mb >= 1000
+    ? `${(mb / 1000).toLocaleString('en-GB', { maximumFractionDigits: 1 })} GB`
+    : `${mb} MB`
 const tb = (mb: number) =>
   mb >= 1_000_000
     ? `${(mb / 1_000_000).toLocaleString('en-GB', { maximumFractionDigits: 1 })} TB`
@@ -100,7 +103,10 @@ export function StoragePage() {
           ))}
         </ul>
         <p className="flex items-start gap-2 border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
-          <Archive className="mt-0.5 size-4 shrink-0 text-slate" aria-hidden="true" />
+          <Archive
+            className="mt-0.5 size-4 shrink-0 text-slate"
+            aria-hidden="true"
+          />
           Each ACSP controls its own verification records. Evidence One
           processes them on its behalf, and each ACSP&rsquo;s records are kept
           separate.
@@ -112,16 +118,26 @@ export function StoragePage() {
           id="est-title"
           title="Storage estimate"
           description={`About ${MB_PER_CASE} MB per case. Seed numbers, never real data.`}
-          actions={<StateBadge tone="info">Indicative, to be confirmed</StateBadge>}
+          actions={
+            <StateBadge tone="info">Indicative, to be confirmed</StateBadge>
+          }
         />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] text-left">
             <thead className="bg-mist/50 text-[0.875rem] text-slate">
               <tr>
-                <th scope="col" className="py-2.5 pr-4 pl-6 font-normal">Cases a month</th>
-                <th scope="col" className="py-2.5 pr-4 text-right font-normal">Added each year</th>
-                <th scope="col" className="py-2.5 pr-4 text-right font-normal">Held at {years} years</th>
-                <th scope="col" className="py-2.5 pr-6 text-right font-normal">Indicative cost a month at {years} years</th>
+                <th scope="col" className="py-2.5 pr-4 pl-6 font-normal">
+                  Cases a month
+                </th>
+                <th scope="col" className="py-2.5 pr-4 text-right font-normal">
+                  Added each year
+                </th>
+                <th scope="col" className="py-2.5 pr-4 text-right font-normal">
+                  Held at {years} years
+                </th>
+                <th scope="col" className="py-2.5 pr-6 text-right font-normal">
+                  Indicative cost a month at {years} years
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -131,11 +147,18 @@ export function StoragePage() {
                 const cost = (held / 1000) * PRICE_PER_GB
                 return (
                   <tr key={v} className="border-t border-line/70">
-                    <th scope="row" className="py-3.5 pr-4 pl-6 text-left text-[0.9375rem] font-medium text-ink">
+                    <th
+                      scope="row"
+                      className="py-3.5 pr-4 pl-6 text-left text-[0.9375rem] font-medium text-ink"
+                    >
                       {v.toLocaleString('en-GB')}
                     </th>
-                    <td className="py-3.5 pr-4 text-right text-[0.9375rem] text-ink tabular">{tb(yearly)}</td>
-                    <td className="py-3.5 pr-4 text-right text-[0.9375rem] text-ink tabular">{tb(held)}</td>
+                    <td className="py-3.5 pr-4 text-right text-[0.9375rem] text-ink tabular">
+                      {tb(yearly)}
+                    </td>
+                    <td className="py-3.5 pr-4 text-right text-[0.9375rem] text-ink tabular">
+                      {tb(held)}
+                    </td>
                     <td className="py-3.5 pr-6 text-right text-[0.9375rem] text-ink tabular">
                       about £{Math.round(cost).toLocaleString('en-GB')}
                     </td>
@@ -146,9 +169,9 @@ export function StoragePage() {
           </table>
         </div>
         <p className="border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
-          Indicative, to be confirmed. The cost assumes standard storage at about
-          £{PRICE_PER_GB.toFixed(2)} a GB a month and ignores archiving and
-          retrieval charges.
+          Indicative, to be confirmed. The cost assumes standard storage at
+          about £{PRICE_PER_GB.toFixed(2)} a GB a month and ignores archiving
+          and retrieval charges.
         </p>
       </Panel>
 
@@ -161,7 +184,10 @@ export function StoragePage() {
         </div>
         <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {decisions.map((d) => (
-            <li key={d.code} className="rounded-2xl border border-line/80 bg-white p-5">
+            <li
+              key={d.code}
+              className="rounded-2xl border border-line/80 bg-white p-5"
+            >
               <PendingDecision />
               <p className="mt-3 text-base font-medium text-ink">{d.title}</p>
               <p className="mt-1 text-[0.9375rem] text-slate">{d.body}</p>

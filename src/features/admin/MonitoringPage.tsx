@@ -50,7 +50,8 @@ export function MonitoringPage() {
   const { monitoring } = data
 
   const toConfirm = monitoring.nameMatches.filter(
-    (m) => !m.confirmedAt && (m.status === 'to_confirm' || m.status === 'not_found'),
+    (m) =>
+      !m.confirmedAt && (m.status === 'to_confirm' || m.status === 'not_found'),
   )
   const history = monitoring.nameMatches.filter((m) => m.confirmedAt)
   const lapsed = data.acsps.filter(
@@ -60,9 +61,7 @@ export function MonitoringPage() {
   const toggle = (key: keyof PublishedLists, name: string, on: boolean) =>
     setLists((l) => ({
       ...l,
-      [key]: on
-        ? [...l[key], name]
-        : l[key].filter((n) => !sameName(n, name)),
+      [key]: on ? [...l[key], name] : l[key].filter((n) => !sameName(n, name)),
     }))
 
   const ingest = (fileName: string, text: string) => {
@@ -110,12 +109,20 @@ export function MonitoringPage() {
           />
           <Figure
             label="Allocation paused"
-            value={data.acsps.filter((a) => !allocationState(a, now).open && a.status !== 'pending_approval').length}
+            value={
+              data.acsps.filter(
+                (a) =>
+                  !allocationState(a, now).open &&
+                  a.status !== 'pending_approval',
+              ).length
+            }
             detail="Lapse, overdue or not accepting"
           />
           <Figure
             label="Not yet listed"
-            value={data.acsps.filter((a) => a.status === 'not_yet_listed').length}
+            value={
+              data.acsps.filter((a) => a.status === 'not_yet_listed').length
+            }
             detail="Time to register: to be set"
           />
         </dl>
@@ -127,8 +134,19 @@ export function MonitoringPage() {
           <table className="w-full min-w-[64rem] text-left">
             <thead className="bg-mist/50 text-[0.875rem] text-slate">
               <tr>
-                {['ACSP', 'Status', 'Last check and source', 'Last reconfirmed', 'Next due', 'Allocation'].map((h) => (
-                  <th key={h} scope="col" className="px-4 py-2.5 font-normal first:pl-6">
+                {[
+                  'ACSP',
+                  'Status',
+                  'Last check and source',
+                  'Last reconfirmed',
+                  'Next due',
+                  'Allocation',
+                ].map((h) => (
+                  <th
+                    key={h}
+                    scope="col"
+                    className="px-4 py-2.5 font-normal first:pl-6"
+                  >
                     {h}
                   </th>
                 ))}
@@ -195,7 +213,8 @@ export function MonitoringPage() {
                             apply((d) => markAsListed(d, a.id))
                             toast({
                               title: `${a.name} marked as listed`,
-                              description: 'Status Active. Recorded on the audit trail.',
+                              description:
+                                'Status Active. Recorded on the audit trail.',
                             })
                           }}
                         >
@@ -227,15 +246,24 @@ export function MonitoringPage() {
             <table className="w-full text-left">
               <thead className="bg-mist/50 text-[0.875rem] text-slate">
                 <tr>
-                  <th scope="col" className="py-2.5 pr-3 pl-5 font-normal">ACSP</th>
-                  <th scope="col" className="px-2 py-2.5 font-normal">On the opt-in list</th>
-                  <th scope="col" className="px-2 py-2.5 pr-5 font-normal">On the ceased and suspended list</th>
+                  <th scope="col" className="py-2.5 pr-3 pl-5 font-normal">
+                    ACSP
+                  </th>
+                  <th scope="col" className="px-2 py-2.5 font-normal">
+                    On the opt-in list
+                  </th>
+                  <th scope="col" className="px-2 py-2.5 pr-5 font-normal">
+                    On the ceased and suspended list
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {data.acsps.map((a) => (
                   <tr key={a.id} className="border-t border-line/70">
-                    <th scope="row" className="py-3 pr-3 pl-5 text-left text-[0.9375rem] font-normal text-ink">
+                    <th
+                      scope="row"
+                      className="py-3 pr-3 pl-5 text-left text-[0.9375rem] font-normal text-ink"
+                    >
                       {a.name}
                     </th>
                     {(['optIn', 'ceasedSuspended'] as const).map((k) => (
@@ -246,7 +274,11 @@ export function MonitoringPage() {
                           aria-label={`${a.name} on the ${k === 'optIn' ? 'opt-in list' : 'ceased and suspended list'}`}
                           checked={lists[k].some((n) => sameName(n, a.name))}
                           onChange={(e) =>
-                            toggle(k, a.name.replace(/,/g, '').toUpperCase(), e.target.checked)
+                            toggle(
+                              k,
+                              a.name.replace(/,/g, '').toUpperCase(),
+                              e.target.checked,
+                            )
                           }
                         />
                       </td>
@@ -334,7 +366,9 @@ export function MonitoringPage() {
                     }}
                   >
                     <Check className="size-4" aria-hidden="true" />
-                    {m.status === 'not_found' ? 'Confirm not listed' : 'Confirm match'}
+                    {m.status === 'not_found'
+                      ? 'Confirm not listed'
+                      : 'Confirm match'}
                   </Button>
                 </li>
               ))}
@@ -348,8 +382,8 @@ export function MonitoringPage() {
               <ul className="mt-3 space-y-2">
                 {history.map((m) => (
                   <li key={m.id} className="text-[0.875rem] text-graphite">
-                    {m.platformName ?? m.listedName}, {matchSourceLabel(m.source)}.
-                    Confirmed by {m.confirmedBy}
+                    {m.platformName ?? m.listedName},{' '}
+                    {matchSourceLabel(m.source)}. Confirmed by {m.confirmedBy}
                     {m.confirmedAt ? `, ${formatDateTime(m.confirmedAt)}` : ''}.
                   </li>
                 ))}
@@ -377,7 +411,10 @@ export function MonitoringPage() {
             <div className="grid gap-0 divide-line/70 xl:grid-cols-2 xl:divide-x">
               <div className="p-5 sm:p-6">
                 <h3 className="text-[0.9375rem] font-medium text-ink">
-                  Cases it verified <span className="font-mono text-[0.8125rem] text-slate">ACSP-12</span>
+                  Cases it verified{' '}
+                  <span className="font-mono text-[0.8125rem] text-slate">
+                    ACSP-12
+                  </span>
                 </h3>
                 <p className="mt-1 text-[0.875rem] text-slate">
                   Directors verified by this ACSP may need to verify again.
@@ -389,9 +426,16 @@ export function MonitoringPage() {
                     {verified.map((c) => {
                       const p = data.people.find((x) => x.id === c.personId)
                       return (
-                        <li key={c.id} className="flex justify-between gap-3 px-4 py-2.5 text-[0.9375rem]">
-                          <span className="text-ink">{p ? fullName(p) : c.personId}</span>
-                          <span className="font-mono text-[0.8125rem] text-slate">{c.id}</span>
+                        <li
+                          key={c.id}
+                          className="flex justify-between gap-3 px-4 py-2.5 text-[0.9375rem]"
+                        >
+                          <span className="text-ink">
+                            {p ? fullName(p) : c.personId}
+                          </span>
+                          <span className="font-mono text-[0.8125rem] text-slate">
+                            {c.id}
+                          </span>
                         </li>
                       )
                     })}
@@ -400,13 +444,18 @@ export function MonitoringPage() {
               </div>
               <div className="p-5 sm:p-6">
                 <h3 className="text-[0.9375rem] font-medium text-ink">
-                  Open cases offered to another ACSP <span className="font-mono text-[0.8125rem] text-slate">ACSP-13</span>
+                  Open cases offered to another ACSP{' '}
+                  <span className="font-mono text-[0.8125rem] text-slate">
+                    ACSP-13
+                  </span>
                 </h3>
                 <p className="mt-1 text-[0.875rem] text-slate">
                   A case moves only if the individual agrees.
                 </p>
                 {rows.length === 0 ? (
-                  <p className="mt-3 text-[0.9375rem] text-slate">None offered.</p>
+                  <p className="mt-3 text-[0.9375rem] text-slate">
+                    None offered.
+                  </p>
                 ) : (
                   <ul className="mt-3 divide-y divide-line/70 rounded-xl border border-line/80">
                     {rows.map((r) => (
@@ -420,8 +469,8 @@ export function MonitoringPage() {
                           </StateBadge>
                         </div>
                         <p className="text-[0.8125rem] text-slate">
-                          <span className="font-mono">{r.vc.id}</span>, offered to{' '}
-                          {r.offered?.name ?? 'another ACSP'}
+                          <span className="font-mono">{r.vc.id}</span>, offered
+                          to {r.offered?.name ?? 'another ACSP'}
                         </p>
                       </li>
                     ))}
@@ -458,8 +507,9 @@ export function MonitoringPage() {
         <div className="space-y-4 p-5 sm:p-6">
           <p className="text-[0.9375rem] text-graphite">
             Whether the yearly upload replaces or sits beside the two-weekly
-            check is open (setting <span className="font-mono">yearly_upload_role</span> on
-            the Rules page). Use a synthetic file only.
+            check is open (setting{' '}
+            <span className="font-mono">yearly_upload_role</span> on the Rules
+            page). Use a synthetic file only.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <input
@@ -485,7 +535,10 @@ export function MonitoringPage() {
             <Button
               disabled={!canAct}
               onClick={() =>
-                ingest('companies-house-acsp-list-sample.csv', sampleAcspCsv(data.acsps))
+                ingest(
+                  'companies-house-acsp-list-sample.csv',
+                  sampleAcspCsv(data.acsps),
+                )
               }
             >
               Use sample file
@@ -501,14 +554,20 @@ export function MonitoringPage() {
               {monitoring.yearlyUploads.map((u) => (
                 <li key={u.id} className="px-4 py-3">
                   <p className="text-[0.9375rem] text-ink">
-                    <span className="font-mono text-[0.875rem]">{u.fileName}</span>,{' '}
-                    {formatDateTime(u.uploadedAt)} by {u.uploadedBy}
+                    <span className="font-mono text-[0.875rem]">
+                      {u.fileName}
+                    </span>
+                    , {formatDateTime(u.uploadedAt)} by {u.uploadedBy}
                   </p>
                   <p className="text-[0.875rem] text-slate">
-                    {u.rows} rows, {u.matched} matched, {u.notFoundAcspIds.length} not found
+                    {u.rows} rows, {u.matched} matched,{' '}
+                    {u.notFoundAcspIds.length} not found
                     {u.notFoundAcspIds.length > 0 &&
                       `: ${u.notFoundAcspIds
-                        .map((id) => data.acsps.find((a) => a.id === id)?.name ?? id)
+                        .map(
+                          (id) =>
+                            data.acsps.find((a) => a.id === id)?.name ?? id,
+                        )
                         .join(', ')}`}
                     . Time to register: to be set.
                   </p>
