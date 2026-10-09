@@ -42,15 +42,15 @@ export function PersonaSwitcher() {
               aria-pressed={active}
               onClick={() => choose(p.id)}
               className={cn(
-                'inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-3.5 text-[0.9375rem] font-medium transition-colors duration-150',
+                'inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[0.9375rem] font-medium transition-colors duration-150',
                 active
                   ? 'bg-paper text-ink shadow-sm'
                   : 'text-paper/80 hover:bg-white/10 hover:text-paper',
               )}
             >
               <Icon className="size-4" aria-hidden="true" />
-              <span className="2xl:hidden">{p.shortLabel}</span>
-              <span className="hidden 2xl:inline">{p.label}</span>
+              <span className="min-[1800px]:hidden">{p.shortLabel}</span>
+              <span className="hidden min-[1800px]:inline">{p.label}</span>
             </button>
           )
         })}

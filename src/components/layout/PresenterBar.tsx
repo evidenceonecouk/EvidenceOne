@@ -21,7 +21,7 @@ function GuidedMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          'inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-[0.9375rem] font-medium',
+          'inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[0.9375rem] font-medium',
           on
             ? 'bg-paper text-ink'
             : 'text-paper/85 hover:bg-white/10 hover:text-paper',
@@ -74,7 +74,7 @@ export function PresenterBar() {
     <>
       <div className="on-dark sticky top-0 z-40 h-14 bg-ink text-paper print:hidden">
         <div className="mx-auto flex h-full max-w-[88rem] items-center gap-3 px-4 sm:px-6">
-          <span className="hidden text-sm font-medium tracking-wide text-paper/70 uppercase xl:inline">
+          <span className="hidden whitespace-nowrap text-sm font-medium tracking-wide text-paper/70 uppercase min-[1800px]:inline">
             Demo view
           </span>
           <PersonaSwitcher />

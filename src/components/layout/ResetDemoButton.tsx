@@ -20,7 +20,7 @@ export function ResetDemoButton() {
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-[0.9375rem] font-medium text-paper/85 hover:bg-white/10 hover:text-paper">
+      <AlertDialogTrigger className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[0.9375rem] font-medium text-paper/85 hover:bg-white/10 hover:text-paper">
         <RotateCcw className="size-4" aria-hidden="true" />
         <span className="hidden sm:inline">Reset demo</span>
         <span className="sr-only sm:hidden">Reset demo</span>
