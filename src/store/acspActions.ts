@@ -59,7 +59,9 @@ export function setInvoiceMode(
   const acsp = data.acsps.find((a) => a.id === acspId)
   if (!acsp || acsp.plan.invoiceMode === mode) return { data, audit: [] }
   const label = (m: AcspPlan['invoiceMode']) =>
-    m === 'per_case' ? 'one invoice for each case' : 'one consolidated invoice each month'
+    m === 'per_case'
+      ? 'one invoice for each case'
+      : 'one consolidated invoice each month'
   return {
     data: patchAcsp(data, acspId, (a) => ({
       ...a,
