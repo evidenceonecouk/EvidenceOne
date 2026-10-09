@@ -590,6 +590,11 @@ export interface CorrectionTask {
   correctValue: string
   status: 'open' | 'filed' | 'register_updated'
   createdAt: ISODate
+  /** The ACSP continued to its own WebFiling account through the Evidence One interstitial. */
+  handedOffAt?: ISODate
+  /** Outcome recorded on return. The company authentication code and One Login details are never stored. */
+  filingReference?: string
+  filingOutcome?: 'accepted'
   filedAt?: ISODate
   updatedAt?: ISODate
 }

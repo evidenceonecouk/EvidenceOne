@@ -982,13 +982,23 @@ export function fileCorrection(
   reviewerId: string,
 ): ActionResult {
   const task = data.corrections.find((t) => t.id === taskId)
-  if (!task) return { data, audit: [] }
+  if (!task || task.status !== 'open') return { data, audit: [] }
   const now = new Date().toISOString()
+  // A synthetic filing reference. The company authentication code and One Login details are never seen or stored.
+  const filingReference = `WF-2026-${syntheticCode(taskId, 6)}`
   return {
     data: {
       ...data,
       corrections: data.corrections.map((t) =>
-        t.id === taskId ? { ...t, status: 'filed', filedAt: now } : t,
+        t.id === taskId
+          ? {
+              ...t,
+              status: 'filed',
+              filedAt: now,
+              filingReference,
+              filingOutcome: 'accepted',
+            }
+          : t,
       ),
     },
     audit: [
@@ -996,22 +1006,25 @@ export function fileCorrection(
         at: now,
         actor: reviewerName(data, reviewerId),
         actorType: 'person',
-        action: 'route_b.acsp04.filed',
+        action: 'route_b.filing.recorded',
         caseId: task.caseId,
-        detail: `ACSP04 correction filed with Companies House: ${task.field.toLowerCase()} ${task.registerValue} to ${task.correctValue}. A correction, never a resubmission.`,
+        detail: `Filing ${task.id} made by the ACSP through its own Companies House WebFiling account: ${task.field.toLowerCase()} ${task.registerValue} to ${task.correctValue}. Outcome accepted, filing reference ${filingReference}. Evidence One did not see the login or the company authentication code.`,
       },
     ],
   }
 }
 
-/** Once Companies House updates the register, the halted verification resumes automatically. */
+/**
+  Once Companies House updates the register, the register comparison passes. A
+  register difference no longer halts Route A, so the case is not paused or
+  resumed by this task: it stays where the reviewer has it.
+*/
 export function registerUpdated(data: DemoData, taskId: string): ActionResult {
   const task = data.corrections.find((t) => t.id === taskId)
-  if (!task) return { data, audit: [] }
+  if (!task || task.status !== 'filed') return { data, audit: [] }
   const now = Date.now()
   const iso = (o = 0) => new Date(now + o).toISOString()
   const person = data.people.find((p) => p.id === task.personId)
-  const hours = currentRuleSet(data).params.review_target_hours
   const register = data.register.map((r) => {
     if (r.personId !== task.personId || r.companyNumber !== task.companyNumber)
       return r
@@ -1032,9 +1045,6 @@ export function registerUpdated(data: DemoData, taskId: string): ActionResult {
   })
   const next = patchCase({ ...data, register }, task.caseId, (c) => ({
     ...c,
-    status: 'in_review',
-    submittedForReviewAt: iso(1000),
-    slaDueAt: iso(1000 + hours * HOUR),
     observations: [
       {
         id: `o-${c.id}-fix`,
@@ -1042,7 +1052,7 @@ export function registerUpdated(data: DemoData, taskId: string): ActionResult {
         ruleId: 'REG-11',
         severity: 'info',
         title: 'Register corrected, details now match',
-        detail: `Companies House updated the register after ACSP04 correction ${task.id}. The name on the document now matches the register after normalisation.`,
+        detail: `Companies House updated the register after filing ${task.id}. The details on the document now match the register after normalisation. The reviewer's decision on the earlier difference stands on the record.`,
         source: 'Companies House officer record',
       },
       ...c.observations.filter((o) => o.severity !== 'mismatch'),
@@ -1064,15 +1074,7 @@ export function registerUpdated(data: DemoData, taskId: string): ActionResult {
         actorType: 'system',
         action: 'register.updated',
         caseId: task.caseId,
-        detail: `Register updated: ${task.field.toLowerCase()} now ${task.correctValue}.`,
-      },
-      {
-        at: iso(1000),
-        actor: 'Evidence One rules',
-        actorType: 'system',
-        action: 'route_a.resumed',
-        caseId: task.caseId,
-        detail: `REG-11 now passes. Route A resumed automatically and returned to the review queue with a new ${hours}-hour review target.`,
+        detail: `Register updated: ${task.field.toLowerCase()} now ${task.correctValue}. Route A was not paused by task ${task.id}.`,
       },
     ],
   }
