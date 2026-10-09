@@ -1,9 +1,20 @@
 import type {
   CaseStatus,
   DemoData,
+  PartnerStatus,
   PersonStatus,
+  ReferralPartner,
   VerificationCase,
 } from '@/types/domain'
+import {
+  hasFlaggedCheck,
+  partnerChecksFor,
+  partnerFlagsFor,
+  partnerSeesChecks,
+  partnerStatusForCase,
+  type PartnerChecks,
+  type PartnerFlag,
+} from './partnerSelectors'
 
 export const getPerson = (data: DemoData, id: string) =>
   data.people.find((p) => p.id === id)
@@ -49,7 +60,7 @@ const statusMap: Record<CaseStatus, PersonStatus> = {
   abandoned: 'not_completed',
 }
 
-/** Derives the status shown to Agents. Agents see status only, never documents or evidence. */
+/** Internal status of a person. A Referral Partner sees partnerStatus and check results only, never documents or evidence. */
 export function personStatus(data: DemoData, personId: string): PersonStatus {
   const person = getPerson(data, personId)
   const latest = casesForPerson(data, personId)[0]
@@ -74,7 +85,7 @@ export function companiesForPartner(data: DemoData, partnerId: string) {
   return data.companies.filter((c) => c.lodgedByPartnerId === partnerId)
 }
 
-/** Name of whoever reviews a case: an ACSP firm, or an Agent reviewing in-house. */
+/** Name of whoever holds a case: the ACSP firm that verifies it. */
 export function reviewerOrgName(
   data: DemoData,
   orgId: string,
@@ -88,6 +99,11 @@ export interface PersonRow {
   role: keyof typeof roleLabel
   appointedOn: string
   status: PersonStatus
+  /** The status a Referral Partner sees. Null when the person has not been invited. */
+  partnerStatus: PartnerStatus | null
+  flags: PartnerFlag[]
+  /** Check results as passed, flagged or not passed. Never a document or evidence. */
+  checks?: PartnerChecks
   latestCase?: VerificationCase
   detail: string
   invitable: boolean
@@ -95,25 +111,26 @@ export interface PersonRow {
   registerVerified: boolean
 }
 
-/* Status detail only. Nothing here reveals a document, a check result or evidence. */
+/* Status detail only. Nothing here reveals a document, extracted data, evidence or a message. */
 const caseDetail: Record<CaseStatus, string> = {
   invited: 'Invite sent, not yet started',
-  in_progress: 'Completing the app journey',
-  in_review: 'With the ACSP for review',
-  info_requested: 'The ACSP has asked the individual for information',
-  approved: 'Approved, awaiting submission to Companies House',
-  submission_started: 'Being submitted to Companies House',
-  submitted: 'Submitted to Companies House',
-  confirmed:
-    'Verified. Companies House emails the personal code to the individual',
-  declined: 'Not completed',
-  abandoned: 'Not completed',
+  in_progress: 'Completing the journey in the browser',
+  in_review: 'With the ACSP',
+  info_requested: 'The ACSP has asked the individual for further information',
+  approved: 'With the ACSP, being prepared for submission',
+  submission_started: 'With the ACSP, being submitted to Companies House',
+  submitted: 'Submitted to Companies House by the ACSP',
+  confirmed: 'Completed. Companies House has confirmed the verification',
+  declined: 'Declined by the ACSP',
+  abandoned: 'The invite lapsed before the journey was completed',
 }
 
 export function peopleForCompany(
   data: DemoData,
   companyNumber: string,
+  partner?: Pick<ReferralPartner, 'country'>,
 ): PersonRow[] {
+  const showChecks = !partner || partnerSeesChecks(partner)
   return data.register
     .filter((r) => r.companyNumber === companyNumber)
     .map((r) => {
@@ -133,7 +150,7 @@ export function peopleForCompany(
       )
         detail = 'Invite expired before completion'
       else if (latestCase?.status === 'invited' && invite?.status === 'opened')
-        detail = 'Invite opened in the app'
+        detail = 'Invite opened in the browser'
       else if (latestCase) detail = caseDetail[latestCase.status]
       return {
         personId: r.personId,
@@ -141,6 +158,12 @@ export function peopleForCompany(
         role: r.role,
         appointedOn: r.appointedOn,
         status,
+        partnerStatus: partnerStatusForCase(latestCase),
+        flags: partnerFlagsFor(data, r.personId, companyNumber),
+        checks:
+          showChecks && latestCase
+            ? partnerChecksFor(data, latestCase)
+            : undefined,
         latestCase,
         detail,
         invitable:
@@ -154,56 +177,44 @@ export function peopleForCompany(
 
 export interface AttentionItem {
   id: string
-  status: PersonStatus | 'register_verified'
+  kind:
+    | 'register_verified'
+    | 'not_invited'
+    | 'further_information'
+    | 'declined'
+    | 'invite_expired'
+    | 'reverification_due'
+    | 'check_flagged'
   personName: string
   companyName: string
   title: string
 }
 
-/** Follow-ups for an Agent, from status alone. */
+/** Follow-ups for a Referral Partner, from status and check results alone. */
 export function attentionForPartner(
   data: DemoData,
   partnerId: string,
 ): AttentionItem[] {
+  const partner = getPartner(data, partnerId)
   const items: AttentionItem[] = []
   for (const company of companiesForPartner(data, partnerId)) {
-    for (const row of peopleForCompany(data, company.number)) {
+    for (const row of peopleForCompany(data, company.number, partner)) {
       const base = { personName: row.name, companyName: company.name }
+      const add = (kind: AttentionItem['kind'], title: string) =>
+        items.push({ ...base, id: `${kind}-${row.personId}`, kind, title })
       if (row.registerVerified && !row.latestCase)
-        items.push({
-          ...base,
-          id: `v-${row.personId}`,
-          status: 'register_verified',
-          title: 'Register already shows identity verified',
-        })
-      else if (row.status === 'not_started' && !row.latestCase)
-        items.push({
-          ...base,
-          id: `u-${row.personId}`,
-          status: 'not_started',
-          title: 'Not yet invited',
-        })
-      if (row.status === 'not_completed')
-        items.push({
-          ...base,
-          id: `n-${row.personId}`,
-          status: 'not_completed',
-          title: 'Verification not completed',
-        })
-      if (row.status === 'awaiting_info')
-        items.push({
-          ...base,
-          id: `a-${row.personId}`,
-          status: 'awaiting_info',
-          title: 'Awaiting information from the individual',
-        })
-      if (row.status === 'reverification_due')
-        items.push({
-          ...base,
-          id: `r-${row.personId}`,
-          status: 'reverification_due',
-          title: 'Reverification due',
-        })
+        add('register_verified', 'Register already shows identity verified')
+      else if (!row.latestCase) add('not_invited', 'Not yet invited')
+      if (row.partnerStatus === 'further_information')
+        add('further_information', 'Further information required')
+      if (row.partnerStatus === 'declined')
+        add('declined', 'Declined by the ACSP')
+      if (row.flags.includes('invite_expired'))
+        add('invite_expired', 'Invite expired before completion')
+      if (row.flags.includes('reverification_due'))
+        add('reverification_due', 'Reverification due')
+      if (row.checks && hasFlaggedCheck(row.checks))
+        add('check_flagged', 'A check is flagged. The ACSP will decide.')
     }
   }
   return items
