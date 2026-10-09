@@ -41,7 +41,10 @@ export function AiObservationCard({ o }: { o: AiObservation }) {
       <p className="mt-1 text-[0.9375rem] leading-relaxed text-graphite">
         {o.detail}
       </p>
-      <p className="mt-2 text-[0.875rem] text-slate">Source: {o.source}</p>
+      <p className="mt-2 text-[0.875rem] text-slate">
+        Source: {o.source}. Not a decision, and never applied to the identity
+        document itself.
+      </p>
     </div>
   )
 }

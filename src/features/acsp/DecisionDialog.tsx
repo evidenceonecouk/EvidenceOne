@@ -146,7 +146,8 @@ export function DecisionDialog({
                 )}
                 {outcome === 'request_info' && (
                   <p className="mt-0.5 text-sm text-slate">
-                    Shown to the individual in the app.
+                    Shown to the individual in their case, with an email
+                    notification.
                   </p>
                 )}
                 <textarea

@@ -14,12 +14,14 @@ import { Button } from '@/components/ui/button'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { reasonCodes } from '@/data/reasonCodes'
-import { verifyChain } from '@/lib/audit'
+import { recordAttribution, sourceDetail } from '@/lib/attribution'
 import { formatDate, formatDateTime, fullName, shortHash } from '@/lib/format'
 import { documentName, ruleSetFor } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { recordExport, reviewerName } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
+import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
+import { chainIntact } from './chain'
+import { CasePayment } from '@/features/acsp/CasePayment'
 import {
   auditForCase,
   getCase,
@@ -34,6 +36,7 @@ import {
 export function VerificationRecord() {
   const { caseId = '' } = useParams()
   const { data, apply } = useDemoStore()
+  const { acsp: actingAcsp, reviewer: actingReviewer } = useActingAcsp()
   const [stepUp, setStepUp] = useState(false)
   const vc = getCase(data, caseId)
   const person = vc && getPerson(data, vc.personId)
@@ -45,6 +48,16 @@ export function VerificationRecord() {
     )
   if (!vc || !person || !company || !entry)
     return <Page>Record not found.</Page>
+  if (vc.acspId !== actingAcsp.id)
+    return (
+      <Page width="narrow">
+        <p className="text-lg text-ink">
+          This record is held by{' '}
+          {reviewerOrgName(data, vc.acspId) ?? 'another ACSP'}. Each ACSP's
+          records are kept separate.
+        </p>
+      </Page>
+    )
 
   const acspName = reviewerOrgName(data, vc.acspId)
   const reviewer = data.acsps
@@ -63,7 +76,11 @@ export function VerificationRecord() {
       ).toISOString()
     : undefined
   const events = auditForCase(data, vc.id)
-  const chainOk = verifyChain(data.audit)
+  const chainOk = chainIntact(data.audit, vc.acspId)
+  const partner = vc.partnerId
+    ? data.partners.find((p) => p.id === vc.partnerId)
+    : undefined
+  const pep = data.acsps.find((a) => a.id === vc.acspId)?.profile.pepScreening
   const reason = reasonCodes.find((r) => r.code === vc.decision?.reasonCode)
   const name = fullName(person)
 
@@ -92,8 +109,8 @@ export function VerificationRecord() {
     [
       'Checks',
       vc.option === 2
-        ? 'Option 2: person check by a trained reviewer, PEP and sanctions'
-        : `Option 1: ${vc.browserCapture ? '' : 'chip read, '}authenticity, liveness, face match${vc.idvt.faceMatchScore ? ` ${vc.idvt.faceMatchScore}%` : ''}, PEP and sanctions`,
+        ? `Option 2: person check by a trained reviewer, register comparison${pep ? ', PEP and sanctions screening' : ''}`
+        : `Option 1, certified identity provider: document authenticity, liveness, face match${vc.idvt.faceMatchScore ? ` ${vc.idvt.faceMatchScore}%` : ''}, register comparison${pep ? ', PEP and sanctions screening' : ''}`,
     ],
     [
       'Decision',
@@ -109,6 +126,19 @@ export function VerificationRecord() {
       'Decided by',
       vc.decision ? reviewerName(data, vc.decision.reviewerId) : 'Not decided',
     ],
+    ...(vc.decision?.stepUpRef
+      ? ([['Step-up reference', vc.decision.stepUpRef]] as [string, string][])
+      : []),
+    ['Case source', sourceDetail(vc, partner?.name)],
+    ...(vc.discrepancyReport?.choice
+      ? ([
+          [
+            'Register difference',
+            `${vc.discrepancyReport.summary}. Choice logged: ${vc.discrepancyReport.choice === 'will_report' ? 'will report to Companies House' : 'will not report'}`,
+          ],
+        ] as [string, string][])
+      : []),
+    ['Secure messages', `${vc.messages?.length ?? 0} kept with the record`],
     ['Rule set applied', `Route A rule set ${rs.version}`],
     [
       'Companies House verification reference',
@@ -178,11 +208,9 @@ export function VerificationRecord() {
           </div>
 
           <p className="mt-6 text-lg leading-relaxed text-graphite">
-            The identity verification of{' '}
-            <span className="text-ink">{name}</span> was conducted by{' '}
-            <span className="text-ink">{acspName}</span> using the Evidence One
-            platform. It {outcome} Evidence One prepared, evidenced and recorded
-            the verification. The decision was made by a person at the ACSP.
+            {recordAttribution(name, acspName ?? 'the ACSP')} It {outcome}{' '}
+            Evidence One prepared, evidenced and recorded the verification. The
+            decision was made by a person at the ACSP.
           </p>
 
           <dl className="mt-8 grid gap-x-8 gap-y-5 border-t border-line pt-8 sm:grid-cols-2">
@@ -218,6 +246,12 @@ export function VerificationRecord() {
         </div>
       </article>
 
+      <CasePayment
+        vc={vc}
+        acspName={acspName ?? 'the ACSP'}
+        className="mt-6 p-5 sm:p-6"
+      />
+
       <Panel
         aria-labelledby="audit-title"
         className="mt-6 overflow-hidden print:mt-8 print:break-before-page print:border-0 print:shadow-none"
@@ -225,7 +259,7 @@ export function VerificationRecord() {
         <PanelHeader
           id="audit-title"
           title="Audit trail"
-          description="Append-only. Each entry's hash includes the previous one, so any change breaks the chain."
+          description={`Append-only, one chain per ACSP: the chain of ${acspName}. Each entry's hash includes the previous one, so any change breaks the chain.`}
           actions={
             <span
               className={cn(
@@ -244,27 +278,38 @@ export function VerificationRecord() {
             </span>
           }
         />
-        <ol className="divide-y divide-line/70">
+        <ol className="relative px-5 py-5 sm:px-6">
+          <span
+            aria-hidden="true"
+            className="absolute top-7 bottom-7 left-[2.05rem] w-px bg-line sm:left-[2.3rem]"
+          />
           {events.map((e) => (
-            <li
-              key={e.seq}
-              className="grid gap-x-5 gap-y-1 px-5 py-4 sm:grid-cols-[5.5rem_1fr_auto] sm:px-6"
-            >
-              <span className="font-mono text-[0.875rem] text-slate tabular">
-                #{String(e.seq).padStart(4, '0')}
-              </span>
-              <div className="min-w-0">
-                <p className="text-[0.9375rem] text-ink">{e.detail}</p>
-                <p className="mt-0.5 text-[0.8125rem] text-slate">
-                  {formatDateTime(e.at)} · {e.actor} ·{' '}
-                  <span className="font-mono">{e.action}</span>
-                </p>
+            <li key={e.seq} className="relative flex gap-4 pb-5 last:pb-0">
+              <span
+                className={cn(
+                  'relative z-10 mt-1.5 size-3 shrink-0 translate-x-[0.3rem] rounded-full ring-4 ring-white',
+                  e.actorType === 'ai'
+                    ? 'bg-silver'
+                    : e.actorType === 'system'
+                      ? 'bg-slate'
+                      : 'bg-ink',
+                )}
+                aria-hidden="true"
+              />
+              <div className="grid min-w-0 flex-1 gap-x-5 gap-y-1 sm:grid-cols-[1fr_auto]">
+                <div className="min-w-0">
+                  <p className="text-[0.9375rem] text-ink">{e.detail}</p>
+                  <p className="mt-0.5 text-[0.8125rem] text-slate">
+                    {formatDateTime(e.at)} · {e.actor} ·{' '}
+                    <span className="font-mono">{e.action}</span>
+                  </p>
+                </div>
+                <span className="flex items-center gap-1.5 font-mono text-[0.8125rem] text-slate">
+                  #{String(e.seq).padStart(4, '0')} {shortHash(e.prevHash)}
+                  <ArrowRight className="size-3" aria-label="then" />
+                  <span className="text-ink">{shortHash(e.hash)}</span>
+                </span>
               </div>
-              <span className="flex items-center gap-1.5 font-mono text-[0.8125rem] text-slate">
-                {shortHash(e.prevHash)}
-                <ArrowRight className="size-3" aria-label="then" />
-                <span className="text-ink">{shortHash(e.hash)}</span>
-              </span>
             </li>
           ))}
         </ol>
@@ -281,7 +326,7 @@ export function VerificationRecord() {
         onConfirmed={(ref) => {
           setStepUp(false)
           apply((d) =>
-            recordExport(d, vc.id, ref, reviewerName(d, 'rev-marsh')),
+            recordExport(d, vc.id, ref, reviewerName(d, actingReviewer.id)),
           )
           window.setTimeout(() => window.print(), 300)
         }}

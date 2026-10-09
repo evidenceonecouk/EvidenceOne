@@ -10,38 +10,37 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Panel, PanelHeader } from '@/components/app/Page'
 import { CompletionTick } from '@/components/brand/CompletionTick'
+import { PendingDecision } from '@/components/PendingDecision'
 import { RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { AiObservationCard } from '@/components/visual/AiObservationCard'
-import { Avatar } from '@/components/visual/Avatar'
-import {
-  CardFront,
-  PassportDataPage,
-} from '@/components/visual/IdDocumentMockup'
-import { Portrait } from '@/components/visual/Portrait'
-import { portraitFor } from '@/data/portraits'
 import {
   formatAddress,
   formatDate,
   formatShortDate,
   fullName,
 } from '@/lib/format'
-import { documentFacts } from '@/lib/idDocument'
 import { NORMALISATION_NOTE } from '@/lib/register'
-import { comparisonRows, documentName, type RuleResult } from '@/lib/rules'
+import {
+  comparisonRows,
+  documentName,
+  ruleSetFor,
+  type RuleResult,
+} from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { recordOption2Check } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import type {
   CaseStep,
   CheckResult,
-  EvidenceItem,
-  IdDocumentType,
   Person,
   RegisterEntry,
   Reviewer,
+  SupportingEvidenceType,
   VerificationCase,
 } from '@/types/domain'
+import { DiscrepancyPrompt } from './DiscrepancyPrompt'
+import { EvidenceThumb } from './EvidenceThumb'
 import { RuleList } from './RuleList'
 
 export interface SectionProps {
@@ -51,6 +50,8 @@ export interface SectionProps {
   results: RuleResult[]
   reviewerId: string
   decidable: boolean
+  /** PEP and sanctions screening is switched on for this ACSP (profile.pepScreening). */
+  pepScreening: boolean
 }
 
 function StepPanel({
@@ -166,6 +167,12 @@ export function RegisterSection(p: SectionProps) {
   const { data } = useDemoStore()
   const { vc, person, entry } = p
   const rows = comparisonRows(person, person.document, entry)
+  const mismatches = rows.filter((r) => r.result === 'mismatch')
+  const differences = mismatches.map((r) =>
+    r.field === 'Full name' && r.note
+      ? `${r.field}: ${r.note.replace(/\.$/, '')}`
+      : `${r.field}: ${r.document} on the document, ${r.register} on the register`,
+  )
   const task = vc.correctionTaskId
     ? data.corrections.find((t) => t.id === vc.correctionTaskId)
     : undefined
@@ -174,7 +181,7 @@ export function RegisterSection(p: SectionProps) {
       id="sec-register"
       kicker="Register"
       title="Register comparison"
-      description="What the person told us, what the document holds and what Companies House holds. Compared by rule, the same way every time."
+      description="What the person told us, what the document holds and what Companies House holds. Compared by rule, the same way every time. A difference is flagged for your decision. It never halts the case."
       step="register"
       p={p}
       actions={
@@ -188,6 +195,15 @@ export function RegisterSection(p: SectionProps) {
         ) : undefined
       }
     >
+      {mismatches.length > 0 && (
+        <DiscrepancyPrompt
+          vc={vc}
+          differences={differences}
+          fields={mismatches.map((r) => r.field)}
+          reviewerId={p.reviewerId}
+          decidable={p.decidable}
+        />
+      )}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[44rem] text-left">
           <thead className="bg-mist/50 text-[0.875rem] text-slate">
@@ -249,7 +265,7 @@ export function RegisterSection(p: SectionProps) {
                   {r.result === 'mismatch' ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-info px-2.5 py-1 text-sm font-medium whitespace-nowrap text-white">
                       <FileWarning className="size-4" aria-hidden="true" />
-                      Differs
+                      Flagged, differs
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 text-[0.9375rem] font-medium text-approve">
@@ -297,98 +313,34 @@ export function RegisterSection(p: SectionProps) {
         </table>
       </div>
       <p className="border-t border-line/70 bg-mist/40 px-5 py-3 text-[0.9375rem] text-graphite sm:px-6">
-        {NORMALISATION_NOTE} The case resumes automatically once the register
-        matches.
+        {NORMALISATION_NOTE}
       </p>
     </StepPanel>
   )
 }
 
-function EvidenceThumb({
-  item,
-  name,
-  person,
-  docType,
-}: {
-  item: EvidenceItem
-  name: string
-  person?: Person
-  docType?: IdDocumentType
-}) {
-  // The same specimen document and illustrated face the person saw in the app
-  if (person && item.kind === 'identity_document') {
-    const facts = documentFacts(
-      person,
-      docType ?? person.document?.type ?? 'passport',
-    )
-    const look = portraitFor(person)
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-ink">
-        <div className="w-[8.25rem] overflow-hidden rounded-md shadow-[0_8px_20px_-10px_rgb(0_0_0/0.8)]">
-          {facts.type === 'passport' ? (
-            <PassportDataPage facts={facts} look={look} />
-          ) : (
-            <CardFront facts={facts} look={look} />
-          )}
-        </div>
-      </div>
-    )
-  }
-  if (person && item.kind === 'selfie')
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#2a2c30,#17181a)]">
-        <Portrait
-          look={portraitFor(person)}
-          background="#3a3d42"
-          className="h-20 rounded-[50%]"
-        />
-      </div>
-    )
-  if (item.kind === 'identity_document' || item.kind === 'option2_document')
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-ink">
-        <div className="flex h-16 w-12 flex-col justify-between rounded-md border border-white/15 bg-white/[0.06] p-1.5">
-          <span className="h-0.5 w-5 rounded bg-white/30" />
-          <span className="mx-auto grid size-4 grid-cols-2 gap-px rounded-[3px] border border-highlight/70 p-[2px]">
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-          </span>
-          <span className="h-0.5 w-7 rounded bg-white/25" />
-        </div>
-      </div>
-    )
-  if (item.kind === 'selfie')
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#e4e6e8,#f4f5f6)]">
-        <Avatar seed={name} name={name} size={56} />
-      </div>
-    )
-  return (
-    <div className="flex h-24 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#e9ebed,#f6f7f8)]">
-      <div className="h-16 w-12 space-y-1.5 rounded-md bg-white p-2 shadow-sm">
-        <span className="block h-1.5 w-6 rounded bg-slate/50" />
-        <span className="block h-1 w-full rounded bg-line" />
-        <span className="block h-1 w-8 rounded bg-line" />
-        <span className="block h-1 w-full rounded bg-line" />
-      </div>
-    </div>
-  )
-}
+const captureLabel = {
+  upload: 'Uploaded from a computer, in the browser',
+  phone: 'Captured in the phone’s browser, then returned to the case',
+  camera: 'Direct camera capture in the mobile browser',
+} as const
 
 export function DocumentSection(p: SectionProps) {
+  const { data } = useDemoStore()
   const { vc, person } = p
   const doc = person.document
   const items = vc.evidence.filter(
     (e) => e.kind === 'identity_document' || e.kind === 'selfie',
   )
+  const setting = ruleSetFor(data, vc).settings.chip_not_read_fallback
+  const isPassport =
+    (vc.journey?.documentType ?? doc?.type) === 'passport' && vc.option === 1
   return (
     <StepPanel
       id="sec-document"
       kicker="Steps 2 and 3"
       title="Identity document"
-      description="One photographic identity document, uploaded once and passed to the identity checks"
+      description="One photographic identity document, captured in the browser and passed to the identity checks"
       step="document"
       p={p}
     >
@@ -400,14 +352,7 @@ export function DocumentSection(p: SectionProps) {
               ['Number', `Held securely, ends ${doc.numberLastTwo}`],
               ['Expires', formatDate(doc.expiresOn)],
               ['Country of issue', doc.issuingCountry],
-              [
-                'Captured',
-                vc.browserCapture
-                  ? 'In the browser, no chip read'
-                  : doc.hasChip
-                    ? 'In the app, chip read'
-                    : 'In the app',
-              ],
+              ['Captured', captureLabel[vc.journey?.captureRoute ?? 'upload']],
               ['Name on document', doc.nameOnDocument],
             ] as const
           ).map(([k, v]) => (
@@ -417,6 +362,14 @@ export function DocumentSection(p: SectionProps) {
             </div>
           ))}
         </dl>
+      )}
+      {isPassport && (
+        <p className="flex flex-wrap items-center gap-2 border-t border-line/70 px-5 py-3 text-[0.9375rem] text-slate sm:px-6">
+          {setting === 'accept_web_result'
+            ? 'Chip not read by Evidence One. Browser route result accepted under the current setting.'
+            : 'Chip not read by Evidence One. The current setting asks for another Option 1 document, then Option 2.'}
+          <PendingDecision code="P1" />
+        </p>
       )}
       {items.length > 0 && (
         <ul className="grid gap-4 border-t border-line/70 p-5 sm:grid-cols-2 sm:p-6">
@@ -440,7 +393,7 @@ export function DocumentSection(p: SectionProps) {
               </p>
               {e.note && (
                 <p className="mt-2 rounded-lg bg-mist px-2.5 py-1.5 text-[0.8125rem] leading-snug text-graphite">
-                  Provider result: {e.note}
+                  Certified identity provider result: {e.note}
                 </p>
               )}
             </li>
@@ -465,17 +418,10 @@ const checkLabel: Record<CheckResult, string> = {
 
 export function IdvtSection(p: SectionProps) {
   const i = p.vc.idvt
+  const mismatch = comparisonRows(p.person, p.person.document, p.entry).some(
+    (r) => r.result === 'mismatch',
+  )
   const rows: [string, string, CheckResult, string?][] = [
-    [
-      'chip',
-      'Passport NFC chip read',
-      i.nfcChipRead,
-      i.nfcChipRead === 'pass'
-        ? 'Signature valid'
-        : p.vc.browserCapture
-          ? 'Not possible in a browser'
-          : undefined,
-    ],
     ['authenticity', 'Document authenticity', i.documentAuthenticity],
     ['liveness', 'Liveness', i.liveness],
     [
@@ -485,11 +431,26 @@ export function IdvtSection(p: SectionProps) {
       i.faceMatchScore ? `${i.faceMatchScore}%` : undefined,
     ],
   ]
+  if (p.pepScreening)
+    rows.push([
+      'screening',
+      'PEP and sanctions screening',
+      i.pepSanctions,
+      i.pepPossibleMatch || i.sanctionsPossibleMatch
+        ? 'Possible match'
+        : undefined,
+    ])
+  rows.push([
+    'register',
+    'Register comparison',
+    mismatch ? 'refer' : 'pass',
+    mismatch ? 'Flagged, see below' : 'Matches',
+  ])
   return (
     <StepPanel
       id="sec-idvt"
       kicker="Steps 3 and 4"
-      title="IDVT checks"
+      title="Identity checks"
       description={`Certified identity provider${i.attempts && i.attempts > 1 ? ` · ${i.attempts} attempts` : ''}`}
       step="idvt"
       p={p}
@@ -508,6 +469,8 @@ export function IdvtSection(p: SectionProps) {
                 className="size-5 text-decline"
                 aria-label="Not passed"
               />
+            ) : result === 'refer' ? (
+              <FileWarning className="size-5 text-info" aria-label="Flagged" />
             ) : (
               <span
                 className="size-5 rounded-full border-[1.5px] border-line"
@@ -521,6 +484,11 @@ export function IdvtSection(p: SectionProps) {
           </li>
         ))}
       </ul>
+      {!p.pepScreening && (
+        <p className="border-t border-line/70 px-5 py-3 text-[0.875rem] text-slate sm:px-6">
+          PEP and sanctions screening is switched off for your firm.
+        </p>
+      )}
       {i.providerReference && (
         <p className="border-t border-line/70 px-5 py-3 font-mono text-[0.8125rem] text-slate sm:px-6">
           Provider reference {i.providerReference}
@@ -532,6 +500,7 @@ export function IdvtSection(p: SectionProps) {
 
 export function ScreeningSection(p: SectionProps) {
   const i = p.vc.idvt
+  if (!p.pepScreening) return null
   return (
     <StepPanel
       id="sec-aml"
@@ -574,40 +543,95 @@ export function ScreeningSection(p: SectionProps) {
   )
 }
 
+const supportingLabel: Record<SupportingEvidenceType, string> = {
+  bank_statement: 'Bank or credit card statement',
+  utility_bill: 'Utility or council tax bill',
+  insurance: 'Insurance policy document',
+  passport_use: 'Evidence of recent passport use',
+}
+
 export function EvidenceSection(p: SectionProps) {
+  const { data } = useDemoStore()
+  const months = ruleSetFor(data, p.vc).params.supporting_evidence_months
   const items = p.vc.evidence.filter((e) => e.kind === 'address_evidence')
   const hasResults =
     p.results.some((r) => r.step === 'evidence') ||
     p.vc.observations.some((o) => o.step === 'evidence')
-  if (!hasResults) return null
+  if (!hasResults && items.length === 0) return null
+  const since = new Date()
+  since.setMonth(since.getMonth() - months)
   return (
     <StepPanel
       id="sec-evidence"
-      kicker="Only when a trigger applies"
-      title="Supporting evidence"
-      description="One supporting document, never a second identity document"
+      kicker="Proof of address from everyone"
+      title="Proof of address and supporting evidence"
+      description={`Proof of current address dated within ${months} months (ADDL-02). One supporting document only when the document is expired (ADDL-01) or a name change is declared (ADDL-03), never a second identity document.`}
       step="evidence"
       p={p}
+      actions={<PendingDecision code="P3" />}
     >
       {items.length > 0 && (
         <ul className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-          {items.map((e) => (
-            <li
-              key={e.id}
-              data-cite={`evidence:${e.id}`}
-              className="rounded-2xl border border-line bg-white p-3"
-            >
-              <EvidenceThumb item={e} name="" />
-              <p className="mt-3 text-[0.9375rem] font-medium text-ink">
-                {e.label}
-              </p>
-              <p className="text-[0.875rem] text-slate">
-                Uploaded {formatShortDate(e.uploadedAt)}
-                {e.documentDate &&
-                  ` · dated ${formatShortDate(e.documentDate)}`}
-              </p>
-            </li>
-          ))}
+          {items.map((e) => {
+            const within = e.documentDate
+              ? new Date(e.documentDate) >= since
+              : undefined
+            return (
+              <li
+                key={e.id}
+                data-cite={`evidence:${e.id}`}
+                className="rounded-2xl border border-line bg-white p-3"
+              >
+                <EvidenceThumb item={e} name="" />
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-[0.9375rem] font-medium text-ink">
+                  {e.label}
+                  {e.redaction && (
+                    <span className="rounded-full border border-line bg-mist px-2 py-0.5 text-[0.75rem] font-medium text-graphite">
+                      Option O3
+                    </span>
+                  )}
+                </p>
+                <p className="text-[0.875rem] text-slate">
+                  {e.supportingType &&
+                    `${supportingLabel[e.supportingType]} · `}
+                  Uploaded {formatShortDate(e.uploadedAt)}
+                  {e.documentDate &&
+                    ` · dated ${formatShortDate(e.documentDate)}`}
+                </p>
+                {within !== undefined && (
+                  <p
+                    className={cn(
+                      'mt-1.5 inline-flex items-center gap-1.5 text-[0.875rem] font-medium',
+                      within ? 'text-approve' : 'text-info',
+                    )}
+                  >
+                    {within ? (
+                      <CircleCheck className="size-4" aria-hidden="true" />
+                    ) : (
+                      <FileWarning className="size-4" aria-hidden="true" />
+                    )}
+                    {within
+                      ? `Dated within ${months} months`
+                      : `Older than ${months} months`}
+                  </p>
+                )}
+                {e.redaction && (
+                  <div className="mt-2 rounded-lg bg-mist px-2.5 py-2 text-[0.8125rem] leading-snug text-graphite">
+                    <p>
+                      Redacted copy only. Amounts and payees were masked by the
+                      individual, who confirmed the redaction on{' '}
+                      {formatShortDate(e.redaction.confirmedAt)}. You never see
+                      the original.
+                    </p>
+                    <p className="mt-1">
+                      Masked: {e.redaction.masked.join(', ')}. AI observation.
+                      Advisory only.
+                    </p>
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </StepPanel>
