@@ -2,7 +2,9 @@ import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { paramDefs, RULE_SET_NAME, settingDefs } from '@/data/rules'
 import type { AuditInput } from '@/lib/audit'
 import { formatDate, formatMoney, fullName } from '@/lib/format'
+import { suggestAcsps } from '@/lib/matching'
 import { currentRuleSet, draftRuleSet, evaluateCase } from '@/lib/rules'
+import { criteriaForPerson } from './partnerSelectors'
 import type {
   AiObservation,
   DecisionOutcome,
@@ -15,7 +17,6 @@ import type {
   Option2Reason,
   ParamKey,
   Payment,
-  PaymentMethod,
   Person,
   RuleDecision,
   RuleSettings,
@@ -106,21 +107,32 @@ export interface SendInvitesInput {
   personIds: string[]
   partnerId: string
   actor: string
-  payment: PaymentMethod
-  review: 'referred' | 'in_house'
+  /** The instructing ACSP the Partner chose, or 'platform_suggest' to let the platform suggest one. */
+  instructingAcspId: string | 'platform_suggest'
+  /** Who pays: the client, or the Partner with a single-use Agent Payment Code tied to the invite. */
+  payer: 'client' | 'partner'
+  /** Language and capacity preferences used to suggest an ACSP when the platform suggests one. */
+  languages?: string[]
+  maxTurnaroundHours?: number
 }
 
+/**
+  A Referral Partner invites people to verify. The invite names the instructing
+  ACSP (or asks the platform to suggest one) and who pays. The Partner never
+  reviews or decides: every case is referred to an ACSP.
+*/
 export function sendInvites(
   data: DemoData,
   input: SendInvitesInput,
 ): ActionResult & { inviteIds: string[] } {
   const now = new Date().toISOString()
-  const agent = data.partners.find((a) => a.id === input.partnerId)
+  const partner = data.partners.find((a) => a.id === input.partnerId)
   const invites: Invite[] = []
   const cases: VerificationCase[] = []
   const audit: AuditInput[] = []
   let inviteIds = data.invites.map((i) => i.id)
   let caseIds = data.cases.map((c) => c.id)
+  const suggest = input.instructingAcspId === 'platform_suggest'
 
   for (const personId of input.personIds) {
     const person = data.people.find((p) => p.id === personId)
@@ -128,15 +140,28 @@ export function sendInvites(
     const inviteId = nextRef(inviteIds, 'INV-2026-', 0)
     const caseId = nextRef(caseIds, 'EO-2026-', 0)
     const code =
-      input.payment === 'agent_payment_code' && agent?.paymentCode
-        ? paymentCodeFor(agent.paymentCode, inviteId)
+      input.payer === 'partner' && partner?.paymentCode
+        ? paymentCodeFor(partner.paymentCode, inviteId)
         : undefined
     inviteIds = [...inviteIds, inviteId]
     caseIds = [...caseIds, caseId]
-    const inHouse = input.review === 'in_house'
     const entry = data.register.find(
       (r) => r.personId === personId && r.companyNumber === input.companyNumber,
     )
+    // A named ACSP is the instructing ACSP. When the platform suggests, the top ranked ACSP is provisional until the individual instructs one.
+    const ranked = suggest
+      ? suggestAcsps(
+          data,
+          criteriaForPerson(data, personId, input.companyNumber, {
+            languages: input.languages,
+            maxTurnaroundHours: input.maxTurnaroundHours,
+          }),
+        ).map((s) => s.acsp.id)
+      : []
+    const acspId = suggest
+      ? (ranked[0] ?? PRIMARY_ACSP_ID)
+      : input.instructingAcspId
+    const acspName = data.acsps.find((a) => a.id === acspId)?.name ?? acspId
     invites.push({
       id: inviteId,
       personId,
@@ -146,7 +171,8 @@ export function sendInvites(
       paymentCode: code,
       status: 'sent',
       caseId,
-      review: input.review,
+      instructingAcspId: input.instructingAcspId,
+      payer: input.payer,
     })
     cases.push({
       id: caseId,
@@ -154,14 +180,16 @@ export function sendInvites(
       personId,
       companyNumber: input.companyNumber,
       origin: 'partner_invite',
+      source: 'referred',
       partnerId: input.partnerId,
-      acspId: inHouse ? input.partnerId : PRIMARY_ACSP_ID,
-      inHouse,
+      acspId,
       option: 1,
       status: 'invited',
       createdAt: now,
+      allocation: suggest
+        ? { source: 'suggested', suggestedAcspIds: ranked }
+        : { source: 'invite' },
       idvt: {
-        nfcChipRead: 'pending',
         documentAuthenticity: 'pending',
         liveness: 'pending',
         faceMatch: 'pending',
@@ -169,6 +197,7 @@ export function sendInvites(
       },
       observations: [],
       evidence: [],
+      journey: {},
     })
     audit.push({
       at: now,
@@ -176,7 +205,7 @@ export function sendInvites(
       actorType: 'person',
       action: 'invite.sent',
       caseId,
-      detail: `Invite ${inviteId} sent to ${fullName(person)}, pre-filled from the register${code ? `, with single-use Agent Payment Code ${code}` : ', individual pays by card'}. ${inHouse ? 'Reviewed in-house.' : 'Referred to Harcourt Lane Solicitors LLP.'}${entry?.identityVerified ? ' REG-04: the register already shows this person as verified.' : ''}`,
+      detail: `Invite ${inviteId} sent to ${fullName(person)}, pre-filled from the register. ${suggest ? 'Instructing ACSP: to be suggested by the platform from clear criteria, not AI.' : `Instructing ACSP: ${acspName}.`} ${code ? `Paid by ${partner?.name ?? 'the Referral Partner'} with single-use Agent Payment Code ${code}.` : 'The individual pays the ACSP.'}${entry?.identityVerified ? ' REG-04: the register already shows this person as verified. The sender and the individual are both told.' : ''}`,
     })
   }
 

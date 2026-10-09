@@ -9,7 +9,9 @@ import {
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { Page, PageHeader, Panel } from '@/components/app/Page'
+import { PartnerStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
+import { partnerStatusForCase } from '@/store/partnerSelectors'
 import { formatDateTime, shortHash } from '@/lib/format'
 import { Avatar } from '@/components/visual/Avatar'
 import { cn } from '@/lib/utils'
@@ -61,9 +63,9 @@ export function InviteLog() {
   return (
     <Page>
       <PageHeader
-        kicker="Agent portal"
+        kicker="Referral Partner portal"
         title="Invites"
-        description="Every invite you have sent, with its single-use payment code, who reviews it and its entry in the audit trail. You see status only, never documents or evidence."
+        description="Every invite you have sent, with its single-use payment code, the instructing ACSP and its entry in the audit trail. You see status only, never documents or evidence."
         actions={
           <Button asChild variant="outline">
             <Link to="/partner">Back to companies</Link>
@@ -80,8 +82,8 @@ export function InviteLog() {
                   'Invite',
                   'Person and company',
                   'Sent',
-                  'Payment',
-                  'Decision by',
+                  'Who pays',
+                  'Instructing ACSP',
                   'Status',
                   'Audit',
                 ].map((h, i) => (
@@ -107,6 +109,7 @@ export function InviteLog() {
                   (e) => e.caseId === inv.caseId && e.action === 'invite.sent',
                 )
                 const s = inviteStatus[inv.status]
+                const partnerStatus = partnerStatusForCase(vc)
                 const isNew = idx < fresh
                 return (
                   <tr
@@ -154,6 +157,8 @@ export function InviteLog() {
                     <td className="py-4 pr-4 text-[0.9375rem] text-graphite">
                       {inv.paymentCode ? (
                         <>
+                          Referral Partner pays
+                          <br />
                           Agent Payment Code
                           <span className="block font-mono text-slate">
                             {inv.paymentCode}
@@ -164,26 +169,30 @@ export function InviteLog() {
                           </span>
                         </>
                       ) : (
-                        'Individual pays by card'
+                        'The client pays the ACSP'
                       )}
                     </td>
                     <td className="py-4 pr-4 text-[0.9375rem] text-graphite">
-                      {vc && reviewerOrgName(data, vc.acspId)}
+                      {inv.instructingAcspId === 'platform_suggest'
+                        ? 'Suggested by Evidence One'
+                        : vc && reviewerOrgName(data, vc.acspId)}
                       <span className="block text-slate">
-                        {inv.review === 'in_house'
-                          ? 'In-house review'
-                          : 'Referred'}
+                        {inv.instructingAcspId === 'platform_suggest'
+                          ? 'The person chooses from the ranked list'
+                          : 'Named by you, the person instructs them'}
                       </span>
                     </td>
                     <td className="py-4 pr-4">
+                      {partnerStatus && (
+                        <PartnerStatusChip status={partnerStatus} />
+                      )}
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm font-medium whitespace-nowrap',
-                          s.tone,
+                          'mt-1.5 flex w-fit items-center gap-1.5 text-[0.875rem] text-slate',
                         )}
                       >
                         <s.icon className="size-4" aria-hidden="true" />
-                        {s.label}
+                        Invite {s.label.toLowerCase()}
                       </span>
                       {vc && ['sent', 'opened'].includes(inv.status) && (
                         <Link

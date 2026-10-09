@@ -2,14 +2,14 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  Check,
   CreditCard,
   Mail,
   Send,
-  ShieldCheck,
   Ticket,
-  Waypoints,
+  X,
 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   Checkbox,
@@ -22,36 +22,51 @@ import {
 import { Stepper } from '@/components/app/Stepper'
 import { useToast } from '@/components/app/Toaster'
 import { Wordmark } from '@/components/brand/Wordmark'
-import { PersonStatusChip } from '@/components/StatusChip'
+import { AcspStatusChip, PartnerStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
-import { PRIMARY_ACSP_ID } from '@/data/organisations'
-import { attributionText } from '@/lib/attribution'
-import { formatMoney, formatShortDate, VERIFICATION_FEE } from '@/lib/format'
 import { Avatar } from '@/components/visual/Avatar'
+import { attributionText } from '@/lib/attribution'
+import { formatMoney, formatShortDate } from '@/lib/format'
+import { capacityLeftToday, matchAcsps, type AcspMatch } from '@/lib/matching'
 import { cn } from '@/lib/utils'
 import { sendInvites } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
-import {
-  getAcsp,
-  getPartner,
-  getCompany,
-  peopleForCompany,
-  roleLabel,
-} from '@/store/selectors'
-import type { PaymentMethod } from '@/types/domain'
+import { useActingPartner, useDemoStore } from '@/store/DemoStore'
+import { criteriaForPerson } from '@/store/partnerSelectors'
+import { getCompany, peopleForCompany, roleLabel } from '@/store/selectors'
+import type { AcspFirm } from '@/types/domain'
+import { useActingPartnerUser } from './usePartnerUser'
 
-const STEPS = ['Choose people', 'Payment and review', 'Preview and send']
+const STEPS = [
+  'Choose people',
+  'Instructing ACSP',
+  'Who pays',
+  'Preview and send',
+]
+const LANGUAGES = ['English', 'Russian', 'Ukrainian', 'Arabic']
+const TURNAROUND: { label: string; hours?: number }[] = [
+  { label: 'Any' },
+  { label: 'Within 24 hours', hours: 24 },
+  { label: 'Within 48 hours', hours: 48 },
+]
+
+interface CardMatch {
+  acsp: AcspFirm
+  eligible: boolean
+  failing: { label: string; reason: string; ruleId: string; who?: string }[]
+  passing: { label: string; reason: string; ruleId: string }[]
+  caveat?: string
+}
 
 export function BulkInvite() {
   const { number = '' } = useParams()
   const [params] = useSearchParams()
-  const { data, state, apply } = useDemoStore()
+  const { data, apply } = useDemoStore()
+  const partner = useActingPartner()
+  const { can } = useActingPartnerUser()
   const toast = useToast()
   const navigate = useNavigate()
   const company = getCompany(data, number)
-  const agent = getPartner(data, state.partnerId)!
-  const acsp = getAcsp(data, PRIMARY_ACSP_ID)!
-  const rows = company ? peopleForCompany(data, number) : []
+  const rows = company ? peopleForCompany(data, number, partner) : []
   const eligible = rows.filter((r) => r.invitable)
   const preselected = (params.get('people') ?? '')
     .split(',')
@@ -61,12 +76,73 @@ export function BulkInvite() {
   const [selected, setSelected] = useState<string[]>(
     preselected.length ? preselected : eligible.map((r) => r.personId),
   )
-  const [payment, setPayment] = useState<PaymentMethod>(
-    agent.paymentCode ? 'agent_payment_code' : 'pay_myself',
-  )
-  const [review, setReview] = useState<'referred' | 'in_house'>('referred')
+  const [payer, setPayer] = useState<'client' | 'partner'>('client')
+  const [acspChoice, setAcspChoice] = useState('')
+  const [languages, setLanguages] = useState<string[]>(['English'])
+  const [turnaround, setTurnaround] = useState(0)
+  const [capacityToday, setCapacityToday] = useState(true)
 
-  if (!company || company.lodgedByPartnerId !== agent.id) {
+  const chosen = eligible.filter((r) => selected.includes(r.personId))
+  const maxTurnaroundHours = TURNAROUND[turnaround].hours
+  const chosenKey = chosen.map((r) => r.personId).join(',')
+
+  // Criteria come from each person's register entry and details. An ACSP must suit everyone in the batch.
+  const matches: CardMatch[] = useMemo(() => {
+    const perPerson = chosenKey
+      ? chosenKey.split(',').map((personId) => {
+          const person = data.people.find((p) => p.id === personId)
+          return {
+            name: person ? `${person.givenNames} ${person.familyName}` : '',
+            matches: matchAcsps(
+              data,
+              criteriaForPerson(data, personId, number, {
+                languages,
+                maxTurnaroundHours,
+                needsCapacityToday: capacityToday,
+              }),
+            ),
+          }
+        })
+      : []
+    return data.acsps.map((acsp) => {
+      const mine = perPerson.map((p) => ({
+        name: p.name,
+        match: p.matches.find((m) => m.acsp.id === acsp.id) as
+          AcspMatch | undefined,
+      }))
+      const failing = mine.flatMap((m) =>
+        (m.match?.results ?? [])
+          .filter((r) => !r.pass)
+          .map((r) => ({
+            ...r,
+            who: mine.length > 1 ? m.name : undefined,
+          })),
+      )
+      const passing = mine[0]?.match?.results.filter((r) => r.pass) ?? []
+      return {
+        acsp,
+        eligible: mine.length > 0 && mine.every((m) => m.match?.eligible),
+        failing,
+        passing,
+        caveat: passing.find((r) => r.caveat)?.caveat,
+      }
+    })
+  }, [data, number, chosenKey, languages, maxTurnaroundHours, capacityToday])
+
+  const eligibleAcsps = matches.filter((m) => m.eligible)
+  const choice =
+    acspChoice &&
+    (acspChoice === 'platform_suggest' ||
+      eligibleAcsps.some((m) => m.acsp.id === acspChoice))
+      ? acspChoice
+      : (eligibleAcsps[0]?.acsp.id ?? 'platform_suggest')
+  const suggest = choice === 'platform_suggest'
+  const instructing = suggest
+    ? undefined
+    : data.acsps.find((a) => a.id === choice)
+  const partnerPays = payer === 'partner' && !suggest
+
+  if (!company || company.lodgedByPartnerId !== partner.id) {
     return (
       <Page>
         <PageHeader
@@ -80,27 +156,45 @@ export function BulkInvite() {
     )
   }
 
-  const chosen = eligible.filter((r) => selected.includes(r.personId))
-  const total = chosen.length * VERIFICATION_FEE
-  const reviewer = review === 'in_house' ? agent.name : acsp.name
+  if (!can.invite) {
+    return (
+      <Page>
+        <PageHeader
+          title="Your role cannot send invites"
+          description="A Portfolio Viewer sees status but cannot send invites. Ask a Partner Administrator or a Referrer."
+        />
+        <Button asChild variant="outline">
+          <Link to="/partner">Back to the portfolio</Link>
+        </Button>
+      </Page>
+    )
+  }
 
   const send = () => {
     apply((d) =>
       sendInvites(d, {
         companyNumber: number,
         personIds: chosen.map((r) => r.personId),
-        partnerId: agent.id,
-        actor: `${agent.contactName}, ${agent.name}`,
-        payment,
-        review,
+        partnerId: partner.id,
+        actor: `${partner.contactName}, ${partner.name}`,
+        instructingAcspId: choice,
+        payer: partnerPays ? 'partner' : 'client',
+        languages,
+        maxTurnaroundHours,
       }),
     )
+    const verified = chosen.filter((r) => r.registerVerified)
     toast({
       title: `${chosen.length} invite${chosen.length === 1 ? '' : 's'} sent`,
-      description: `Each one is pre-filled from the register and written to the audit trail.`,
+      description: verified.length
+        ? `${verified.map((r) => r.name).join(', ')}: the register already shows an identity as verified (REG-04). They are told before payment and may continue or stop.`
+        : 'Each one is pre-filled from the register and written to the audit trail.',
     })
     navigate(`/partner/invites?new=${chosen.length}`)
   }
+
+  const acspName = instructing?.name ?? 'the ACSP the platform suggests'
+  const fee = instructing?.profile.fee.standard
 
   return (
     <Page width="narrow">
@@ -114,6 +208,7 @@ export function BulkInvite() {
       <PageHeader
         kicker="Bulk invite"
         title="Invite directors and PSCs to verify"
+        description="You introduce the people. The ACSP they instruct makes the verification and the decision."
       />
       <div className="mb-8">
         <Stepper steps={STEPS} current={step} />
@@ -163,7 +258,9 @@ export function BulkInvite() {
                       <span className="text-base font-medium text-ink">
                         {r.name}
                       </span>
-                      <PersonStatusChip status={r.status} />
+                      {r.partnerStatus && (
+                        <PartnerStatusChip status={r.partnerStatus} />
+                      )}
                     </label>
                     <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.9375rem] sm:grid-cols-3">
                       <Field
@@ -191,8 +288,8 @@ export function BulkInvite() {
                           REG-04
                         </span>{' '}
                         Companies House already shows this person’s identity as
-                        verified. They may not need to verify. They will be told
-                        before payment.
+                        verified. They are told before payment and may continue
+                        or stop. You are told too.
                       </p>
                     )}
                   </div>
@@ -214,74 +311,178 @@ export function BulkInvite() {
 
       {step === 1 && (
         <div className="space-y-6">
+          <Panel aria-labelledby="criteria-step">
+            <PanelHeader
+              id="criteria-step"
+              title="Instructing ACSP"
+              description="The person instructs this ACSP, who verifies them and takes the payment. Evidence One is the ACSP's technology provider."
+            />
+            <div className="grid gap-5 p-5 sm:grid-cols-3 sm:p-6">
+              <fieldset>
+                <legend className="mb-2 text-[0.9375rem] text-slate">
+                  Languages the people can use
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {LANGUAGES.map((l) => {
+                    const on = languages.includes(l)
+                    return (
+                      <label
+                        key={l}
+                        className={cn(
+                          'inline-flex h-10 cursor-pointer items-center rounded-full border px-3.5 text-[0.9375rem] has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink',
+                          on
+                            ? 'border-ink bg-ink text-paper'
+                            : 'border-line bg-white text-ink',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={on}
+                          onChange={() =>
+                            setLanguages((ls) =>
+                              on ? ls.filter((x) => x !== l) : [...ls, l],
+                            )
+                          }
+                        />
+                        {l}
+                      </label>
+                    )
+                  })}
+                </div>
+              </fieldset>
+              <div>
+                <label
+                  htmlFor="turnaround"
+                  className="mb-2 block text-[0.9375rem] text-slate"
+                >
+                  Turnaround
+                </label>
+                <select
+                  id="turnaround"
+                  value={turnaround}
+                  onChange={(e) => setTurnaround(Number(e.target.value))}
+                  className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base text-ink focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  {TURNAROUND.map((t, i) => (
+                    <option key={t.label} value={i}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-center gap-3 self-end text-base text-ink">
+                <Checkbox
+                  checked={capacityToday}
+                  onChange={() => setCapacityToday((v) => !v)}
+                />
+                Capacity left today
+              </label>
+            </div>
+            <p className="border-t border-line/70 px-5 py-3.5 text-[0.875rem] text-slate sm:px-6">
+              Residence country, document type, issuing country and role come
+              from each person’s register entry and details. Matching is
+              evaluated by rules, never by AI.
+            </p>
+          </Panel>
+
+          <fieldset className="space-y-3">
+            <legend className="sr-only">Choose the instructing ACSP</legend>
+            {matches.map((m) => (
+              <AcspCard
+                key={m.acsp.id}
+                m={m}
+                checked={choice === m.acsp.id}
+                onChange={() => setAcspChoice(m.acsp.id)}
+              />
+            ))}
+            <label
+              className={cn(
+                'flex cursor-pointer items-start gap-4 rounded-2xl border bg-white p-5 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink has-[:focus-visible]:ring-offset-2',
+                suggest
+                  ? 'border-ink shadow-[0_0_0_1px_var(--ink)]'
+                  : 'border-line hover:border-silver',
+              )}
+            >
+              <input
+                type="radio"
+                name="acsp"
+                className="mt-1.5 size-4 accent-[var(--ink)]"
+                checked={suggest}
+                onChange={() => setAcspChoice('platform_suggest')}
+              />
+              <span>
+                <span className="block text-base font-medium text-ink">
+                  Let Evidence One suggest an ACSP
+                </span>
+                <span className="mt-1 block text-[0.9375rem] text-graphite">
+                  The platform ranks matching ACSPs on clear criteria, not AI.
+                  Each person sees every suggestion with its own fee and
+                  turnaround before they instruct one.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setStep(0)}>
+              <ArrowLeft aria-hidden="true" />
+              Back
+            </Button>
+            <Button onClick={() => setStep(2)}>
+              Continue
+              <ArrowRight aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-6">
           <Panel aria-labelledby="payment-step">
             <PanelHeader
               id="payment-step"
               title="Who pays?"
-              description={`A flat ${formatMoney(VERIFICATION_FEE)} per verification.`}
+              description={
+                fee !== undefined
+                  ? `${acspName} charges ${formatMoney(fee)} for each verification. That is the ACSP's own fee.`
+                  : 'Each ACSP sets its own fee. The person sees it before they pay.'
+              }
             />
             <fieldset className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6">
-              <legend className="sr-only">Payment</legend>
+              <legend className="sr-only">Who pays</legend>
               <RadioCard
-                name="payment"
-                checked={payment === 'agent_payment_code'}
-                disabled={!agent.paymentCode}
-                onChange={() => setPayment('agent_payment_code')}
+                name="payer"
+                checked={!partnerPays}
+                onChange={() => setPayer('client')}
+                icon={<CreditCard className="size-5" aria-hidden="true" />}
+                title="The client pays"
+                body={`Each person pays ${acspName} by card after they instruct the ACSP.`}
+              />
+              <RadioCard
+                name="payer"
+                checked={partnerPays}
+                disabled={!partner.paymentCode || suggest}
+                onChange={() => setPayer('partner')}
                 icon={<Ticket className="size-5" aria-hidden="true" />}
-                title="Agent Payment Code"
+                title="Referral Partner pays, with an Agent Payment Code"
                 body={
-                  agent.paymentCode
-                    ? `${agent.name} pays. A single-use Agent Payment Code is generated for each invite and works for that invite only.`
-                    : 'No payment code on this account.'
+                  !partner.paymentCode
+                    ? 'No payment code on this account.'
+                    : suggest
+                      ? 'Name an ACSP in the previous step so the fee is known before you pay.'
+                      : `${partner.name} pays. A single-use Agent Payment Code is generated for each invite and works for that invite only.`
                 }
               />
-              <RadioCard
-                name="payment"
-                checked={payment === 'pay_myself'}
-                onChange={() => setPayment('pay_myself')}
-                icon={<CreditCard className="size-5" aria-hidden="true" />}
-                title="Pay myself"
-                body={`Each person pays ${formatMoney(VERIFICATION_FEE)} by card at the end of their journey.`}
-              />
             </fieldset>
-          </Panel>
-
-          <Panel aria-labelledby="review-step">
-            <PanelHeader
-              id="review-step"
-              title="Who makes the decision?"
-              description="Only an ACSP can approve or decline a verification."
-            />
-            {agent.hasAcspStatus ? (
-              <fieldset className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6">
-                <legend className="sr-only">Review</legend>
-                <RadioCard
-                  name="review"
-                  checked={review === 'referred'}
-                  onChange={() => setReview('referred')}
-                  icon={<Waypoints className="size-5" aria-hidden="true" />}
-                  title="Refer to an ACSP on Evidence One"
-                  body={`${acsp.name} reviews each case and makes the decision.`}
-                />
-                <RadioCard
-                  name="review"
-                  checked={review === 'in_house'}
-                  onChange={() => setReview('in_house')}
-                  icon={<ShieldCheck className="size-5" aria-hidden="true" />}
-                  title="Review in-house"
-                  body={`${agent.name} has ACSP status, so your own reviewers can approve or decline.`}
-                />
-              </fieldset>
-            ) : (
-              <p className="flex gap-3 p-5 text-base leading-relaxed text-graphite sm:p-6">
-                <Waypoints
-                  className="mt-0.5 size-5 shrink-0"
-                  aria-hidden="true"
-                />
-                Referred to {acsp.name}. {agent.name} does not have ACSP status,
-                so an ACSP on Evidence One makes the decision.
-              </p>
-            )}
+            <p className="border-t border-line/70 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
+              Evidence One collects the payment as the ACSP’s disclosed agent
+              and pays it to the ACSP’s own payment account. The platform fee of{' '}
+              {formatMoney(data.billing.settings.platformFee)} plus VAT applies
+              to referred cases and is deducted from that payment. It is never
+              added on top, so neither you nor the client pays more than the
+              ACSP’s fee.
+            </p>
           </Panel>
 
           <Panel className="p-5 sm:p-6">
@@ -298,25 +499,27 @@ export function BulkInvite() {
                 label="Fee"
                 value={
                   <span className="text-lg text-ink tabular">
-                    {payment === 'agent_payment_code'
-                      ? `${formatMoney(total)} to ${agent.name}`
-                      : `${formatMoney(VERIFICATION_FEE)} each, paid by card`}
+                    {fee !== undefined
+                      ? partnerPays
+                        ? `${formatMoney(fee * chosen.length)} to ${acspName}, paid by you`
+                        : `${formatMoney(fee)} each, paid by the client`
+                      : 'Shown once an ACSP is suggested'}
                   </span>
                 }
               />
               <Field
-                label="Decision by"
-                value={<span className="text-lg text-ink">{reviewer}</span>}
+                label="Instructing ACSP"
+                value={<span className="text-lg text-ink">{acspName}</span>}
               />
             </dl>
           </Panel>
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep(0)}>
+            <Button variant="outline" onClick={() => setStep(1)}>
               <ArrowLeft aria-hidden="true" />
               Back
             </Button>
-            <Button onClick={() => setStep(2)}>
+            <Button onClick={() => setStep(3)}>
               Preview invite
               <ArrowRight aria-hidden="true" />
             </Button>
@@ -324,7 +527,7 @@ export function BulkInvite() {
         </div>
       )}
 
-      {step === 2 && chosen[0] && (
+      {step === 3 && chosen[0] && (
         <div className="space-y-6">
           <Panel aria-labelledby="preview-step" className="overflow-hidden">
             <PanelHeader
@@ -337,7 +540,7 @@ export function BulkInvite() {
                 <div className="border-b border-line px-6 py-4 text-[0.9375rem] text-slate">
                   <p>
                     <span className="text-ink">From:</span> Evidence One on
-                    behalf of {agent.name}
+                    behalf of {partner.name}
                   </p>
                   <p>
                     <span className="text-ink">Subject:</span> Verify your
@@ -350,9 +553,10 @@ export function BulkInvite() {
                     Dear {chosen[0].name.split(' ')[0]},
                   </p>
                   <p className="mt-3 text-base leading-relaxed text-graphite">
-                    Companies House now asks every director and person with
-                    significant control to verify their identity. {agent.name}{' '}
-                    has invited you to do this for {company.name}.
+                    Companies House asks every director and person with
+                    significant control to verify their identity. {partner.name}{' '}
+                    has invited you to do this for {company.name}, in your
+                    browser.
                   </p>
                   <div className="mt-5 flex items-center gap-3 rounded-xl bg-mist px-4 py-3 text-[0.9375rem] text-graphite">
                     <Building2 className="size-4 shrink-0" aria-hidden="true" />
@@ -360,17 +564,23 @@ export function BulkInvite() {
                     {roleLabel[chosen[0].role]}
                   </div>
                   <p className="mt-4 text-base leading-relaxed text-graphite">
-                    {payment === 'agent_payment_code'
-                      ? `There is nothing to pay. ${agent.name} has covered the fee.`
-                      : `The fee is ${formatMoney(VERIFICATION_FEE)}, paid by card at the end.`}{' '}
-                    It takes about five minutes with your passport and phone.
+                    {instructing
+                      ? `Your identity verification is being conducted by ${instructing.name} using the Evidence One platform. `
+                      : 'You will see ACSPs that suit you, each with its own fee, and choose one. '}
+                    {partnerPays
+                      ? `There is nothing to pay. ${partner.name} has covered the ACSP's fee.`
+                      : instructing
+                        ? `The ACSP's fee is ${formatMoney(instructing.profile.fee.standard)}, paid to ${instructing.name}.`
+                        : 'You pay the ACSP you choose.'}
                   </p>
                   <span className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-ink px-5 text-base font-medium text-paper">
                     <Mail className="size-4" aria-hidden="true" />
                     Open my invite
                   </span>
                   <p className="mt-7 border-t border-line pt-4 text-[0.9375rem] leading-relaxed text-slate">
-                    {attributionText(reviewer)}
+                    {instructing
+                      ? attributionText(instructing.name)
+                      : 'Evidence One is the technology provider of the ACSP you instruct.'}
                   </p>
                 </div>
               </div>
@@ -389,10 +599,14 @@ export function BulkInvite() {
                 </li>
               ))}
             </ul>
+            <p className="mt-4 text-[0.875rem] text-slate">
+              Recorded in the audit trail as “Instructing ACSP:{' '}
+              {instructing?.name ?? 'to be suggested by the platform'}”.
+            </p>
           </Panel>
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep(1)}>
+            <Button variant="outline" onClick={() => setStep(2)}>
               <ArrowLeft aria-hidden="true" />
               Back
             </Button>
@@ -404,6 +618,90 @@ export function BulkInvite() {
         </div>
       )}
     </Page>
+  )
+}
+
+function AcspCard({
+  m,
+  checked,
+  onChange,
+}: {
+  m: CardMatch
+  checked: boolean
+  onChange: () => void
+}) {
+  const { acsp } = m
+  const p = acsp.profile
+  return (
+    <label
+      className={cn(
+        'flex items-start gap-4 rounded-2xl border bg-white p-5 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink has-[:focus-visible]:ring-offset-2',
+        m.eligible ? 'cursor-pointer' : 'cursor-not-allowed opacity-80',
+        checked
+          ? 'border-ink shadow-[0_0_0_1px_var(--ink)]'
+          : 'border-line hover:border-silver',
+      )}
+    >
+      <input
+        type="radio"
+        name="acsp"
+        className="mt-1.5 size-4 accent-[var(--ink)]"
+        checked={checked}
+        disabled={!m.eligible}
+        onChange={onChange}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-base font-medium text-ink">{acsp.name}</span>
+          <AcspStatusChip status={acsp.status} />
+          <span className="inline-flex items-center gap-1 text-[0.875rem] text-graphite">
+            {m.eligible ? (
+              <Check className="size-4" aria-hidden="true" />
+            ) : (
+              <X className="size-4" aria-hidden="true" />
+            )}
+            {m.eligible ? 'Matches' : 'Does not match'}
+          </span>
+        </span>
+        <span className="mt-1 block text-[0.9375rem] text-graphite">
+          Fee {formatMoney(p.fee.standard)} · Turnaround{' '}
+          {p.targetTurnaroundHours} hours · {capacityLeftToday(acsp)} places
+          left today · {p.languages.join(', ')}
+        </span>
+        {m.eligible && m.caveat && (
+          <span className="mt-1 block text-[0.875rem] text-slate">
+            {m.caveat}
+          </span>
+        )}
+        {!m.eligible && (
+          <ul className="mt-2 space-y-0.5 text-[0.875rem] text-slate">
+            {m.failing.length === 0 && (
+              <li>{acsp.statusNote ?? 'Not available for this invite.'}</li>
+            )}
+            {m.failing.map((f, i) => (
+              <li key={i}>
+                <span className="font-mono">{f.ruleId}</span> {f.reason}
+                {f.who ? ` (${f.who})` : ''}
+              </li>
+            ))}
+          </ul>
+        )}
+        {m.eligible && m.passing.length > 0 && (
+          <details className="mt-2 text-[0.875rem] text-slate">
+            <summary className="cursor-pointer underline-offset-4 hover:underline">
+              Why this ACSP matches
+            </summary>
+            <ul className="mt-1 space-y-0.5">
+              {m.passing.map((r) => (
+                <li key={r.ruleId}>
+                  <span className="font-mono">{r.ruleId}</span> {r.reason}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </span>
+    </label>
   )
 }
 

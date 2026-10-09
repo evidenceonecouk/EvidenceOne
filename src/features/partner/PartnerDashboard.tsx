@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   Building2,
   CircleDot,
+  Flag,
   Hourglass,
   Info,
   Link2,
@@ -10,8 +11,10 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
+  UserRound,
   Users,
   Waypoints,
+  type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -23,66 +26,80 @@ import {
   PanelHeader,
   StatTile,
 } from '@/components/app/Page'
-import { PersonStatusChip } from '@/components/StatusChip'
+import { PendingDecision } from '@/components/PendingDecision'
+import { PartnerCheckChip, PartnerStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { formatShortDate, shortHash, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { useDemoStore } from '@/store/DemoStore'
+import { useActingPartner, useDemoStore } from '@/store/DemoStore'
+import {
+  partnerCheckLabels,
+  partnerFlagLabels,
+  partnerRoleLabel,
+  partnerSeesChecks,
+  type PartnerChecks,
+  type PartnerFlag,
+} from '@/store/partnerSelectors'
 import {
   attentionForPartner,
   companiesForPartner,
-  getPartner,
+  getAcsp,
   peopleForCompany,
   roleLabel,
   type AttentionItem,
+  type PersonRow,
 } from '@/store/selectors'
-import type { Company, PersonStatus } from '@/types/domain'
+import type { Company, PartnerStatus } from '@/types/domain'
+import { useActingPartnerUser } from './usePartnerUser'
 
 /* One column template shared by the header row and every person row, so all companies line up. */
 const ROW =
-  'grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 px-6 sm:grid-cols-[2.5rem_minmax(0,1.2fr)_11rem_minmax(0,1.4fr)]'
+  'grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 px-6 sm:grid-cols-[2.5rem_minmax(0,1.1fr)_12rem_14rem_minmax(0,1.1fr)]'
 
-const segment: Record<PersonStatus, string> = {
-  verified: 'bg-approve',
+const segment: Record<PartnerStatus | 'none', string> = {
+  completed: 'bg-approve',
   in_progress: 'bg-ink',
-  with_acsp: 'bg-graphite-soft',
-  awaiting_info: 'bg-info',
-  not_started: 'bg-line',
-  not_completed: 'bg-decline',
-  reverification_due: 'bg-info',
+  invited: 'bg-silver',
+  further_information: 'bg-info',
+  declined: 'bg-decline',
+  none: 'bg-line',
 }
 
 export function PartnerDashboard() {
   const { data, state } = useDemoStore()
-  const agent = getPartner(data, state.partnerId)!
-  const companies = companiesForPartner(data, agent.id)
-  const rows = companies.flatMap((c) => peopleForCompany(data, c.number))
-  const flags = attentionForPartner(data, agent.id)
-  const count = (s: PersonStatus) => rows.filter((r) => r.status === s).length
+  const partner = useActingPartner()
+  const { can } = useActingPartnerUser()
+  const companies = companiesForPartner(data, partner.id)
+  const rows = companies.flatMap((c) =>
+    peopleForCompany(data, c.number, partner),
+  )
+  const flags = attentionForPartner(data, partner.id)
+  const count = (s: PartnerStatus) =>
+    rows.filter((r) => r.partnerStatus === s).length
   const needAction = rows.filter((r) => r.invitable).length
+  const statusOnly = !partnerSeesChecks(partner)
 
   return (
     <Page>
       <HeroBanner
-        kicker="Agent portal"
-        title={`Good to see you, ${agent.contactName.split(' ')[0]}`}
-        description={
-          agent.hasAcspStatus
-            ? `${agent.name} has ACSP status, so you can approve or decline verifications yourself, or refer them to an ACSP on Evidence One.`
-            : `${agent.name} does not have ACSP status, so every verification you start is referred to an ACSP on Evidence One, who makes the decision.`
-        }
+        kicker="Referral Partner portal"
+        title={`Good to see you, ${partner.contactName.split(' ')[0]}`}
+        description={`${partner.name} introduces clients to Evidence One and tracks their progress. The ACSP each person instructs makes the verification and the decision. You are not the verifying ACSP.`}
         meta={
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] text-graphite">
-            {agent.hasAcspStatus ? (
-              <ShieldCheck className="size-4" aria-hidden="true" />
-            ) : (
+          <>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] text-graphite">
               <Waypoints className="size-4" aria-hidden="true" />
-            )}
-            {agent.hasAcspStatus
-              ? 'Agent with ACSP status'
-              : 'Agent without ACSP status'}
-          </span>
+              Referral Partner · {partner.country}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] text-graphite">
+              <ShieldCheck className="size-4" aria-hidden="true" />
+              {statusOnly
+                ? 'You see status only'
+                : 'You see status and check results only'}
+            </span>
+            {statusOnly && <PendingDecision code="P11" />}
+          </>
         }
         actions={
           <>
@@ -92,30 +109,45 @@ export function PartnerDashboard() {
                 Invite log
               </Link>
             </Button>
-            <Button asChild>
-              <Link to="/partner/lookup">
+            {can.connect ? (
+              <Button asChild>
+                <Link to="/partner/lookup">
+                  <Plus aria-hidden="true" />
+                  Connect a company
+                </Link>
+              </Button>
+            ) : (
+              <Button disabled>
                 <Plus aria-hidden="true" />
                 Connect a company
-              </Link>
-            </Button>
+              </Button>
+            )}
           </>
         }
       />
+
+      <div className="mb-8 grid items-start gap-5 lg:grid-cols-2">
+        <SignedInAs />
+        {partner.alsoAcspId && <MembershipCard />}
+      </div>
 
       <dl className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatTile label="Companies" value={companies.length} icon={Building2} />
         <StatTile label="Directors and PSCs" value={rows.length} icon={Users} />
         <StatTile
-          label="Verified"
-          value={count('verified')}
+          label="Completed"
+          value={count('completed')}
           icon={BadgeCheck}
         />
         <StatTile
-          label="In progress or with the ACSP"
+          label="Open"
           value={
-            count('in_progress') + count('with_acsp') + count('awaiting_info')
+            count('invited') +
+            count('in_progress') +
+            count('further_information')
           }
           icon={CircleDot}
+          detail="Invited, in progress or further information required"
         />
         <StatTile
           label="Need an invite"
@@ -123,7 +155,7 @@ export function PartnerDashboard() {
           icon={RefreshCw}
           detail={
             needAction
-              ? 'Not started, not completed or due again'
+              ? 'Not invited, not completed or due again'
               : 'Everyone is covered'
           }
         />
@@ -167,16 +199,189 @@ export function PartnerDashboard() {
         <FlagsPanel flags={flags} />
         <ActivityPanel />
       </div>
+
+      {state.guided.on && (
+        <aside
+          aria-label="Presenter note"
+          className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-dashed border-line bg-mist/60 px-5 py-3.5 text-[0.9375rem] text-graphite"
+        >
+          <PendingDecision code="M3" />
+          <span>
+            Presenter note: if an ACSP lapses, a Referral Partner is not shown
+            which of its own clients are affected. Whether partners should see
+            this is for the client to decide.
+          </span>
+        </aside>
+      )}
     </Page>
+  )
+}
+
+/** Who is signed in, and what that role may do. Roles: Partner Administrator, Referrer, Portfolio Viewer. */
+function SignedInAs() {
+  const { user, users, setUser, can } = useActingPartnerUser()
+  return (
+    <Panel aria-labelledby="signed-in-title" className="p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2
+            id="signed-in-title"
+            className="flex items-center gap-2 text-[1.0625rem] font-medium text-ink"
+          >
+            <UserRound className="size-5" aria-hidden="true" />
+            Signed in as {user.name}
+          </h2>
+          <p className="mt-1 text-[0.9375rem] text-slate">
+            Role: {partnerRoleLabel[user.role]}.{' '}
+            {can.invite
+              ? 'You can connect companies and send invites. You see status and check results only.'
+              : 'You can see status but you cannot send invites or connect companies.'}
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="partner-user"
+            className="mb-1 block text-[0.875rem] text-slate"
+          >
+            Show the portal as
+          </label>
+          <select
+            id="partner-user"
+            value={user.id}
+            onChange={(e) => setUser(e.target.value)}
+            className="h-11 rounded-lg border border-line bg-white px-3 text-base text-ink focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:outline-none"
+          >
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}, {partnerRoleLabel[u.role]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
+/** A firm that is both a Referral Partner and an ACSP holds two memberships. They never merge. */
+function MembershipCard() {
+  const { data, setAcsp, setPersona } = useDemoStore()
+  const partner = useActingPartner()
+  const navigate = useNavigate()
+  const acsp = partner.alsoAcspId ? getAcsp(data, partner.alsoAcspId) : null
+  if (!acsp) return null
+  return (
+    <Panel aria-labelledby="membership-title" className="p-5 sm:p-6">
+      <h2
+        id="membership-title"
+        className="text-[1.0625rem] font-medium text-ink"
+      >
+        Two memberships
+      </h2>
+      <ul className="mt-3 space-y-1.5 text-[0.9375rem] text-graphite">
+        <li>
+          <span className="font-medium text-ink">Referral Partner</span>:{' '}
+          {partner.name}. You are acting through this one now.
+        </li>
+        <li>
+          <span className="font-medium text-ink">ACSP</span>: {acsp.name}.
+          Onboarded separately, with its own reviewers and records.
+        </li>
+      </ul>
+      <p className="mt-3 text-[0.9375rem] text-slate">
+        The two roles never merge. You act through one at a time, and a Referral
+        Partner is never the verifying ACSP.
+      </p>
+      <Button
+        variant="outline"
+        className="mt-4"
+        onClick={() => {
+          setAcsp(acsp.id)
+          setPersona('reviewer')
+          navigate('/acsp/queue')
+        }}
+      >
+        <Waypoints aria-hidden="true" />
+        Also an ACSP: switch membership
+      </Button>
+    </Panel>
+  )
+}
+
+const flagIcon: Record<PartnerFlag, LucideIcon> = {
+  unverified: Info,
+  invite_expired: Hourglass,
+  reverification_due: RefreshCw,
+  register_verified: BadgeCheck,
+}
+
+function FlagTags({ flags }: { flags: PartnerFlag[] }) {
+  if (!flags.length) return null
+  return (
+    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+      {flags.map((f) => {
+        const Icon = flagIcon[f]
+        return (
+          <li
+            key={f}
+            className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-1.5 py-0.5 text-[0.8125rem] text-graphite"
+          >
+            <Icon className="size-3.5" aria-hidden="true" />
+            {partnerFlagLabels[f]}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function StatusCell({ row }: { row: PersonRow }) {
+  return row.partnerStatus ? (
+    <PartnerStatusChip status={row.partnerStatus} />
+  ) : (
+    <span className="inline-flex items-center rounded-full border border-dashed border-silver px-2.5 py-1 text-sm font-medium whitespace-nowrap text-graphite">
+      Not invited
+    </span>
+  )
+}
+
+/** Passed, flagged or not passed for each check. Never a document, extracted data or evidence. */
+function ChecksCell({
+  checks,
+  statusOnly,
+}: {
+  checks?: PartnerChecks
+  statusOnly: boolean
+}) {
+  if (statusOnly)
+    return <span className="text-[0.875rem] text-slate">Status only</span>
+  if (!checks)
+    return <span className="text-[0.875rem] text-slate">No checks yet</span>
+  return (
+    <dl className="space-y-1">
+      {(Object.keys(partnerCheckLabels) as (keyof PartnerChecks)[]).map((k) => (
+        <div key={k} className="flex items-center justify-between gap-2">
+          <dt className="text-[0.8125rem] leading-tight text-slate">
+            {partnerCheckLabels[k]}
+          </dt>
+          <dd>
+            <PartnerCheckChip result={checks[k]} />
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
 function CompanyBlock({ company }: { company: Company }) {
   const { data } = useDemoStore()
+  const partner = useActingPartner()
+  const { can } = useActingPartnerUser()
   const navigate = useNavigate()
-  const rows = peopleForCompany(data, company.number)
+  const rows = peopleForCompany(data, company.number, partner)
+  const statusOnly = !partnerSeesChecks(partner)
   const [selected, setSelected] = useState<string[]>([])
-  const verified = rows.filter((r) => r.status === 'verified').length
+  const completed = rows.filter((r) => r.partnerStatus === 'completed').length
   const toggle = (id: string) =>
     setSelected((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
@@ -212,16 +417,19 @@ function CompanyBlock({ company }: { company: Company }) {
         <div className="flex items-center gap-6">
           <div className="w-40">
             <div className="flex items-baseline justify-between text-[0.875rem]">
-              <span className="text-slate">Verified</span>
+              <span className="text-slate">Completed</span>
               <span className="font-medium text-ink tabular">
-                {verified} of {rows.length}
+                {completed} of {rows.length}
               </span>
             </div>
             <div className="mt-2 flex gap-1" aria-hidden="true">
               {rows.map((r) => (
                 <span
                   key={r.personId}
-                  className={cn('h-1.5 flex-1 rounded-full', segment[r.status])}
+                  className={cn(
+                    'h-1.5 flex-1 rounded-full',
+                    segment[r.partnerStatus ?? 'none'],
+                  )}
                 />
               ))}
             </div>
@@ -230,7 +438,7 @@ function CompanyBlock({ company }: { company: Company }) {
             variant={selected.length ? 'default' : 'outline'}
             size="sm"
             className="w-44"
-            disabled={!invitable.length}
+            disabled={!invitable.length || !can.invite}
             onClick={() => {
               const ids = selected.length
                 ? selected
@@ -263,6 +471,7 @@ function CompanyBlock({ company }: { company: Company }) {
           </span>
           <span role="columnheader">Person</span>
           <span role="columnheader">Status</span>
+          <span role="columnheader">Check results</span>
           <span role="columnheader">Latest</span>
         </div>
         {rows.map((r) => {
@@ -278,7 +487,7 @@ function CompanyBlock({ company }: { company: Company }) {
               )}
             >
               <span role="cell" className="flex items-center">
-                {r.invitable ? (
+                {r.invitable && can.invite ? (
                   <Checkbox
                     aria-label={`Select ${r.name} to invite`}
                     checked={isSelected}
@@ -297,14 +506,17 @@ function CompanyBlock({ company }: { company: Company }) {
                   <span className="block truncate text-[0.875rem] text-slate">
                     {roleLabel[r.role]}
                   </span>
-                  <PersonStatusChip
-                    status={r.status}
-                    className="mt-1.5 sm:hidden"
-                  />
+                  <span className="mt-1.5 block sm:hidden">
+                    <StatusCell row={r} />
+                  </span>
                 </span>
               </span>
               <span role="cell" className="hidden sm:block">
-                <PersonStatusChip status={r.status} />
+                <StatusCell row={r} />
+                <FlagTags flags={r.flags} />
+              </span>
+              <span role="cell" className="hidden sm:block">
+                <ChecksCell checks={r.checks} statusOnly={statusOnly} />
               </span>
               <span role="cell" className="hidden min-w-0 sm:block">
                 <span className="line-clamp-2 text-[0.9375rem] text-graphite">
@@ -312,7 +524,7 @@ function CompanyBlock({ company }: { company: Company }) {
                 </span>
                 {r.registerVerified && !r.latestCase && (
                   <span className="mt-0.5 block font-mono text-[0.8125rem] text-slate">
-                    REG-04 · shown before payment
+                    REG-04 · the person is told before payment
                   </span>
                 )}
                 {r.latestCase && (
@@ -329,18 +541,17 @@ function CompanyBlock({ company }: { company: Company }) {
   )
 }
 
-const attentionIcon: Record<AttentionItem['status'], typeof Info> = {
+const attentionIcon: Record<AttentionItem['kind'], LucideIcon> = {
   register_verified: Info,
-  not_started: Send,
-  not_completed: RefreshCw,
-  awaiting_info: Hourglass,
+  not_invited: Send,
+  further_information: Hourglass,
+  declined: RefreshCw,
+  invite_expired: Hourglass,
   reverification_due: RefreshCw,
-  in_progress: CircleDot,
-  with_acsp: Building2,
-  verified: BadgeCheck,
+  check_flagged: Flag,
 }
 
-/** Follow-ups from status alone. Agents never see documents, check results or evidence. */
+/** Follow-ups from status and check results alone. Referral Partners never see documents or evidence. */
 function FlagsPanel({ flags }: { flags: AttentionItem[] }) {
   return (
     <Panel aria-labelledby="flags-title" className="overflow-hidden">
@@ -355,7 +566,7 @@ function FlagsPanel({ flags }: { flags: AttentionItem[] }) {
       />
       <ul className="divide-y divide-line/70">
         {flags.map((f) => {
-          const Icon = attentionIcon[f.status]
+          const Icon = attentionIcon[f.kind]
           return (
             <li key={f.id} className="flex items-start gap-3.5 px-6 py-4">
               <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-mist text-graphite">
@@ -379,8 +590,8 @@ function FlagsPanel({ flags }: { flags: AttentionItem[] }) {
         )}
       </ul>
       <p className="border-t border-line/70 px-6 py-3.5 text-[0.875rem] text-slate">
-        You see each person’s status only. Documents and evidence stay with the
-        ACSP, who makes every decision.
+        You see each person’s status and check results only. Documents and
+        evidence stay with the ACSP, who makes every decision.
       </p>
     </Panel>
   )
@@ -394,7 +605,7 @@ function ActivityPanel() {
   const companyNames = companiesForPartner(data, state.partnerId).map(
     (c) => c.name,
   )
-  // Status-level events only, reworded, so nothing about documents or evidence reaches the Agent.
+  // Status-level events only, reworded, so nothing about documents or evidence reaches the Referral Partner.
   const name = (caseId?: string) => {
     const vc = data.cases.find((c) => c.id === caseId)
     const p = vc && data.people.find((x) => x.id === vc.personId)
@@ -403,16 +614,12 @@ function ActivityPanel() {
   const safe: Record<string, (caseId?: string) => string> = {
     'invite.sent': (id) => `Invite sent to ${name(id)}`,
     'invite.opened': (id) => `${name(id)} opened their invite`,
-    'payment.completed': (id) => `${name(id)}: fee paid`,
-    'case.submitted': (id) => `${name(id)}: with the ACSP for review`,
+    'payment.completed': (id) => `${name(id)}: payment made to the ACSP`,
+    'case.submitted': (id) => `${name(id)}: In progress, with the ACSP`,
     'case.decision.request_info': (id) =>
-      `${name(id)}: the ACSP asked for information`,
-    'case.decision.approve': (id) => `${name(id)}: approved by the ACSP`,
-    'case.decision.decline': (id) => `${name(id)}: not completed`,
-    'submission.confirmed': (id) =>
-      `${name(id)}: verified with Companies House`,
-    'route_a.resumed': (id) =>
-      `${name(id)}: back with the ACSP after a register correction`,
+      `${name(id)}: Further information required`,
+    'case.decision.decline': (id) => `${name(id)}: Declined`,
+    'submission.confirmed': (id) => `${name(id)}: Completed`,
   }
   const events = data.audit
     .filter(
@@ -459,6 +666,11 @@ function ActivityPanel() {
             </p>
           </li>
         ))}
+        {events.length === 0 && (
+          <li className="px-6 py-6 text-base text-slate">
+            No activity to show yet.
+          </li>
+        )}
       </ol>
       <p className="border-t border-line/70 px-6 py-3.5 text-[0.875rem] text-slate">
         From the hash-chained audit trail.

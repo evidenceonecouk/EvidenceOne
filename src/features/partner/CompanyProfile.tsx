@@ -27,7 +27,7 @@ import {
   StatTile,
 } from '@/components/app/Page'
 import { useToast } from '@/components/app/Toaster'
-import { PersonStatusChip } from '@/components/StatusChip'
+import { PartnerStatusChip } from '@/components/StatusChip'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,8 +48,9 @@ import {
 import { formatDate, formatShortDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { connectCompany } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
-import { getPartner, personStatus } from '@/store/selectors'
+import { useActingPartner, useDemoStore } from '@/store/DemoStore'
+import { partnerStatusFor } from '@/store/partnerSelectors'
+import { useActingPartnerUser } from './usePartnerUser'
 
 const DAY = 24 * 60 * 60 * 1000
 const daysUntil = (iso: string) =>
@@ -66,7 +67,7 @@ function yearsSince(iso: string) {
 
 export function CompanyProfile() {
   const { number = '' } = useParams()
-  const { data, state, apply } = useDemoStore()
+  const { data, apply } = useDemoStore()
   const toast = useToast()
   const navigate = useNavigate()
   const demo = demoProfile(data, number)
@@ -86,7 +87,8 @@ export function CompanyProfile() {
 
   const profile = demo ?? (live === 'loading' ? null : live)
   const company = data.companies.find((c) => c.number === number)
-  const agent = getPartner(data, state.partnerId)!
+  const agent = useActingPartner()
+  const { can } = useActingPartnerUser()
   const connectedHere = company?.lodgedByPartnerId === agent.id
   const lodgedElsewhere = company?.lodgedByPartnerId && !connectedHere
 
@@ -143,9 +145,7 @@ export function CompanyProfile() {
   const invitable = profile.people.filter(
     (p) =>
       p.personId &&
-      ['not_started', 'expired', 'reverification_due'].includes(
-        personStatus(data, p.personId),
-      ),
+      [null, 'declined'].includes(partnerStatusFor(data, p.personId)),
   )
   const officers = profile.people.filter((p) => p.role !== 'psc')
   const directors = officers.filter(
@@ -233,7 +233,7 @@ export function CompanyProfile() {
                 {company?.connectedAt && formatShortDate(company.connectedAt)}
               </span>
               <Button
-                disabled={!invitable.length}
+                disabled={!invitable.length || !can.invite}
                 onClick={() =>
                   navigate(
                     `/partner/companies/${number}/invite?people=${invitable.map((p) => p.personId).join(',')}`,
@@ -246,12 +246,12 @@ export function CompanyProfile() {
             </>
           ) : lodgedElsewhere ? (
             <span className="text-base text-slate">
-              Lodged by another Agent
+              Lodged by another Referral Partner
             </span>
           ) : (
-            <Button onClick={connect}>
+            <Button onClick={connect} disabled={!can.connect}>
               <Link2 aria-hidden="true" />
-              Connect company to portal
+              Connect company
             </Button>
           )}
         </div>
@@ -415,11 +415,16 @@ export function CompanyProfile() {
                       </td>
                       {connectedHere && (
                         <td className="py-4 pr-6">
-                          {p.personId && (
-                            <PersonStatusChip
-                              status={personStatus(data, p.personId)}
-                            />
-                          )}
+                          {p.personId &&
+                            (partnerStatusFor(data, p.personId) ? (
+                              <PartnerStatusChip
+                                status={partnerStatusFor(data, p.personId)!}
+                              />
+                            ) : (
+                              <span className="text-[0.9375rem] text-slate">
+                                Not invited
+                              </span>
+                            ))}
                         </td>
                       )}
                     </tr>
