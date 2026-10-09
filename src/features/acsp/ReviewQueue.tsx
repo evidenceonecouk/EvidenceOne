@@ -23,7 +23,7 @@ import { formatShortDate, fullName, timeRemaining } from '@/lib/format'
 import { evaluateCase, outstandingFor } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
-import { getAcsp, getAgent, getCompany, getPerson } from '@/store/selectors'
+import { getAcsp, getPartner, getCompany, getPerson } from '@/store/selectors'
 import type { CaseStatus, VerificationCase } from '@/types/domain'
 
 const filters: { id: string; label: string; statuses: CaseStatus[] }[] = [
@@ -235,7 +235,7 @@ function QueueRow({
   const { data } = useDemoStore()
   const person = getPerson(data, vc.personId)!
   const company = getCompany(data, vc.companyNumber)!
-  const agent = vc.agentId ? getAgent(data, vc.agentId) : undefined
+  const agent = vc.partnerId ? getPartner(data, vc.partnerId) : undefined
   const results = evaluateCase(data, vc)
   const outstanding = outstandingFor(results)
   const mandatory = outstanding.filter(

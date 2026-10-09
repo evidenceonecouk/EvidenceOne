@@ -345,7 +345,7 @@ export function buildUsers(now = Date.now()): PlatformUser[] {
       lastSeen: ago(0.6 * HOUR, now),
     },
     {
-      id: 'agent-belgrave',
+      id: 'partner-belgrave',
       name: 'Oliver Grant',
       org: 'Belgrave Family Office',
       role: 'agent',

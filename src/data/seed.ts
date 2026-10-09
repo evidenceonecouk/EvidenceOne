@@ -3,7 +3,7 @@ import { versionAt } from '@/lib/rules'
 import type { DemoData } from '@/types/domain'
 import { buildCases } from './cases'
 import { companies, register } from './companies'
-import { acsps, agents } from './organisations'
+import { acsps, partners } from './organisations'
 import { people } from './people'
 import { RULE_SET_NAME, SECOND_APPROVER, seedRuleSets } from './rules'
 
@@ -13,11 +13,12 @@ export function createSeed(now = Date.now()): DemoData {
   const ruleSets = seedRuleSets()
 
   const connections: AuditInput[] = companies
-    .filter((c) => c.connectedAt && c.lodgedByAgentId)
+    .filter((c) => c.connectedAt && c.lodgedByPartnerId)
     .map((c) => ({
       at: c.connectedAt!,
       actor:
-        agents.find((a) => a.id === c.lodgedByAgentId)?.contactName ?? 'Agent',
+        partners.find((a) => a.id === c.lodgedByPartnerId)?.contactName ??
+        'Referral Partner',
       actorType: 'person' as const,
       action: 'company.connected',
       detail: `${c.name} (${c.number}) connected to the portal from the Companies House register.`,
@@ -33,7 +34,7 @@ export function createSeed(now = Date.now()): DemoData {
 
   const data: DemoData = {
     acsps,
-    agents,
+    partners,
     companies,
     people,
     register,
@@ -41,6 +42,29 @@ export function createSeed(now = Date.now()): DemoData {
     corrections,
     invites,
     ruleSets,
+    // Placeholders: the seed workstream fills these in (src/data/billing.ts, monitoring.ts, applications.ts).
+    billing: {
+      settings: {
+        platformFee: 69,
+        vatRate: 0.2,
+        subscription: {
+          structure: 'monthly_only',
+          price: null,
+          casesIncluded: null,
+          termsDueBy: '2027-01-04',
+        },
+      },
+      clientInvoices: [],
+      platformInvoices: [],
+    },
+    approvals: [],
+    referralRecords: [],
+    applications: [],
+    monitoring: {
+      lastFortnightlyCheckAt: '2026-10-05T07:30:00.000Z',
+      nameMatches: [],
+      yearlyUploads: [],
+    },
     audit: buildChain([...publications, ...connections, ...audit]),
   }
   // Each decided case records the rule set version in force at its decision.

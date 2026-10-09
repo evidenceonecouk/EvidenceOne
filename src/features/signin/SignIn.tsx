@@ -25,19 +25,19 @@ const workspaces: {
   {
     id: 'reviewer',
     label: 'Evidence One Compliance',
-    detail: 'Harcourt Lane Solicitors LLP · ACSP reviewer',
+    detail: 'Harcourt Lane Solicitors LLP · ACSP Reviewer',
     icon: Building2,
   },
   {
-    id: 'agent',
-    label: 'Agent portal',
+    id: 'partner',
+    label: 'Referral Partner portal',
     detail: 'Fenwick & Shaw Chartered Accountants',
     icon: Briefcase,
   },
   {
-    id: 'admin',
+    id: 'platformAdmin',
     label: 'Administration',
-    detail: 'Evidence One platform',
+    detail: 'Evidence One platform · Platform Administrator',
     icon: Settings2,
   },
 ]

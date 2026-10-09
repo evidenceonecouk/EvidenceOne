@@ -29,7 +29,7 @@ const audiences: {
     title: 'Five minutes on your phone',
     body: 'Open your invite, check the details we already hold from the register, scan your passport and take a short selfie video. Pay, then use one identity document. You can follow every step until your ACSP submits to Companies House, which emails your personal code to you.',
     cta: 'Try the app journey',
-    to: '/app/EO-2026-000135/invite',
+    to: '/journey/EO-2026-000135/invite',
     persona: 'individual',
   },
   {
@@ -38,8 +38,8 @@ const audiences: {
     title: 'Every client company in one view',
     body: 'Connect companies from the register, see who still needs to verify, and invite several directors at once with a pre-authorised Agent Payment Code. Agents without ACSP status refer each case to an ACSP on the platform.',
     cta: 'Open the Agent portal',
-    to: '/agent',
-    persona: 'agent',
+    to: '/partner',
+    persona: 'partner',
   },
   {
     id: 'acsps',
@@ -107,7 +107,7 @@ export function Audiences() {
               </div>
               <div className="flex min-h-[25rem] items-center justify-center rounded-[24px] bg-[linear-gradient(140deg,#e4e7ea_0%,#c9ced3_55%,#b4bac0_100%)] p-5 sm:p-10">
                 {a.id === 'individuals' && <TrackerVisual />}
-                {a.id === 'agents' && <AgentVisual />}
+                {a.id === 'agents' && <PartnerVisual />}
                 {a.id === 'acsps' && <QueueVisual />}
               </div>
             </TabsContent>
@@ -151,7 +151,7 @@ function TrackerVisual() {
   )
 }
 
-function AgentVisual() {
+function PartnerVisual() {
   const { data } = useDemoStore()
   const company = getCompany(data, '99520316')
   const entries = data.register.filter((r) => r.companyNumber === '99520316')

@@ -40,7 +40,7 @@ export function CompanyLookup() {
     .map((n) => data.companies.find((c) => c.number === n)!)
     .filter(Boolean)
   const connected = data.companies.filter(
-    (c) => c.lodgedByAgentId === state.agentId,
+    (c) => c.lodgedByPartnerId === state.partnerId,
   )
   const peopleAt = (number: string) =>
     data.register.filter((r) => r.companyNumber === number).length
@@ -84,11 +84,11 @@ export function CompanyLookup() {
               <MonoLabel>Fictional demo companies</MonoLabel>
               <ul className="mt-3 grid gap-4 md:grid-cols-3">
                 {suggestions.map((c) => {
-                  const lodged = c.lodgedByAgentId
+                  const lodged = c.lodgedByPartnerId
                   return (
                     <li key={c.number}>
                       <Link
-                        to={`/agent/companies/${c.number}`}
+                        to={`/partner/companies/${c.number}`}
                         className="group flex h-full flex-col rounded-2xl border border-line/80 bg-white p-5 shadow-[0_1px_2px_rgb(22_24_27/0.04)] transition-[border-color,box-shadow] duration-150 hover:border-silver hover:shadow-[0_4px_16px_rgb(22_24_27/0.06)]"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -116,7 +116,7 @@ export function CompanyLookup() {
                           </span>
                           {lodged && (
                             <span className="rounded-full bg-mist px-2.5 py-1 text-graphite">
-                              {lodged === state.agentId
+                              {lodged === state.partnerId
                                 ? 'Connected'
                                 : 'Lodged by another Agent'}
                             </span>
@@ -155,7 +155,7 @@ export function CompanyLookup() {
                 <ResultGroup
                   title="Fictional demo companies"
                   results={demo}
-                  agentId={state.agentId}
+                  partnerId={state.partnerId}
                 />
               )}
               {live === 'loading' && (
@@ -171,7 +171,7 @@ export function CompanyLookup() {
                 <ResultGroup
                   title="Live from Companies House"
                   results={live}
-                  agentId={state.agentId}
+                  partnerId={state.partnerId}
                 />
               )}
               {live === null && (
@@ -205,7 +205,7 @@ export function CompanyLookup() {
               {connected.map((c) => (
                 <li key={c.number}>
                   <Link
-                    to={`/agent/companies/${c.number}`}
+                    to={`/partner/companies/${c.number}`}
                     className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-150 hover:bg-mist/60"
                   >
                     <CompanyMark name={c.name} size={32} />
@@ -259,11 +259,11 @@ export function CompanyLookup() {
 function ResultGroup({
   title,
   results,
-  agentId,
+  partnerId,
 }: {
   title: string
   results: CompanySummary[]
-  agentId: string
+  partnerId: string
 }) {
   const { data } = useDemoStore()
   return (
@@ -274,11 +274,11 @@ function ResultGroup({
           {results.map((r) => {
             const lodged = data.companies.find(
               (c) => c.number === r.number,
-            )?.lodgedByAgentId
+            )?.lodgedByPartnerId
             return (
               <li key={`${r.source}-${r.number}`}>
                 <Link
-                  to={`/agent/companies/${r.number}`}
+                  to={`/partner/companies/${r.number}`}
                   className="group flex items-center gap-4 px-5 py-4 transition-colors duration-150 hover:bg-mist/60 sm:px-6"
                 >
                   <CompanyMark name={r.name} size={40} />
@@ -299,7 +299,7 @@ function ResultGroup({
                   </div>
                   {lodged && (
                     <span className="hidden rounded-full bg-mist px-3 py-1 text-sm font-medium text-graphite sm:inline">
-                      {lodged === agentId
+                      {lodged === partnerId
                         ? 'Connected'
                         : 'Lodged by another Agent'}
                     </span>

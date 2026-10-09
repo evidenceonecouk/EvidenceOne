@@ -13,8 +13,8 @@ export const getCase = (data: DemoData, id: string) =>
   data.cases.find((c) => c.id === id)
 export const getAcsp = (data: DemoData, id: string) =>
   data.acsps.find((a) => a.id === id)
-export const getAgent = (data: DemoData, id: string) =>
-  data.agents.find((a) => a.id === id)
+export const getPartner = (data: DemoData, id: string) =>
+  data.partners.find((a) => a.id === id)
 export const getEntry = (data: DemoData, vc: VerificationCase) =>
   data.register.find(
     (r) => r.personId === vc.personId && r.companyNumber === vc.companyNumber,
@@ -41,7 +41,6 @@ const statusMap: Record<CaseStatus, PersonStatus> = {
   in_progress: 'in_progress',
   info_requested: 'awaiting_info',
   in_review: 'with_acsp',
-  halted_register_mismatch: 'with_acsp',
   approved: 'with_acsp',
   submission_started: 'with_acsp',
   submitted: 'verified',
@@ -71,8 +70,8 @@ export const roleLabel = {
   director_psc: 'Director and PSC',
 } as const
 
-export function companiesForAgent(data: DemoData, agentId: string) {
-  return data.companies.filter((c) => c.lodgedByAgentId === agentId)
+export function companiesForPartner(data: DemoData, partnerId: string) {
+  return data.companies.filter((c) => c.lodgedByPartnerId === partnerId)
 }
 
 /** Name of whoever reviews a case: an ACSP firm, or an Agent reviewing in-house. */
@@ -80,7 +79,7 @@ export function reviewerOrgName(
   data: DemoData,
   orgId: string,
 ): string | undefined {
-  return getAcsp(data, orgId)?.name ?? getAgent(data, orgId)?.name
+  return getAcsp(data, orgId)?.name ?? getPartner(data, orgId)?.name
 }
 
 export interface PersonRow {
@@ -102,7 +101,6 @@ const caseDetail: Record<CaseStatus, string> = {
   in_progress: 'Completing the app journey',
   in_review: 'With the ACSP for review',
   info_requested: 'The ACSP has asked the individual for information',
-  halted_register_mismatch: 'Paused until the register is corrected (Route B)',
   approved: 'Approved, awaiting submission to Companies House',
   submission_started: 'Being submitted to Companies House',
   submitted: 'Submitted to Companies House',
@@ -163,12 +161,12 @@ export interface AttentionItem {
 }
 
 /** Follow-ups for an Agent, from status alone. */
-export function attentionForAgent(
+export function attentionForPartner(
   data: DemoData,
-  agentId: string,
+  partnerId: string,
 ): AttentionItem[] {
   const items: AttentionItem[] = []
-  for (const company of companiesForAgent(data, agentId)) {
+  for (const company of companiesForPartner(data, partnerId)) {
     for (const row of peopleForCompany(data, company.number)) {
       const base = { personName: row.name, companyName: company.name }
       if (row.registerVerified && !row.latestCase)

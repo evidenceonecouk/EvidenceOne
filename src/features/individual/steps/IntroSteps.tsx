@@ -25,7 +25,7 @@ import type { StepProps } from './types'
 export function InviteStep({ vc, person, company, entry, next }: StepProps) {
   const { data } = useDemoStore()
   const invite = data.invites.find((i) => i.caseId === vc.id)
-  const agent = data.agents.find((a) => a.id === vc.agentId)
+  const agent = data.partners.find((a) => a.id === vc.partnerId)
   return (
     <Screen
       footer={

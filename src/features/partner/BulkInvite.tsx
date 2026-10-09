@@ -33,7 +33,7 @@ import { sendInvites } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import {
   getAcsp,
-  getAgent,
+  getPartner,
   getCompany,
   peopleForCompany,
   roleLabel,
@@ -49,7 +49,7 @@ export function BulkInvite() {
   const toast = useToast()
   const navigate = useNavigate()
   const company = getCompany(data, number)
-  const agent = getAgent(data, state.agentId)!
+  const agent = getPartner(data, state.partnerId)!
   const acsp = getAcsp(data, PRIMARY_ACSP_ID)!
   const rows = company ? peopleForCompany(data, number) : []
   const eligible = rows.filter((r) => r.invitable)
@@ -66,7 +66,7 @@ export function BulkInvite() {
   )
   const [review, setReview] = useState<'referred' | 'in_house'>('referred')
 
-  if (!company || company.lodgedByAgentId !== agent.id) {
+  if (!company || company.lodgedByPartnerId !== agent.id) {
     return (
       <Page>
         <PageHeader
@@ -74,7 +74,7 @@ export function BulkInvite() {
           description="Invites can only be sent for companies connected to your portal."
         />
         <Button asChild variant="outline">
-          <Link to={`/agent/companies/${number}`}>Back to the company</Link>
+          <Link to={`/partner/companies/${number}`}>Back to the company</Link>
         </Button>
       </Page>
     )
@@ -89,7 +89,7 @@ export function BulkInvite() {
       sendInvites(d, {
         companyNumber: number,
         personIds: chosen.map((r) => r.personId),
-        agentId: agent.id,
+        partnerId: agent.id,
         actor: `${agent.contactName}, ${agent.name}`,
         payment,
         review,
@@ -99,13 +99,13 @@ export function BulkInvite() {
       title: `${chosen.length} invite${chosen.length === 1 ? '' : 's'} sent`,
       description: `Each one is pre-filled from the register and written to the audit trail.`,
     })
-    navigate(`/agent/invites?new=${chosen.length}`)
+    navigate(`/partner/invites?new=${chosen.length}`)
   }
 
   return (
     <Page width="narrow">
       <Link
-        to={`/agent/companies/${number}`}
+        to={`/partner/companies/${number}`}
         className="mb-6 inline-flex items-center gap-1.5 text-base text-slate underline-offset-4 hover:text-ink hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />

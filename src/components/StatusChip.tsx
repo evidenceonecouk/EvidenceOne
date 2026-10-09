@@ -17,7 +17,14 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { CaseStatus, PersonStatus, RuleOutcome } from '@/types/domain'
+import type {
+  AcspStatus,
+  CaseStatus,
+  PartnerCheckResult,
+  PartnerStatus,
+  PersonStatus,
+  RuleOutcome,
+} from '@/types/domain'
 
 type Tone = 'neutral' | 'progress' | 'complete' | 'attention' | 'negative'
 
@@ -53,11 +60,6 @@ const caseSpecs: Record<CaseStatus, ChipSpec> = {
   info_requested: {
     label: 'Information requested',
     icon: CircleAlert,
-    tone: 'attention',
-  },
-  halted_register_mismatch: {
-    label: 'Paused: register mismatch',
-    icon: CirclePause,
     tone: 'attention',
   },
   approved: { label: 'Approved', icon: CircleCheck, tone: 'complete' },
@@ -112,6 +114,83 @@ export function PersonStatusChip({
   className?: string
 }) {
   return <Chip spec={personSpecs[status]} className={className} />
+}
+
+/* Statuses a Referral Partner sees. Status and check results only, never documents. */
+const partnerSpecs: Record<PartnerStatus, ChipSpec> = {
+  invited: { label: 'Invited', icon: Send, tone: 'neutral' },
+  in_progress: { label: 'In progress', icon: CircleDot, tone: 'progress' },
+  further_information: {
+    label: 'Further information required',
+    icon: Hourglass,
+    tone: 'attention',
+  },
+  completed: { label: 'Completed', icon: CircleCheck, tone: 'complete' },
+  declined: { label: 'Declined', icon: CircleX, tone: 'negative' },
+}
+
+export const partnerStatusLabel = (s: PartnerStatus) => partnerSpecs[s].label
+
+export function PartnerStatusChip({
+  status,
+  className,
+}: {
+  status: PartnerStatus
+  className?: string
+}) {
+  return <Chip spec={partnerSpecs[status]} className={className} />
+}
+
+const checkSpecs: Record<PartnerCheckResult, ChipSpec> = {
+  passed: { label: 'Passed', icon: CircleCheck, tone: 'complete' },
+  flagged: { label: 'Flagged', icon: Flag, tone: 'attention' },
+  not_passed: { label: 'Not passed', icon: CircleX, tone: 'negative' },
+  pending: { label: 'Pending', icon: CircleDashed, tone: 'neutral' },
+}
+
+export function PartnerCheckChip({
+  result,
+  className,
+}: {
+  result: PartnerCheckResult
+  className?: string
+}) {
+  return (
+    <Chip
+      spec={checkSpecs[result]}
+      className={cn('px-2 py-0.5 text-[0.8125rem] [&_svg]:size-3.5', className)}
+    />
+  )
+}
+
+/* One ACSP status set everywhere. */
+const acspSpecs: Record<AcspStatus, ChipSpec> = {
+  pending_approval: {
+    label: 'Pending approval',
+    icon: Hourglass,
+    tone: 'neutral',
+  },
+  active: { label: 'Active', icon: CircleCheck, tone: 'complete' },
+  not_yet_listed: {
+    label: 'Not yet listed',
+    icon: CircleDashed,
+    tone: 'attention',
+  },
+  suspended: { label: 'Suspended', icon: CirclePause, tone: 'negative' },
+  ceased: { label: 'Ceased', icon: CircleX, tone: 'negative' },
+  withdrawn: { label: 'Withdrawn', icon: Ban, tone: 'neutral' },
+}
+
+export const acspStatusLabel = (s: AcspStatus) => acspSpecs[s].label
+
+export function AcspStatusChip({
+  status,
+  className,
+}: {
+  status: AcspStatus
+  className?: string
+}) {
+  return <Chip spec={acspSpecs[status]} className={className} />
 }
 
 export function CaseStatusChip({

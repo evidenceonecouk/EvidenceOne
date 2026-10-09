@@ -49,7 +49,7 @@ import { formatDate, formatShortDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { connectCompany } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
-import { getAgent, personStatus } from '@/store/selectors'
+import { getPartner, personStatus } from '@/store/selectors'
 
 const DAY = 24 * 60 * 60 * 1000
 const daysUntil = (iso: string) =>
@@ -86,9 +86,9 @@ export function CompanyProfile() {
 
   const profile = demo ?? (live === 'loading' ? null : live)
   const company = data.companies.find((c) => c.number === number)
-  const agent = getAgent(data, state.agentId)!
-  const connectedHere = company?.lodgedByAgentId === agent.id
-  const lodgedElsewhere = company?.lodgedByAgentId && !connectedHere
+  const agent = getPartner(data, state.partnerId)!
+  const connectedHere = company?.lodgedByPartnerId === agent.id
+  const lodgedElsewhere = company?.lodgedByPartnerId && !connectedHere
 
   if (live === 'loading') {
     return (
@@ -112,7 +112,7 @@ export function CompanyProfile() {
           may be unavailable, or the number may be wrong.
         </p>
         <Button asChild variant="outline">
-          <Link to="/agent/lookup">
+          <Link to="/partner/lookup">
             <ArrowLeft aria-hidden="true" />
             Back to search
           </Link>
@@ -175,7 +175,7 @@ export function CompanyProfile() {
   return (
     <Page>
       <Link
-        to="/agent/lookup"
+        to="/partner/lookup"
         className="mb-6 inline-flex items-center gap-1.5 text-base text-slate underline-offset-4 hover:text-ink hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
@@ -236,7 +236,7 @@ export function CompanyProfile() {
                 disabled={!invitable.length}
                 onClick={() =>
                   navigate(
-                    `/agent/companies/${number}/invite?people=${invitable.map((p) => p.personId).join(',')}`,
+                    `/partner/companies/${number}/invite?people=${invitable.map((p) => p.personId).join(',')}`,
                   )
                 }
               >

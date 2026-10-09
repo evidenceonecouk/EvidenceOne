@@ -63,9 +63,9 @@ export function CopilotPanel({
   const asker =
     state.persona === 'reviewer'
       ? reviewerName(data, PRIMARY_REVIEWER_ID)
-      : state.persona === 'admin2'
-        ? 'Second approver'
-        : 'Platform administrator'
+      : state.persona === 'superAdmin'
+        ? 'Super Administrator'
+        : 'Platform Administrator'
 
   useEffect(() => {
     if (!open) return

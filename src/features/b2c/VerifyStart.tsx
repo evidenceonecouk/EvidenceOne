@@ -40,7 +40,7 @@ export function VerifyStart() {
     () =>
       demoSearch(data, term).filter(
         (c) =>
-          !data.companies.find((x) => x.number === c.number)?.lodgedByAgentId,
+          !data.companies.find((x) => x.number === c.number)?.lodgedByPartnerId,
       ),
     [data, term],
   )
@@ -71,7 +71,7 @@ export function VerifyStart() {
     apply((d) =>
       createB2cCase(d, personId, company.number, nextB2cAcsp(d).id, caseId),
     )
-    navigate(`/app/${caseId}/contact`)
+    navigate(`/journey/${caseId}/contact`)
   }
 
   return (

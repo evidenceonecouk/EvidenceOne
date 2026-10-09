@@ -47,10 +47,7 @@ function LiveFeed({ caseId }: { caseId: string }) {
     .slice(-4)
     .reverse()
   return (
-    <aside
-      className="hidden lg:block"
-      aria-label="Audit trail for this case"
-    >
+    <aside className="hidden lg:block" aria-label="Audit trail for this case">
       <p className="font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
         Live on the platform
       </p>

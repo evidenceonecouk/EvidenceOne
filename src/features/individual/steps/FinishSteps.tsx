@@ -197,13 +197,13 @@ export function PaymentStep({ vc, entry, next, go }: StepProps) {
   const { data, apply } = useDemoStore()
   const invite = data.invites.find((i) => i.caseId === vc.id)
   const prepaid = invite?.paymentCode
-  const agent = data.agents.find((a) => a.id === invite?.agentId)
+  const agent = data.partners.find((a) => a.id === invite?.partnerId)
   const [method, setMethod] = useState<'card' | 'code'>('card')
   const [code, setCode] = useState('')
   const [processing, setProcessing] = useState(false)
   const paid = !!vc.journey?.paid
   const typed = code.trim().toUpperCase()
-  const codeOwner = data.agents.find(
+  const codeOwner = data.partners.find(
     (a) =>
       a.paymentCode &&
       typed.startsWith(`${a.paymentCode}-`) &&

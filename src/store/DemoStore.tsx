@@ -8,9 +8,15 @@ import {
   type ReactNode,
 } from 'react'
 import { createSeed } from '@/data/seed'
-import { PRIMARY_AGENT_ID } from '@/data/organisations'
+import { PRIMARY_ACSP_ID, PRIMARY_PARTNER_ID } from '@/data/organisations'
 import { appendAudit, type AuditInput } from '@/lib/audit'
-import type { DemoData, PersonaId } from '@/types/domain'
+import type {
+  AcspFirm,
+  DemoData,
+  LanguageCode,
+  PersonaId,
+  ReferralPartner,
+} from '@/types/domain'
 import type { ActionResult } from './actions'
 
 /*
@@ -19,7 +25,7 @@ import type { ActionResult } from './actions'
 */
 
 const STORAGE_KEY = 'evidenceone.demo'
-const SCHEMA = 5
+const SCHEMA = 6
 /** A saved demo older than this is reseeded so SLA timers look live again. */
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000
 
@@ -27,8 +33,16 @@ export interface DemoState {
   schema: number
   seededAt: number
   persona: PersonaId
-  /** Which Agent organisation the Agent persona is viewing as. */
-  agentId: string
+  /** Which Referral Partner organisation the Referral Partner persona is acting as. */
+  partnerId: string
+  /** Which ACSP the ACSP persona is acting as. A firm that is both a Partner and an ACSP holds two memberships, one at a time. */
+  acspId: string
+  /** Super Administrator seat: 1 proposes, 2 is the second approver. Nobody approves their own change. */
+  superAdminSeat: 1 | 2
+  /** Language for guidance on individual-facing screens. English is the version of record. */
+  language: LanguageCode
+  /** Guided demo mode: short captions that step through the story. */
+  guided: { on: boolean; step: number }
   data: DemoData
 }
 
@@ -36,7 +50,11 @@ type Action =
   | { type: 'reset' }
   | { type: 'hydrate'; state: DemoState }
   | { type: 'setPersona'; persona: PersonaId }
-  | { type: 'setAgent'; agentId: string }
+  | { type: 'setPartner'; partnerId: string }
+  | { type: 'setAcsp'; acspId: string }
+  | { type: 'setSeat'; seat: 1 | 2 }
+  | { type: 'setLanguage'; language: LanguageCode }
+  | { type: 'setGuided'; guided: { on: boolean; step: number } }
   | {
       type: 'update'
       recipe: (data: DemoData) => DemoData
@@ -44,13 +62,17 @@ type Action =
     }
   | { type: 'apply'; action: (data: DemoData) => ActionResult }
 
-function freshState(persona: PersonaId = 'agent'): DemoState {
+function freshState(persona: PersonaId = 'partner'): DemoState {
   const now = Date.now()
   return {
     schema: SCHEMA,
     seededAt: now,
     persona,
-    agentId: PRIMARY_AGENT_ID,
+    partnerId: PRIMARY_PARTNER_ID,
+    acspId: PRIMARY_ACSP_ID,
+    superAdminSeat: 1,
+    language: 'en',
+    guided: { on: false, step: 0 },
     data: createSeed(now),
   }
 }
@@ -76,8 +98,16 @@ function reducer(state: DemoState, action: Action): DemoState {
       return action.state
     case 'setPersona':
       return { ...state, persona: action.persona }
-    case 'setAgent':
-      return { ...state, agentId: action.agentId }
+    case 'setPartner':
+      return { ...state, partnerId: action.partnerId }
+    case 'setAcsp':
+      return { ...state, acspId: action.acspId }
+    case 'setSeat':
+      return { ...state, superAdminSeat: action.seat }
+    case 'setLanguage':
+      return { ...state, language: action.language }
+    case 'setGuided':
+      return { ...state, guided: action.guided }
     case 'update': {
       let data = action.recipe(state.data)
       if (action.audit?.length) {
@@ -106,7 +136,11 @@ interface DemoStoreValue {
   state: DemoState
   data: DemoData
   setPersona: (persona: PersonaId) => void
-  setAgent: (agentId: string) => void
+  setPartner: (partnerId: string) => void
+  setAcsp: (acspId: string) => void
+  setSeat: (seat: 1 | 2) => void
+  setLanguage: (language: LanguageCode) => void
+  setGuided: (guided: { on: boolean; step: number }) => void
   /** Apply an immutable change to the data and append any audit events to the chain. */
   update: (recipe: (data: DemoData) => DemoData, audit?: AuditInput[]) => void
   /** Run a store action from src/store/actions.ts; its audit events are chained automatically. */
@@ -146,8 +180,25 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     (persona: PersonaId) => dispatch({ type: 'setPersona', persona }),
     [],
   )
-  const setAgent = useCallback(
-    (agentId: string) => dispatch({ type: 'setAgent', agentId }),
+  const setPartner = useCallback(
+    (partnerId: string) => dispatch({ type: 'setPartner', partnerId }),
+    [],
+  )
+  const setAcsp = useCallback(
+    (acspId: string) => dispatch({ type: 'setAcsp', acspId }),
+    [],
+  )
+  const setSeat = useCallback(
+    (seat: 1 | 2) => dispatch({ type: 'setSeat', seat }),
+    [],
+  )
+  const setLanguage = useCallback(
+    (language: LanguageCode) => dispatch({ type: 'setLanguage', language }),
+    [],
+  )
+  const setGuided = useCallback(
+    (guided: { on: boolean; step: number }) =>
+      dispatch({ type: 'setGuided', guided }),
     [],
   )
   const update = useCallback(
@@ -167,12 +218,27 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       state,
       data: state.data,
       setPersona,
-      setAgent,
+      setPartner,
+      setAcsp,
+      setSeat,
+      setLanguage,
+      setGuided,
       update,
       apply,
       reset,
     }),
-    [state, setPersona, setAgent, update, apply, reset],
+    [
+      state,
+      setPersona,
+      setPartner,
+      setAcsp,
+      setSeat,
+      setLanguage,
+      setGuided,
+      update,
+      apply,
+      reset,
+    ],
   )
 
   return (
@@ -188,3 +254,29 @@ export function useDemoStore(): DemoStoreValue {
     throw new Error('useDemoStore must be used inside DemoStoreProvider')
   return ctx
 }
+
+/** The Referral Partner organisation the Partner persona is acting as. */
+export function useActingPartner(): ReferralPartner {
+  const { data, state } = useDemoStore()
+  return data.partners.find((p) => p.id === state.partnerId) ?? data.partners[0]
+}
+
+/** The ACSP the ACSP persona is acting as, and the reviewer who is signed in. */
+export function useActingAcsp(): {
+  acsp: AcspFirm
+  reviewer: AcspFirm['reviewers'][number]
+} {
+  const { data, state } = useDemoStore()
+  const acsp = data.acsps.find((a) => a.id === state.acspId) ?? data.acsps[0]
+  return { acsp, reviewer: acsp.reviewers[0] }
+}
+
+/** Super Administrator seats. Seat 2 is the second approver. */
+export const SUPER_ADMINS = [
+  { seat: 1 as const, name: 'Helen Carver', role: 'Super Administrator' },
+  {
+    seat: 2 as const,
+    name: 'Daniel Achebe',
+    role: 'Super Administrator, second approver',
+  },
+]

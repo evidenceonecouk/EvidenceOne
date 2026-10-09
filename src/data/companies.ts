@@ -21,7 +21,7 @@ export const companies: Company[] = [
     },
     sicCodes: ['10710'],
     sicDescription: 'Manufacture of bread; fresh pastry goods and cakes',
-    lodgedByAgentId: 'agent-fenwick',
+    lodgedByPartnerId: 'partner-fenwick',
     connectedAt: '2026-08-12T09:20:00.000Z',
   },
   {
@@ -38,7 +38,7 @@ export const companies: Company[] = [
     },
     sicCodes: ['62012'],
     sicDescription: 'Business and domestic software development',
-    lodgedByAgentId: 'agent-fenwick',
+    lodgedByPartnerId: 'partner-fenwick',
     connectedAt: '2026-08-12T09:24:00.000Z',
   },
   {
@@ -55,7 +55,7 @@ export const companies: Company[] = [
     },
     sicCodes: ['33150'],
     sicDescription: 'Repair and maintenance of ships and boats',
-    lodgedByAgentId: 'agent-belgrave',
+    lodgedByPartnerId: 'partner-belgrave',
     connectedAt: '2026-09-02T14:05:00.000Z',
   },
   {

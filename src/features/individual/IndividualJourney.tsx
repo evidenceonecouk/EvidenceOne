@@ -77,11 +77,13 @@ export function IndividualJourney() {
   // Once submitted, or paused for a human check, the app only shows the status tracker.
   const locked = !OPEN.includes(vc.status) || vc.option === 2
   if (locked && step !== 'status')
-    return <Navigate to={`/app/${caseId}/status`} replace />
+    return <Navigate to={`/journey/${caseId}/status`} replace />
   if (!locked && step !== 'option-2' && !pathFor(data, vc).includes(spec.id))
-    return <Navigate to={`/app/${caseId}/${pathFor(data, vc)[0]}`} replace />
+    return (
+      <Navigate to={`/journey/${caseId}/${pathFor(data, vc)[0]}`} replace />
+    )
 
-  const go = (id: StepId) => navigate(`/app/${caseId}/${id}`)
+  const go = (id: StepId) => navigate(`/journey/${caseId}/${id}`)
   const back = step === 'option-2' ? 'document' : prevStep(data, vc, spec.id)
   const Step = screens[spec.id]
 

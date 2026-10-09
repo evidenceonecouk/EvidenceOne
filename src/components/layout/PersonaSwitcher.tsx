@@ -49,9 +49,7 @@ export function PersonaSwitcher() {
               )}
             >
               <Icon className="size-4" aria-hidden="true" />
-              <span className="2xl:hidden">
-                {p.id === 'admin2' ? p.shortLabel : p.label}
-              </span>
+              <span className="2xl:hidden">{p.shortLabel}</span>
               <span className="hidden 2xl:inline">{p.label}</span>
             </button>
           )

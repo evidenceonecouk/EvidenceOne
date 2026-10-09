@@ -6,12 +6,18 @@ export type StepId =
   | 'contact'
   | 'details'
   | 'personal'
+  /** B2C only: suggested ACSPs, ranked by clear criteria (not AI). */
+  | 'suggest'
+  /** Who will verify you: the named ACSP, its fee and turnaround. */
+  | 'instruct'
   | 'payment'
   | 'document'
   | 'scan'
-  | 'chip'
   | 'selfie'
   | 'checks'
+  /** Proof of current address from every individual (ADDL-02). */
+  | 'address'
+  /** One supporting document, only on ADDL-01 or ADDL-03. */
   | 'evidence'
   | 'review'
   | 'status'
@@ -63,6 +69,24 @@ export const steps: StepSpec[] = [
     },
   },
   {
+    id: 'suggest',
+    stage: 0,
+    caption: {
+      kicker: 'Suggested ACSPs',
+      title: 'Ranked by clear criteria. Not AI.',
+      body: 'Each suggestion shows its own fee, turnaround and why it matches. The client may ask for a different ACSP once, before instructing.',
+    },
+  },
+  {
+    id: 'instruct',
+    stage: 1,
+    caption: {
+      kicker: 'Who will verify you',
+      title: 'Instruct the named ACSP',
+      body: 'The ACSP is the service provider and Evidence One is its technology provider. The ACSP takes the payment and makes the verification statement.',
+    },
+  },
+  {
     id: 'payment',
     stage: 1,
     caption: {
@@ -90,15 +114,6 @@ export const steps: StepSpec[] = [
     },
   },
   {
-    id: 'chip',
-    stage: 2,
-    caption: {
-      kicker: 'Step 3 · Is the document real?',
-      title: 'Passport chip read',
-      body: 'Only possible in an app: no browser can reach a passport chip. The chip’s digital signature proves who issued the document.',
-    },
-  },
-  {
     id: 'selfie',
     stage: 2,
     caption: {
@@ -114,6 +129,15 @@ export const steps: StepSpec[] = [
       kicker: 'Steps 3 and 4 · Automated checks',
       title: 'Checks run while they wait',
       body: 'Authenticity, liveness, face match and PEP and sanctions screening by the provider. Then the rules compare the details with the register, the same way every time.',
+    },
+  },
+  {
+    id: 'address',
+    stage: 2,
+    caption: {
+      kicker: 'Proof of address',
+      title: 'One proof of current address',
+      body: 'Asked from every individual, dated within the last six months. The exact wording is Pending your decision (P3).',
     },
   },
   {
@@ -185,18 +209,17 @@ export function journeyTriggers(data: DemoData, vc: VerificationCase) {
 
 /** The ordered path for this case, skipping steps that do not apply. */
 export function pathFor(data: DemoData, vc: VerificationCase): StepId[] {
-  const isPassport = (vc.journey?.documentType ?? 'passport') === 'passport'
-  const path: StepId[] = [
-    'invite',
-    'contact',
-    'details',
-    'personal',
+  const path: StepId[] = ['invite', 'contact', 'details', 'personal']
+  if (vc.origin === 'b2c') path.push('suggest')
+  path.push(
+    'instruct',
     'payment',
     'document',
     'scan',
-  ]
-  if (isPassport && !vc.journey?.noChipPhone) path.push('chip')
-  path.push('selfie', 'checks')
+    'selfie',
+    'checks',
+    'address',
+  )
   if (journeyTriggers(data, vc).length) path.push('evidence')
   path.push('review', 'status')
   return vc.origin === 'b2c' ? path.filter((s) => s !== 'invite') : path

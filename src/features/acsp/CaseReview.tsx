@@ -56,7 +56,7 @@ import { decideCase, escalateCase, reviewerName } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import {
   auditForCase,
-  getAgent,
+  getPartner,
   getCase,
   getCompany,
   getEntry,
@@ -107,7 +107,7 @@ export function CaseReview() {
   }
 
   const name = fullName(person)
-  const agent = vc.agentId ? getAgent(data, vc.agentId) : undefined
+  const agent = vc.partnerId ? getPartner(data, vc.partnerId) : undefined
   const decidable = vc.status === 'in_review' || vc.status === 'info_requested'
   const outstanding = outstandingFor(results)
   const reviewer = data.acsps

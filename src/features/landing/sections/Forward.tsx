@@ -126,7 +126,7 @@ export function Forward() {
             size="lg"
             className="mt-9 h-14 rounded-full bg-highlight px-9 text-lg text-ink hover:bg-[#ffcf26]"
           >
-            <Link to="/agent" onClick={() => setPersona('agent')}>
+            <Link to="/partner" onClick={() => setPersona('partner')}>
               Get started
               <ArrowRight aria-hidden="true" />
             </Link>

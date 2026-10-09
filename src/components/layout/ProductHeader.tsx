@@ -4,9 +4,8 @@ import { Logo } from '@/components/brand/Logo'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { getAcsp, getAgent } from '@/store/selectors'
+import { getAcsp, getPartner } from '@/store/selectors'
 import { useDemoStore } from '@/store/DemoStore'
-import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import type { PersonaId } from '@/types/domain'
 
 interface NavItem {
@@ -16,10 +15,10 @@ interface NavItem {
 }
 
 const navByPersona: Record<PersonaId, NavItem[]> = {
-  agent: [
-    { to: '/agent', label: 'Dashboard', end: true },
-    { to: '/agent/lookup', label: 'Companies House lookup' },
-    { to: '/agent/invites', label: 'Invites' },
+  partner: [
+    { to: '/partner', label: 'Dashboard', end: true },
+    { to: '/partner/lookup', label: 'Companies House lookup' },
+    { to: '/partner/invites', label: 'Invites' },
   ],
   reviewer: [
     { to: '/acsp/queue', label: 'Review queue' },
@@ -28,12 +27,12 @@ const navByPersona: Record<PersonaId, NavItem[]> = {
   ],
   individual: [],
   b2c: [],
-  admin: [
+  platformAdmin: [
     { to: '/admin', label: 'Operations', end: true },
     { to: '/admin/compliance', label: 'Compliance' },
     { to: '/admin/audit', label: 'Audit trail' },
   ],
-  admin2: [{ to: '/rules', label: 'Rules' }],
+  superAdmin: [{ to: '/super', label: 'Approvals' }],
 }
 
 const publicLinks = [
@@ -45,33 +44,37 @@ const publicLinks = [
 ] as const
 
 const suffixByPersona: Record<PersonaId, string | undefined> = {
-  agent: 'Portal',
+  partner: 'Portal',
   reviewer: 'Compliance',
   individual: 'Verify',
   b2c: 'Verify',
-  admin: 'Admin',
-  admin2: 'Admin',
+  platformAdmin: 'Admin',
+  superAdmin: 'Admin',
 }
 
 function OrgBadge({ persona }: { persona: PersonaId }) {
   const { data, state } = useDemoStore()
   let primary: string | undefined
   let secondary: string | undefined
-  if (persona === 'agent') {
-    const agent = getAgent(data, state.agentId)
-    primary = agent?.name
-    secondary = agent
-      ? agent.hasAcspStatus
-        ? 'Agent with ACSP status'
-        : 'Agent without ACSP status'
-      : undefined
+  if (persona === 'partner') {
+    const partner = getPartner(data, state.partnerId)
+    primary = partner?.name
+    secondary = partner ? `Referral Partner · ${partner.country}` : undefined
   } else if (persona === 'reviewer') {
-    const acsp = getAcsp(data, PRIMARY_ACSP_ID)
+    const acsp = getAcsp(data, state.acspId)
     primary = acsp?.reviewers[0].name
     secondary = acsp?.name
-  } else if (persona === 'admin' || persona === 'admin2') {
-    primary = persona === 'admin2' ? 'Daniel Achebe' : 'Helen Carver'
-    secondary = 'Evidence One'
+  } else if (persona === 'platformAdmin' || persona === 'superAdmin') {
+    primary =
+      persona === 'superAdmin'
+        ? state.superAdminSeat === 2
+          ? 'Daniel Achebe'
+          : 'Helen Carver'
+        : 'Marcus Adeyemi'
+    secondary =
+      persona === 'superAdmin'
+        ? 'Super Administrator'
+        : 'Platform Administrator'
   }
   if (!primary) return null
   return (

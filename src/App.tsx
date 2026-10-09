@@ -1,6 +1,12 @@
 import { Analytics } from '@vercel/analytics/react'
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router'
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ToastProvider } from '@/components/app/Toaster'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -9,23 +15,23 @@ import { NotFound } from '@/features/placeholders/NotFound'
 import { DemoStoreProvider } from '@/store/DemoStore'
 
 // Screens load on demand so the landing page stays light.
-const AgentDashboard = lazy(() =>
-  import('@/features/agent/AgentDashboard').then((m) => ({
-    default: m.AgentDashboard,
+const PartnerDashboard = lazy(() =>
+  import('@/features/partner/PartnerDashboard').then((m) => ({
+    default: m.PartnerDashboard,
   })),
 )
 const BulkInvite = lazy(() =>
-  import('@/features/agent/BulkInvite').then((m) => ({
+  import('@/features/partner/BulkInvite').then((m) => ({
     default: m.BulkInvite,
   })),
 )
 const CompanyLookup = lazy(() =>
-  import('@/features/agent/CompanyLookup').then((m) => ({
+  import('@/features/partner/CompanyLookup').then((m) => ({
     default: m.CompanyLookup,
   })),
 )
 const CompanyProfile = lazy(() =>
-  import('@/features/agent/CompanyProfile').then((m) => ({
+  import('@/features/partner/CompanyProfile').then((m) => ({
     default: m.CompanyProfile,
   })),
 )
@@ -111,8 +117,74 @@ const WhiteLabelPage = lazy(() =>
   })),
 )
 const InviteLog = lazy(() =>
-  import('@/features/agent/InviteLog').then((m) => ({ default: m.InviteLog })),
+  import('@/features/partner/InviteLog').then((m) => ({
+    default: m.InviteLog,
+  })),
 )
+
+const JoinPartner = lazy(() =>
+  import('@/features/onboarding/JoinPartner').then((m) => ({
+    default: m.JoinPartner,
+  })),
+)
+const JoinAcsp = lazy(() =>
+  import('@/features/onboarding/JoinAcsp').then((m) => ({
+    default: m.JoinAcsp,
+  })),
+)
+const AcspBilling = lazy(() =>
+  import('@/features/acsp/Billing').then((m) => ({ default: m.AcspBilling })),
+)
+const Reconfirm = lazy(() =>
+  import('@/features/acsp/Reconfirm').then((m) => ({ default: m.Reconfirm })),
+)
+const AffectedCases = lazy(() =>
+  import('@/features/acsp/AffectedCases').then((m) => ({
+    default: m.AffectedCases,
+  })),
+)
+const ApprovalsPage = lazy(() =>
+  import('@/features/admin/ApprovalsPage').then((m) => ({
+    default: m.ApprovalsPage,
+  })),
+)
+const MatchingPage = lazy(() =>
+  import('@/features/admin/MatchingPage').then((m) => ({
+    default: m.MatchingPage,
+  })),
+)
+const MonitoringPage = lazy(() =>
+  import('@/features/admin/MonitoringPage').then((m) => ({
+    default: m.MonitoringPage,
+  })),
+)
+const FeesPage = lazy(() =>
+  import('@/features/admin/FeesPage').then((m) => ({ default: m.FeesPage })),
+)
+const CommissionsPage = lazy(() =>
+  import('@/features/admin/CommissionsPage').then((m) => ({
+    default: m.CommissionsPage,
+  })),
+)
+const StoragePage = lazy(() =>
+  import('@/features/admin/StoragePage').then((m) => ({
+    default: m.StoragePage,
+  })),
+)
+const SuperHome = lazy(() =>
+  import('@/features/super/SuperHome').then((m) => ({ default: m.SuperHome })),
+)
+const PointsForCall = lazy(() =>
+  import('@/features/guided/PointsForCall').then((m) => ({
+    default: m.PointsForCall,
+  })),
+)
+
+/** Old paths keep working: /agent became /partner and /app became /journey. */
+function RedirectTo({ from, to }: { from: string; to: string }) {
+  const { pathname, search } = useLocation()
+  return <Navigate to={pathname.replace(from, to) + search} replace />
+}
 
 export default function App() {
   return (
@@ -137,9 +209,26 @@ export default function App() {
                 <Route path="verify" element={<VerifyStart />} />
                 <Route path="signin" element={<SignIn />} />
 
-                {/* Agent */}
-                <Route path="agent">
-                  <Route index element={<AgentDashboard />} />
+                {/* Onboarding, ending in Pending platform approval */}
+                <Route path="join/partner" element={<JoinPartner />} />
+                <Route path="join/acsp" element={<JoinAcsp />} />
+
+                {/* Presenter only */}
+                <Route path="points" element={<PointsForCall />} />
+
+                {/* Old paths */}
+                <Route
+                  path="agent/*"
+                  element={<RedirectTo from="/agent" to="/partner" />}
+                />
+                <Route
+                  path="app/*"
+                  element={<RedirectTo from="/app" to="/journey" />}
+                />
+
+                {/* Referral Partner */}
+                <Route path="partner">
+                  <Route index element={<PartnerDashboard />} />
                   <Route path="lookup" element={<CompanyLookup />} />
                   <Route
                     path="companies/:number"
@@ -153,9 +242,9 @@ export default function App() {
                 </Route>
 
                 {/* Individual, shown in the phone frame */}
-                <Route path="app/:caseId" element={<IndividualJourney />} />
+                <Route path="journey/:caseId" element={<IndividualJourney />} />
                 <Route
-                  path="app/:caseId/:step"
+                  path="journey/:caseId/:step"
                   element={<IndividualJourney />}
                 />
 
@@ -169,6 +258,9 @@ export default function App() {
                     element={<Correction />}
                   />
                   <Route path="filings" element={<Filings />} />
+                  <Route path="billing" element={<AcspBilling />} />
+                  <Route path="reconfirm" element={<Reconfirm />} />
+                  <Route path="affected" element={<AffectedCases />} />
                 </Route>
                 <Route path="records" element={<RecordsIndex />} />
                 <Route
@@ -178,6 +270,13 @@ export default function App() {
 
                 {/* Admin */}
                 <Route path="admin" element={<AdminConsole />} />
+                <Route path="admin/approvals" element={<ApprovalsPage />} />
+                <Route path="admin/matching" element={<MatchingPage />} />
+                <Route path="admin/monitoring" element={<MonitoringPage />} />
+                <Route path="admin/fees" element={<FeesPage />} />
+                <Route path="admin/commissions" element={<CommissionsPage />} />
+                <Route path="admin/storage" element={<StoragePage />} />
+                <Route path="super" element={<SuperHome />} />
                 <Route path="admin/compliance" element={<CompliancePage />} />
                 <Route path="admin/audit" element={<AuditTrailPage />} />
                 <Route path="admin/retention" element={<RetentionPage />} />

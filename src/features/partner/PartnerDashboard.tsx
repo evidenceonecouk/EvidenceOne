@@ -30,9 +30,9 @@ import { formatShortDate, shortHash, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import {
-  attentionForAgent,
-  companiesForAgent,
-  getAgent,
+  attentionForPartner,
+  companiesForPartner,
+  getPartner,
   peopleForCompany,
   roleLabel,
   type AttentionItem,
@@ -53,12 +53,12 @@ const segment: Record<PersonStatus, string> = {
   reverification_due: 'bg-info',
 }
 
-export function AgentDashboard() {
+export function PartnerDashboard() {
   const { data, state } = useDemoStore()
-  const agent = getAgent(data, state.agentId)!
-  const companies = companiesForAgent(data, agent.id)
+  const agent = getPartner(data, state.partnerId)!
+  const companies = companiesForPartner(data, agent.id)
   const rows = companies.flatMap((c) => peopleForCompany(data, c.number))
-  const flags = attentionForAgent(data, agent.id)
+  const flags = attentionForPartner(data, agent.id)
   const count = (s: PersonStatus) => rows.filter((r) => r.status === s).length
   const needAction = rows.filter((r) => r.invitable).length
 
@@ -87,13 +87,13 @@ export function AgentDashboard() {
         actions={
           <>
             <Button asChild variant="outline">
-              <Link to="/agent/invites">
+              <Link to="/partner/invites">
                 <Send aria-hidden="true" />
                 Invite log
               </Link>
             </Button>
             <Button asChild>
-              <Link to="/agent/lookup">
+              <Link to="/partner/lookup">
                 <Plus aria-hidden="true" />
                 Connect a company
               </Link>
@@ -150,7 +150,7 @@ export function AgentDashboard() {
                 started.
               </p>
               <Button asChild className="mt-5">
-                <Link to="/agent/lookup">
+                <Link to="/partner/lookup">
                   <Link2 aria-hidden="true" />
                   Find a company
                 </Link>
@@ -195,7 +195,7 @@ function CompanyBlock({ company }: { company: Company }) {
               className="truncate text-[1.0625rem] font-medium text-ink"
             >
               <Link
-                to={`/agent/companies/${company.number}`}
+                to={`/partner/companies/${company.number}`}
                 className="underline-offset-4 hover:underline"
               >
                 {company.name}
@@ -236,7 +236,7 @@ function CompanyBlock({ company }: { company: Company }) {
                 ? selected
                 : invitable.map((r) => r.personId)
               navigate(
-                `/agent/companies/${company.number}/invite?people=${ids.join(',')}`,
+                `/partner/companies/${company.number}/invite?people=${ids.join(',')}`,
               )
             }}
           >
@@ -389,9 +389,11 @@ function FlagsPanel({ flags }: { flags: AttentionItem[] }) {
 function ActivityPanel() {
   const { data, state } = useDemoStore()
   const caseIds = new Set(
-    data.cases.filter((c) => c.agentId === state.agentId).map((c) => c.id),
+    data.cases.filter((c) => c.partnerId === state.partnerId).map((c) => c.id),
   )
-  const companyNames = companiesForAgent(data, state.agentId).map((c) => c.name)
+  const companyNames = companiesForPartner(data, state.partnerId).map(
+    (c) => c.name,
+  )
   // Status-level events only, reworded, so nothing about documents or evidence reaches the Agent.
   const name = (caseId?: string) => {
     const vc = data.cases.find((c) => c.id === caseId)
@@ -434,7 +436,7 @@ function ActivityPanel() {
         title="Recent activity"
         actions={
           <Link
-            to="/agent/invites"
+            to="/partner/invites"
             className="inline-flex items-center gap-1 text-[0.9375rem] text-ink underline-offset-4 hover:underline"
           >
             All invites

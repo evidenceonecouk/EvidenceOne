@@ -35,7 +35,7 @@ const steps: {
     label: 'Verify',
     title: 'Verify your client',
     body: 'Identity verification with one document and a complete audit trail.',
-    to: '/app/EO-2026-000135/invite',
+    to: '/journey/EO-2026-000135/invite',
     persona: 'individual',
   },
   {
@@ -281,7 +281,7 @@ export function Hub() {
               variant="outline"
               className="mt-8 h-13 rounded-full border-ink/25 px-7"
             >
-              <Link to="/agent" onClick={() => setPersona('agent')}>
+              <Link to="/partner" onClick={() => setPersona('partner')}>
                 Find an ACSP
                 <ArrowRight aria-hidden="true" />
               </Link>

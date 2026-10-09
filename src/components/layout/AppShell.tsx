@@ -10,14 +10,17 @@ export function AppShell() {
   const { pathname } = useLocation()
   const { state, setPersona } = useDemoStore()
   const isLanding = pathname === '/'
-  const isApp = pathname.startsWith('/app/')
+  const isApp = pathname.startsWith('/journey/')
   const professional = (
     p?: string,
-  ): p is 'agent' | 'reviewer' | 'admin' | 'admin2' =>
-    p === 'agent' || p === 'reviewer' || p === 'admin' || p === 'admin2'
+  ): p is 'partner' | 'reviewer' | 'platformAdmin' | 'superAdmin' =>
+    p === 'partner' ||
+    p === 'reviewer' ||
+    p === 'platformAdmin' ||
+    p === 'superAdmin'
   // Shared screens such as Rules keep whichever professional persona is viewing them.
   const portalPersona = isSharedPath(pathname)
-    ? professional(state.persona) && state.persona !== 'agent'
+    ? professional(state.persona) && state.persona !== 'partner'
       ? state.persona
       : 'reviewer'
     : personaForPath(pathname)

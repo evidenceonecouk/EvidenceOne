@@ -8,11 +8,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useDemoStore } from '@/store/DemoStore'
 
-/** Shown with the Agent persona: switch between an Agent with ACSP status and one without. */
-export function AgentSwitcher() {
-  const { data, state, setAgent } = useDemoStore()
-  const current = data.agents.find((a) => a.id === state.agentId)
-  if (state.persona !== 'agent' || !current) return null
+/** Shown with the Referral Partner persona: switch between Referral Partner organisations. */
+export function PartnerSwitcher() {
+  const { data, state, setPartner } = useDemoStore()
+  const current = data.partners.find((a) => a.id === state.partnerId)
+  if (state.persona !== 'partner' || !current) return null
 
   return (
     <DropdownMenu>
@@ -25,12 +25,12 @@ export function AgentSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80">
         <DropdownMenuLabel className="text-sm text-slate">
-          Agent organisation
+          Referral Partner organisation
         </DropdownMenuLabel>
-        {data.agents.map((a) => (
+        {data.partners.map((a) => (
           <DropdownMenuItem
             key={a.id}
-            onSelect={() => setAgent(a.id)}
+            onSelect={() => setPartner(a.id)}
             className="items-start gap-3 py-2.5"
           >
             <span className="flex-1">
@@ -38,10 +38,7 @@ export function AgentSwitcher() {
                 {a.name}
               </span>
               <span className="block text-sm text-slate">
-                {a.kind} ·{' '}
-                {a.hasAcspStatus
-                  ? 'With ACSP status: can approve, decline or refer'
-                  : 'Without ACSP status: refers only'}
+                {a.kind} · {a.country}. Sees status and check results only.
               </span>
             </span>
             {a.id === current.id && (

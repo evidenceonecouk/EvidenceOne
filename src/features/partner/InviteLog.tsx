@@ -53,7 +53,7 @@ export function InviteLog() {
   const [params] = useSearchParams()
   const fresh = Number(params.get('new') ?? 0)
   const invites = data.invites
-    .filter((i) => i.agentId === state.agentId)
+    .filter((i) => i.partnerId === state.partnerId)
     .sort(
       (a, b) => b.sentAt.localeCompare(a.sentAt) || b.id.localeCompare(a.id),
     )
@@ -66,7 +66,7 @@ export function InviteLog() {
         description="Every invite you have sent, with its single-use payment code, who reviews it and its entry in the audit trail. You see status only, never documents or evidence."
         actions={
           <Button asChild variant="outline">
-            <Link to="/agent">Back to companies</Link>
+            <Link to="/partner">Back to companies</Link>
           </Button>
         }
       />
@@ -187,7 +187,7 @@ export function InviteLog() {
                       </span>
                       {vc && ['sent', 'opened'].includes(inv.status) && (
                         <Link
-                          to={`/app/${vc.id}/invite`}
+                          to={`/journey/${vc.id}/invite`}
                           onClick={() => setPersona('individual')}
                           className="mt-2 flex items-center gap-1 text-[0.9375rem] text-ink underline-offset-4 hover:underline"
                         >

@@ -1,7 +1,11 @@
 import {
   Archive,
   ChevronsUpDown,
+  Coins,
+  Database,
   Gauge,
+  GitMerge,
+  Handshake,
   Hourglass,
   Inbox,
   LayoutDashboard,
@@ -9,9 +13,12 @@ import {
   ListChecks,
   Menu,
   Palette,
+  Radar,
+  Receipt,
   Search,
   Send,
   ShieldCheck,
+  UserCheck,
   Users,
   Waypoints,
   X,
@@ -29,10 +36,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
-import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { cn } from '@/lib/utils'
-import { useDemoStore } from '@/store/DemoStore'
-import { getAcsp, getAgent } from '@/store/selectors'
+import { SUPER_ADMINS, useDemoStore } from '@/store/DemoStore'
+import { getAcsp, getPartner } from '@/store/selectors'
 import type { PersonaId } from '@/types/domain'
 
 interface NavItem {
@@ -45,25 +51,29 @@ interface NavItem {
 
 function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
   const { data, state } = useDemoStore()
-  if (persona === 'agent') {
+  if (persona === 'partner') {
     const sent = data.invites.filter(
       (i) =>
-        i.agentId === state.agentId &&
+        i.partnerId === state.partnerId &&
         (i.status === 'sent' || i.status === 'opened'),
     ).length
     return {
-      section: 'Agent portal',
+      section: 'Referral Partner portal',
       items: [
-        { to: '/agent', label: 'Overview', icon: LayoutDashboard, end: true },
-        { to: '/agent/lookup', label: 'Companies House lookup', icon: Search },
-        { to: '/agent/invites', label: 'Invites', icon: Send, count: sent },
+        { to: '/partner', label: 'Overview', icon: LayoutDashboard, end: true },
+        {
+          to: '/partner/lookup',
+          label: 'Companies House lookup',
+          icon: Search,
+        },
+        { to: '/partner/invites', label: 'Invites', icon: Send, count: sent },
       ],
     }
   }
   if (persona === 'reviewer') {
+    const acsp = data.acsps.find((a) => a.id === state.acspId) ?? data.acsps[0]
     const awaiting = data.cases.filter(
-      (c) =>
-        c.acspId === PRIMARY_ACSP_ID && !c.inHouse && c.status === 'in_review',
+      (c) => c.acspId === acsp.id && c.status === 'in_review',
     ).length
     const tasks = data.corrections.filter(
       (t) => t.status !== 'register_updated',
@@ -84,38 +94,70 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
           count: tasks,
         },
         { to: '/records', label: 'Records', icon: Archive },
+        { to: '/acsp/billing', label: 'Billing', icon: Receipt },
         { to: '/rules', label: 'Rules', icon: ListChecks },
       ],
     }
   }
-  const pendingApproval = data.ruleSets.filter(
-    (v) => v.status === 'pending_approval',
-  ).length
-  if (persona === 'admin2')
+  const pendingApprovals =
+    data.approvals.filter((a) => a.status === 'pending').length +
+    data.ruleSets.filter((v) => v.status === 'pending_approval').length
+  if (persona === 'superAdmin')
     return {
-      section: 'Approvals',
+      section: 'Super Administrator',
       items: [
+        {
+          to: '/super',
+          label: 'Approvals',
+          icon: UserCheck,
+          end: true,
+          count: pendingApprovals,
+        },
+        { to: '/admin/fees', label: 'Fees and plans', icon: Coins },
+        {
+          to: '/admin/commissions',
+          label: 'Referral commissions',
+          icon: Handshake,
+        },
         {
           to: '/rules',
           label: 'Rules',
           icon: ListChecks,
-          count: pendingApproval,
+          count: data.ruleSets.filter(
+            (v) => v.status !== 'current' && v.status !== 'superseded',
+          ).length,
         },
+        { to: '/admin/audit', label: 'Audit trail', icon: Link2 },
       ],
     }
   return {
-    section: 'Administration',
+    section: 'Platform administration',
     items: [
       { to: '/admin', label: 'Operations', icon: Gauge, end: true },
-      { to: '/admin/compliance', label: 'Compliance', icon: ShieldCheck },
       {
-        to: '/rules',
-        label: 'Rules',
-        icon: ListChecks,
-        count: data.ruleSets.filter((v) => v.status === 'draft').length,
+        to: '/admin/approvals',
+        label: 'Approvals',
+        icon: UserCheck,
+        count: data.applications.filter((a) => a.status === 'pending_approval')
+          .length,
       },
+      {
+        to: '/admin/matching',
+        label: 'Matching and allocation',
+        icon: GitMerge,
+      },
+      { to: '/admin/monitoring', label: 'ACSP monitoring', icon: Radar },
+      { to: '/admin/fees', label: 'Fees and plans', icon: Coins },
+      {
+        to: '/admin/commissions',
+        label: 'Referral commissions',
+        icon: Handshake,
+      },
+      { to: '/admin/compliance', label: 'Compliance', icon: ShieldCheck },
+      { to: '/rules', label: 'Rules', icon: ListChecks },
       { to: '/admin/audit', label: 'Audit trail', icon: Link2 },
-      { to: '/admin/retention', label: 'Retention', icon: Hourglass },
+      { to: '/admin/storage', label: 'Storage and retention', icon: Database },
+      { to: '/admin/retention', label: 'Retention holds', icon: Hourglass },
       { to: '/admin/users', label: 'Users and roles', icon: Users },
       { to: '/admin/white-label', label: 'White label', icon: Palette },
     ],
@@ -123,21 +165,19 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
 }
 
 function OrgSwitcher({ persona }: { persona: PersonaId }) {
-  const { data, state, setAgent } = useDemoStore()
-  if (persona === 'agent') {
-    const agent = getAgent(data, state.agentId)!
+  const { data, state, setPartner, setAcsp } = useDemoStore()
+  if (persona === 'partner') {
+    const partner = getPartner(data, state.partnerId)!
     return (
       <DropdownMenu>
         <DropdownMenuTrigger className="flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-line bg-white p-2.5 text-left transition-colors duration-150 hover:border-silver">
-          <CompanyMark name={agent.name} size={38} />
+          <CompanyMark name={partner.name} size={38} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[0.9375rem] font-medium text-ink">
-              {agent.name}
+              {partner.name}
             </span>
             <span className="block truncate text-[0.8125rem] text-slate">
-              {agent.hasAcspStatus
-                ? 'Agent with ACSP status'
-                : 'Agent without ACSP status'}
+              Referral Partner · {partner.country}
             </span>
           </span>
           <ChevronsUpDown
@@ -147,12 +187,12 @@ function OrgSwitcher({ persona }: { persona: PersonaId }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-72">
           <DropdownMenuLabel className="text-sm text-slate">
-            Switch organisation
+            Switch Referral Partner
           </DropdownMenuLabel>
-          {data.agents.map((a) => (
+          {data.partners.map((a) => (
             <DropdownMenuItem
               key={a.id}
-              onSelect={() => setAgent(a.id)}
+              onSelect={() => setPartner(a.id)}
               className="gap-3 py-2"
             >
               <CompanyMark name={a.name} size={30} />
@@ -161,7 +201,8 @@ function OrgSwitcher({ persona }: { persona: PersonaId }) {
                   {a.name}
                 </span>
                 <span className="block text-[0.8125rem] text-slate">
-                  {a.hasAcspStatus ? 'With ACSP status' : 'Without ACSP status'}
+                  {a.kind} · {a.country}
+                  {a.alsoAcspId ? ' · also an ACSP' : ''}
                 </span>
               </span>
             </DropdownMenuItem>
@@ -170,24 +211,63 @@ function OrgSwitcher({ persona }: { persona: PersonaId }) {
       </DropdownMenu>
     )
   }
-  const acsp = getAcsp(data, PRIMARY_ACSP_ID)!
-  const admin = persona === 'admin' || persona === 'admin2'
-  const name = admin ? 'Evidence One' : acsp.name
-  const sub =
-    persona === 'admin2'
-      ? 'Second approver'
-      : admin
-        ? 'Platform administration'
-        : `ACSP · ${acsp.acspNumber}`
+  if (persona === 'reviewer') {
+    const acsp = getAcsp(data, state.acspId) ?? data.acsps[0]
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-line bg-white p-2.5 text-left transition-colors duration-150 hover:border-silver">
+          <CompanyMark name={acsp.name} size={38} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[0.9375rem] font-medium text-ink">
+              {acsp.name}
+            </span>
+            <span className="block truncate text-[0.8125rem] text-slate">
+              ACSP · {acsp.acspNumber}
+            </span>
+          </span>
+          <ChevronsUpDown
+            className="size-4 shrink-0 text-slate"
+            aria-hidden="true"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-80">
+          <DropdownMenuLabel className="text-sm text-slate">
+            Act as ACSP
+          </DropdownMenuLabel>
+          {data.acsps
+            .filter((a) => a.approval === 'approved')
+            .map((a) => (
+              <DropdownMenuItem
+                key={a.id}
+                onSelect={() => setAcsp(a.id)}
+                className="gap-3 py-2"
+              >
+                <CompanyMark name={a.name} size={30} />
+                <span>
+                  <span className="block text-[0.9375rem] font-medium text-ink">
+                    {a.name}
+                  </span>
+                  <span className="block text-[0.8125rem] text-slate">
+                    {a.kind}
+                    {a.alsoPartnerId ? ' · also a Referral Partner' : ''}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+  const superAdmin = persona === 'superAdmin'
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-line bg-white p-2.5">
-      <CompanyMark name={admin ? 'Evidence One' : acsp.name} size={38} />
+      <CompanyMark name="Evidence One" size={38} />
       <span className="min-w-0">
         <span className="block truncate text-[0.9375rem] font-medium text-ink">
-          {name}
+          Evidence One
         </span>
         <span className="block truncate text-[0.8125rem] text-slate">
-          {sub}
+          {superAdmin ? 'Super Administrator' : 'Platform Administrator'}
         </span>
       </span>
     </div>
@@ -202,27 +282,31 @@ function Sidebar({
   onNavigate?: () => void
 }) {
   const { section, items } = useNav(persona)
+  const { data, state, setSeat } = useDemoStore()
+  const acsp = getAcsp(data, state.acspId) ?? data.acsps[0]
+  const partner = getPartner(data, state.partnerId)
+  const seat = SUPER_ADMINS.find((x) => x.seat === state.superAdminSeat)!
   const user =
-    persona === 'agent'
-      ? { seed: 'agent-contact', name: 'Rachel Fenwick', role: 'Partner' }
+    persona === 'partner'
+      ? {
+          seed: `partner-${state.partnerId}`,
+          name: partner?.contactName ?? 'Referral Partner',
+          role: 'Partner Administrator',
+        }
       : persona === 'reviewer'
-        ? { seed: 'rev-marsh', name: 'Eleanor Marsh', role: 'ACSP reviewer' }
-        : persona === 'admin2'
-          ? {
-              seed: 'admin-2',
-              name: 'Daniel Achebe',
-              role: 'Compliance Administrator, second approver',
-            }
+        ? {
+            seed: acsp.reviewers[0].id,
+            name: acsp.reviewers[0].name,
+            role: acsp.reviewers[0].role,
+          }
+        : persona === 'superAdmin'
+          ? { seed: `super-${seat.seat}`, name: seat.name, role: seat.role }
           : {
-              seed: 'admin-1',
-              name: 'Helen Carver',
-              role: 'Super Administrator',
+              seed: 'platform-admin',
+              name: 'Marcus Adeyemi',
+              role: 'Platform Administrator',
             }
-  const { data, state } = useDemoStore()
-  const userName =
-    persona === 'agent'
-      ? (getAgent(data, state.agentId)?.contactName ?? user.name)
-      : user.name
+  const userName = user.name
 
   return (
     <div className="flex h-full flex-col gap-5 p-4 short:gap-3 short:py-3">
@@ -293,13 +377,45 @@ function Sidebar({
       </nav>
 
       <div className="shrink-0 space-y-3 short:space-y-2">
-        {persona === 'admin' && (
+        {persona === 'platformAdmin' && (
           <NotificationsPreview onNavigate={onNavigate} />
+        )}
+        {persona === 'superAdmin' && (
+          <div className="rounded-2xl border border-line bg-white p-3">
+            <p className="font-mono text-[0.75rem] tracking-[0.16em] text-slate uppercase">
+              Acting as
+            </p>
+            <div
+              className="mt-2 grid grid-cols-2 gap-1"
+              role="group"
+              aria-label="Super Administrator seat"
+            >
+              {SUPER_ADMINS.map((x) => (
+                <button
+                  key={x.seat}
+                  type="button"
+                  aria-pressed={state.superAdminSeat === x.seat}
+                  onClick={() => setSeat(x.seat)}
+                  className={cn(
+                    'cursor-pointer rounded-lg px-2 py-2 text-left text-[0.8125rem] leading-tight',
+                    state.superAdminSeat === x.seat
+                      ? 'bg-ink text-paper'
+                      : 'bg-mist text-ink hover:bg-ink/[0.08]',
+                  )}
+                >
+                  <span className="block font-medium">{x.name}</span>
+                  <span className="block opacity-75">
+                    {x.seat === 1 ? 'Proposes' : 'Second approver'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         <div
           className={cn(
             'rounded-2xl bg-[linear-gradient(140deg,#16181b,#2b2f36)] p-4 text-paper',
-            persona === 'admin' && 'hidden',
+            persona === 'platformAdmin' && 'hidden',
             'short:hidden',
           )}
         >

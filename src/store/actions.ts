@@ -75,7 +75,7 @@ export const exampleVerificationReference = (caseId: string) =>
 export function connectCompany(
   data: DemoData,
   number: string,
-  agentId: string,
+  partnerId: string,
   actor: string,
 ): ActionResult {
   const now = new Date().toISOString()
@@ -86,7 +86,7 @@ export function connectCompany(
       ...data,
       companies: data.companies.map((c) =>
         c.number === number
-          ? { ...c, lodgedByAgentId: agentId, connectedAt: now }
+          ? { ...c, lodgedByPartnerId: partnerId, connectedAt: now }
           : c,
       ),
     },
@@ -105,7 +105,7 @@ export function connectCompany(
 export interface SendInvitesInput {
   companyNumber: string
   personIds: string[]
-  agentId: string
+  partnerId: string
   actor: string
   payment: PaymentMethod
   review: 'referred' | 'in_house'
@@ -116,7 +116,7 @@ export function sendInvites(
   input: SendInvitesInput,
 ): ActionResult & { inviteIds: string[] } {
   const now = new Date().toISOString()
-  const agent = data.agents.find((a) => a.id === input.agentId)
+  const agent = data.partners.find((a) => a.id === input.partnerId)
   const invites: Invite[] = []
   const cases: VerificationCase[] = []
   const audit: AuditInput[] = []
@@ -142,7 +142,7 @@ export function sendInvites(
       id: inviteId,
       personId,
       companyNumber: input.companyNumber,
-      agentId: input.agentId,
+      partnerId: input.partnerId,
       sentAt: now,
       paymentCode: code,
       status: 'sent',
@@ -154,9 +154,9 @@ export function sendInvites(
       route: 'A',
       personId,
       companyNumber: input.companyNumber,
-      origin: 'agent_invite',
-      agentId: input.agentId,
-      acspId: inHouse ? input.agentId : PRIMARY_ACSP_ID,
+      origin: 'partner_invite',
+      partnerId: input.partnerId,
+      acspId: inHouse ? input.partnerId : PRIMARY_ACSP_ID,
       inHouse,
       option: 1,
       status: 'invited',
