@@ -155,7 +155,9 @@ export function planChecks(
   if (doc && new Date(doc.expiresOn).getTime() < now) {
     const months = Math.max(
       0,
-      Math.floor((now - new Date(doc.expiresOn).getTime()) / (30.44 * 86400000)),
+      Math.floor(
+        (now - new Date(doc.expiresOn).getTime()) / (30.44 * 86400000),
+      ),
     )
     expiry = {
       on: doc.expiresOn,
@@ -224,7 +226,11 @@ export function planChecks(
     },
   ]
   return {
-    outcome: expiredBeyond ? 'expired' : otherDocument ? 'other_document' : 'clear',
+    outcome: expiredBeyond
+      ? 'expired'
+      : otherDocument
+        ? 'other_document'
+        : 'clear',
     rows,
     differences,
     expiry,

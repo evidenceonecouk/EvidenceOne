@@ -103,7 +103,9 @@ export function PhoneHandoff({
           ) : (
             <Smartphone aria-hidden="true" />
           )}
-          {receiving ? 'Receiving from your phone' : 'Simulate return to this case'}
+          {receiving
+            ? 'Receiving from your phone'
+            : 'Simulate return to this case'}
         </Button>
       </div>
       <Button variant="link" className="mt-2 px-0" onClick={onChoose}>
