@@ -794,6 +794,10 @@ export interface OnboardingApplication {
   answers: Record<string, Record<string, string | number | boolean | string[]>>
   decidedBy?: string
   decidedAt?: ISODate
+  /** Reason given when an application is rejected. */
+  decisionNote?: string
+  /** The ACSP or Referral Partner created when the application was approved. */
+  createdOrgId?: string
 }
 
 /* ACSP status monitoring. Companies House publishes files; there is no API. */

@@ -54,11 +54,13 @@ export function liftHold(
   }
 }
 
+/** Records an independent check of one hash chain: the platform chain, or one ACSP's chain. */
 export function recordChainCheck(
   data: DemoData,
   entries: number,
   ok: boolean,
   actor: string,
+  chainLabel = 'platform chain',
 ): ActionResult {
   return {
     data,
@@ -69,8 +71,8 @@ export function recordChainCheck(
         actorType: 'system',
         action: 'audit.chain_verified',
         detail: ok
-          ? `Independent check of ${entries} entries. Every hash matches; the chain is intact.`
-          : `Independent check of ${entries} entries found a break.`,
+          ? `Independent check of the ${chainLabel}: ${entries} entries. Every hash matches; the chain is intact.`
+          : `Independent check of the ${chainLabel}: ${entries} entries found a break.`,
       },
     ],
   }
