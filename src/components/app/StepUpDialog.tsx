@@ -1,5 +1,6 @@
 import { Fingerprint, KeyRound, Loader2, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
+import { PendingDecision } from '@/components/PendingDecision'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -11,9 +12,10 @@ import {
 import { newStepUpRef } from '@/store/actions'
 
 /**
-  Step-up authentication before approve, decline, export and starting a
-  submission. Passkey or authenticator app only; there is no SMS option.
-  Both are simulated in the demo.
+  Step-up authentication ("Confirm it's you") before approve, decline, export,
+  starting a submission, granting access and the Super Administrator's changes.
+  Passkey or authenticator code only. SMS is never offered for step-up (H2,
+  Pending your decision, recommended because of SIM swap). Both are simulated.
 */
 export function StepUpDialog({
   open,
@@ -114,6 +116,12 @@ export function StepUpDialog({
             </div>
             <p className="mt-1.5 text-sm text-slate">
               Any six digits work in this demonstration.
+            </p>
+          </div>
+          <div className="rounded-xl bg-mist px-4 py-3">
+            <PendingDecision code="H2" />
+            <p className="mt-2 text-[0.9375rem] text-graphite">
+              SMS is never used for step-up. Recommended because of SIM swap.
             </p>
           </div>
         </div>

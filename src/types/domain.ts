@@ -755,9 +755,22 @@ export type ApprovalKind =
   | 'referral_commissions'
   | 'disclosure_text'
 
+/** The value a change would apply on approval. Absent on older records; the action then reads the "to" text. */
+export type ApprovalPayload =
+  | { kind: 'platform_fee'; platformFee: number }
+  | {
+      kind: 'subscription_plan'
+      structure: 'monthly_only' | 'monthly_with_cases'
+      price: number | null
+      casesIncluded: number | null
+    }
+  | { kind: 'disclosure_text'; version: string }
+  | { kind: 'referral_commissions'; value: boolean }
+
 export interface ApprovalRequest {
   id: string
   kind: ApprovalKind
+  payload?: ApprovalPayload
   summary: string
   from: string
   to: string
