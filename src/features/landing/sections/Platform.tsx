@@ -257,7 +257,7 @@ function IntelligencePanel() {
     {
       title: 'First name spelt differently on the register',
       detail:
-        'The details given read AIDAN and the register holds AIDEN. Normalisation does not remove a spelling difference, so REG-11 flags it for the reviewer's decision.',
+        'The details given read AIDAN and the register holds AIDEN. Normalisation does not remove a spelling difference, so REG-11 flags it for a reviewer decision.',
       source: 'Register comparison result · explains REG-11',
     },
   ]
