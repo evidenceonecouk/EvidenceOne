@@ -2,7 +2,7 @@ import { portraitFor } from '@/data/portraits'
 import type { IdDocumentType, Person } from '@/types/domain'
 
 /*
-  What is printed on the specimen document shown in the app's capture screens.
+  What is printed on the specimen document shown in the browser capture screens.
   Built from the fictional person's seed data; when they choose a document type
   they have no seed record for, the details are synthesised from their profile.
 */

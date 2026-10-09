@@ -2,6 +2,7 @@ import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { paramDefs, RULE_SET_NAME, settingDefs } from '@/data/rules'
 import type { AuditInput } from '@/lib/audit'
 import { formatDate, formatMoney, fullName } from '@/lib/format'
+import { computeRegisterDifferences, evidenceLabel } from '@/lib/identityChecks'
 import { suggestAcsps } from '@/lib/matching'
 import { currentRuleSet, draftRuleSet, evaluateCase } from '@/lib/rules'
 import { criteriaForPerson } from './partnerSelectors'
@@ -406,8 +407,6 @@ export function requestOption2(
     attempts_used: 'All attempts at the digital checks were used.',
     unsupported_document:
       'The certified identity provider cannot support the document.',
-    no_chip_phone:
-      'The phone cannot read the passport chip and there is no photocard driving licence. Needs the reviewer’s agreement.',
   }[reason]
   return {
     data: patchCase(data, caseId, (c) => ({
@@ -425,7 +424,7 @@ export function requestOption2(
         actorType: 'system',
         action: 'rules.option2',
         caseId,
-        detail: `${reason === 'no_chip_phone' ? 'OPT-02' : 'IDVT-08'}: ${why} Option 2 person check offered.`,
+        detail: `${reason === 'attempts_used' ? 'IDVT-08' : 'OPT-02'}: ${why} Option 2 person check offered. Needs the reviewer’s agreement.`,
       },
       {
         at: iso(1000),
@@ -459,25 +458,25 @@ export function submitForReview(
   if (!vc || !person || !entry) return { data, audit: [] }
   const now = Date.now()
   const iso = (offset = 0) => new Date(now + offset).toISOString()
+  const rs = currentRuleSet(data)
   const document =
     person.document && person.document.type === input.documentType
       ? person.document
       : syntheticDocument(person, input.documentType)
   const score = 95 + ((person.id.length * 7) % 40) / 10
   const ref = `IDV-7F31-${String(now).slice(-4)}`
-  const browser = !!vc.journey?.noChipPhone
+  const acsp = data.acsps.find((a) => a.id === vc.acspId)
+  const pepOn = !!acsp?.profile.pepScreening
+  const differences = computeRegisterDifferences(person, document, entry)
+  const flagged = differences.length > 0
+
   const evidence: EvidenceItem[] = [
     {
       id: `ev-${vc.id}-1`,
       kind: 'identity_document',
-      label: browser
-        ? `${documentLabel[input.documentType]}, captured in the browser`
-        : documentLabel[input.documentType],
+      label: evidenceLabel(document, vc.journey?.captureRoute),
       uploadedAt: iso(-6 * 60000),
-      note:
-        input.documentType === 'passport' && !browser
-          ? 'Chip signature validated by the certified identity provider.'
-          : 'Security features validated by the certified identity provider.',
+      note: 'Security features validated by the certified identity provider.',
     },
     {
       id: `ev-${vc.id}-2`,
@@ -486,8 +485,14 @@ export function submitForReview(
       uploadedAt: iso(-4 * 60000),
       note: 'Raw sample held until completion, then deleted.',
     },
+    ...vc.evidence.filter(
+      (e) => e.kind === 'address_evidence' || e.kind === 'option2_document',
+    ),
   ]
-  if (input.evidenceUploaded)
+  if (
+    input.evidenceUploaded &&
+    !evidence.some((e) => e.kind === 'address_evidence')
+  )
     evidence.push({
       id: `ev-${vc.id}-3`,
       kind: 'address_evidence',
@@ -504,68 +509,84 @@ export function submitForReview(
   )
   const draft = patchCase({ ...data, people }, vc.id, (c) => ({
     ...c,
+    // A register difference is flagged, never halted (G2-10).
     status: 'in_review',
-    browserCapture: browser,
     submittedForReviewAt: iso(),
-    slaDueAt: iso(currentRuleSet(data).params.review_target_hours * HOUR),
+    slaDueAt: iso(rs.params.review_target_hours * HOUR),
     idvt: {
-      nfcChipRead:
-        input.documentType === 'passport' && !browser
-          ? 'pass'
-          : 'not_applicable',
       documentAuthenticity: 'pass',
       liveness: 'pass',
       faceMatch: 'pass',
       faceMatchScore: Math.round(score * 10) / 10,
-      pepSanctions: 'pass',
-      pepSanctionsDetail: 'No match on PEP, sanctions or adverse media lists.',
+      pepSanctions: pepOn ? 'pass' : 'not_applicable',
+      pepSanctionsDetail: pepOn
+        ? 'No match on PEP, sanctions or adverse media lists.'
+        : 'Screening is not switched on for this ACSP.',
       completedAt: iso(-3 * 60000),
       providerReference: ref,
-      attempts: 1,
+      attempts: (vc.journey?.checkAttempts ?? 0) + 1,
+      registerComparison: flagged ? 'refer' : 'pass',
     },
     evidence,
   }))
 
-  // Rules run deterministically; AI only explains the comparison and checks the supporting evidence.
+  // Rules run deterministically; the Mandatory decision comes from the rules engine.
   const updated = draft.cases.find((c) => c.id === vc.id)!
   const results = evaluateCase(draft, updated, now)
-  const halt = results.find((r) => r.outcome === 'halt')
-  const observations: AiObservation[] = [
-    halt
-      ? {
-          id: `o-${vc.id}-m`,
-          step: 'register',
-          ruleId: halt.ruleId,
-          severity: 'mismatch',
-          title: 'A detail differs from the Companies House register',
-          detail: `${halt.title} The case is halted and a register correction is raised in Route B. It resumes automatically once the register matches.`,
-          source: 'Register comparison result',
-        }
-      : {
+  const regRuleIds = results
+    .filter(
+      (r) =>
+        r.ruleId.startsWith('REG-1') &&
+        (r.outcome === 'mandatory' || r.outcome === 'flag'),
+    )
+    .map((r) => r.ruleId)
+  const ruleText = regRuleIds.length
+    ? regRuleIds.join(', ')
+    : differences.map((d) => d.ruleId).join(', ')
+
+  // AI only explains the comparison and checks supporting evidence, never the identity document.
+  const observations: AiObservation[] = flagged
+    ? differences.map((d, i) => ({
+        id: `o-${vc.id}-m${i}`,
+        step: 'register' as const,
+        ruleId: d.ruleId,
+        severity: 'mismatch' as const,
+        title: `${d.field} differs from the Companies House register`,
+        detail: `${d.summary}. This is flagged for your decision. It does not stop the case. You may report the difference to Companies House.`,
+        source: 'Register comparison result',
+      }))
+    : [
+        {
           id: `o-${vc.id}-1`,
           step: 'register',
           ruleId: 'REG-11',
           severity: 'info',
-          title: 'Name and date of birth agree with the register',
+          title: 'Name, date of birth and nationality agree with the register',
           detail:
-            'The identity document, the application and the Companies House register agree after normalisation.',
+            'The details on the document and the Companies House register agree after normalisation.',
           source: 'Register comparison result',
         },
-  ]
+      ]
   if (input.evidenceUploaded)
     observations.push({
       id: `o-${vc.id}-2`,
       step: 'evidence',
       ruleId: 'ADDL-11',
       severity: 'info',
-      title: 'Bank statement checked at upload',
+      title: 'Supporting document checked at upload',
       detail:
-        'The statement appears to be dated within the supporting evidence period and shows the declared name and current address.',
-      source: 'Bank statement, issue date and address (AI extraction)',
+        'The document appears to be dated within the supporting evidence period and shows the declared name and current address.',
+      source: 'Supporting document, issue date and address (AI extraction)',
     })
 
-  let next = patchCase(draft, vc.id, (c) => ({ ...c, observations }))
-  const actor = fullName(person)
+  const summary = differences.map((d) => d.summary).join('; ')
+  let next = patchCase(draft, vc.id, (c) => ({
+    ...c,
+    observations,
+    discrepancyReport: flagged
+      ? { summary, promptedAt: iso(1500) }
+      : c.discrepancyReport,
+  }))
   const audit: AuditInput[] = [
     {
       at: iso(),
@@ -573,17 +594,17 @@ export function submitForReview(
       actorType: 'system',
       action: 'idvt.result.received',
       caseId: vc.id,
-      detail: `${input.documentType === 'passport' && !browser ? 'Chip read, ' : ''}authenticity, liveness, face match ${Math.round(score * 10) / 10}%, PEP and sanctions: all passed.`,
+      detail: `Document authenticity, liveness and face match ${Math.round(score * 10) / 10}% passed in the browser. PEP and sanctions ${pepOn ? 'passed' : 'not switched on for this ACSP'}.`,
     },
     {
       at: iso(500),
       actor: 'Evidence One rules',
       actorType: 'system',
-      action: halt ? 'rules.halted' : 'rules.evaluated',
+      action: flagged ? 'rules.flagged' : 'rules.evaluated',
       caseId: vc.id,
-      detail: halt
-        ? `${halt.ruleId}: ${halt.title} Route A halted.`
-        : `Route A rules evaluated under version ${currentRuleSet(data).version}.`,
+      detail: flagged
+        ? `${ruleText}: ${summary}. Flagged for the reviewer, with a Mandatory decision. The case continues to review.`
+        : `Route A rules evaluated under rule set ${rs.version}.`,
     },
     {
       at: iso(1000),
@@ -593,73 +614,26 @@ export function submitForReview(
       caseId: vc.id,
       detail: `AI observation on ${observations[0].ruleId}${input.evidenceUploaded ? ' and ADDL-11' : ''}. Advisory only.`,
     },
-    {
-      at: iso(3000),
-      actor,
-      actorType: 'person',
-      action: 'case.submitted',
-      caseId: vc.id,
-      detail: `Submitted for ACSP review. ${currentRuleSet(data).params.review_target_hours}-hour review target started.`,
-    },
   ]
-  if (halt) {
-    const row =
-      halt.ruleId === 'REG-11'
-        ? {
-            field: 'Full name',
-            from: entry.registerName,
-            to: `${person.familyName.toUpperCase()}, ${person.givenNames}`,
-          }
-        : {
-            field: 'Date of birth',
-            from: entry.registerDobMonthYear,
-            to: formatDate(document.dobOnDocument),
-          }
-    const taskId = nextRef(
-      next.corrections.map((t) => t.id),
-      'FL-2026-',
-      0,
-    )
-    next = {
-      ...patchCase(next, vc.id, (c) => ({
-        ...c,
-        status: 'halted_register_mismatch',
-        correctionTaskId: taskId,
-      })),
-      corrections: [
-        ...next.corrections,
-        {
-          id: taskId,
-          route: 'B',
-          form: 'ACSP04',
-          caseId: vc.id,
-          companyNumber: vc.companyNumber,
-          personId: vc.personId,
-          field: row.field,
-          registerValue: row.from,
-          correctValue: row.to,
-          status: 'open',
-          createdAt: iso(4000),
-        },
-      ],
-    }
+  if (flagged)
     audit.push({
-      at: iso(4000),
+      at: iso(1500),
       actor: 'Evidence One rules',
       actorType: 'system',
-      action: 'route_b.task.created',
+      action: 'discrepancy.prompted',
       caseId: vc.id,
-      detail: `Route B correction task ${taskId} (ACSP04) raised. Route A resumes once the register matches.`,
+      detail:
+        'The reviewer is prompted to report the difference to Companies House. Filing is not done by the platform.',
     })
-  }
+  audit.push({
+    at: iso(3000),
+    actor: fullName(person),
+    actorType: 'person',
+    action: 'case.submitted',
+    caseId: vc.id,
+    detail: `Submitted for ACSP review. ${rs.params.review_target_hours}-hour review target started.`,
+  })
   return { data: next, audit }
-}
-
-const documentLabel: Record<IdDocumentType, string> = {
-  passport: 'Passport, chip read in app',
-  driving_licence: 'UK photocard driving licence',
-  national_identity_card: 'National identity card',
-  biometric_residence_permit: 'Biometric residence permit',
 }
 
 function syntheticDocument(person: Person, type: IdDocumentType): IdDocument {
