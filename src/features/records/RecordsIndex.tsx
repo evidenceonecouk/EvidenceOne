@@ -9,15 +9,17 @@ import { Link } from 'react-router'
 import { HeroBanner, Page, Panel, StatTile } from '@/components/app/Page'
 import { CaseStatusChip } from '@/components/StatusChip'
 import { Avatar } from '@/components/visual/Avatar'
-import { verifyChain } from '@/lib/audit'
+import { acspChain, chainIntact } from './chain'
 import { formatShortDate, fullName, retentionExpiry } from '@/lib/format'
-import { useDemoStore } from '@/store/DemoStore'
+import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import { getCompany, getPerson } from '@/store/selectors'
 
 /** Every closed verification, with the seven-year retention date counted from the decision. */
 export function RecordsIndex() {
   const { data } = useDemoStore()
+  const { acsp } = useActingAcsp()
   const records = data.cases
+    .filter((c) => c.acspId === acsp.id)
     .filter((c) =>
       [
         'submitted',
@@ -36,14 +38,14 @@ export function RecordsIndex() {
           : undefined) ?? c.closedAt,
     }))
     .sort((a, b) => (b.decided ?? '').localeCompare(a.decided ?? ''))
-  const chainOk = verifyChain(data.audit)
+  const chainOk = chainIntact(data.audit, acsp.id)
 
   return (
     <Page>
       <HeroBanner
         kicker="Evidence One File"
         title="Verification records"
-        description="Approved, declined and abandoned verifications are all kept for seven years from the decision. Nothing is deleted automatically."
+        description={`Approved, declined and abandoned verifications held by ${acsp.name} are all kept for seven years from the decision. Nothing is deleted automatically. Each ACSP's records are kept separate.`}
         illustration={
           <div className="flex size-44 items-center justify-center rounded-[32px] bg-white/70 shadow-[0_20px_40px_-24px_rgb(22_24_27/0.35)]">
             <Archive
@@ -62,8 +64,8 @@ export function RecordsIndex() {
           tone="ink"
         />
         <StatTile
-          label="Audit entries"
-          value={data.audit.length}
+          label="Audit entries in your chain"
+          value={acspChain(data.audit, acsp.id).length}
           icon={ShieldCheck}
           tone={chainOk ? 'approve' : 'decline'}
           detail={chainOk ? 'Hash chain verified' : 'Hash chain broken'}
