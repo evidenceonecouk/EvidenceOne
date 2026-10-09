@@ -1,7 +1,7 @@
 import type { Person } from '@/types/domain'
 
 /*
-  How each fictional person is drawn in the app's camera and document mockups.
+  How each fictional person is drawn in the browser camera and document mockups.
   These are vector illustrations, never photographs of real people. `sex` is
   only used for the sex field printed on the specimen documents.
 */

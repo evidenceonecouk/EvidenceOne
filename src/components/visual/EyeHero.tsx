@@ -18,7 +18,7 @@ const R = { x: 885, y: 318 }
 const IRIS_R = 150
 
 const CHECKS = [
-  'CHIP SIGNATURE VALID',
+  'DOCUMENT AUTHENTIC',
   'LIVENESS PASSED',
   'FACE MATCH 98.6%',
   'PEP AND SANCTIONS CLEAR',
@@ -679,7 +679,7 @@ export function EyeHero({ className }: { className?: string }) {
               fontSize="13"
               letterSpacing="1"
             >
-              CHIP SIGNATURE VALID
+              DOCUMENT AUTHENTIC
             </text>
           </g>
         </g>

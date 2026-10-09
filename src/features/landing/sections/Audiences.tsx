@@ -26,18 +26,18 @@ const audiences: {
   {
     id: 'individuals',
     tab: 'Directors and PSCs',
-    title: 'Five minutes on your phone',
-    body: 'Open your invite, check the details we already hold from the register, scan your passport and take a short selfie video. Pay, then use one identity document. You can follow every step until your ACSP submits to Companies House, which emails your personal code to you.',
-    cta: 'Try the app journey',
+    title: 'In your browser, on a laptop or a phone',
+    body: 'Open your invite, check the details held on the register, choose to pay your named ACSP, then capture one identity document and a short liveness check. Follow every step until your ACSP submits to Companies House, which emails the personal code directly to you.',
+    cta: 'Try the individual journey',
     to: '/journey/EO-2026-000135/invite',
     persona: 'individual',
   },
   {
-    id: 'agents',
-    tab: 'Agents',
+    id: 'partners',
+    tab: 'Referral Partners',
     title: 'Every client company in one view',
-    body: 'Connect companies from the register, see who still needs to verify, and invite several directors at once with a pre-authorised Agent Payment Code. Agents without ACSP status refer each case to an ACSP on the platform.',
-    cta: 'Open the Agent portal',
+    body: 'Connect companies from the register, see who still needs to verify, and invite several directors at once, with an Agent Payment Code if you pay for them. You see status and check results only, never documents.',
+    cta: 'Open the Referral Partner portal',
     to: '/partner',
     persona: 'partner',
   },
@@ -107,7 +107,7 @@ export function Audiences() {
               </div>
               <div className="flex min-h-[25rem] items-center justify-center rounded-[24px] bg-[linear-gradient(140deg,#e4e7ea_0%,#c9ced3_55%,#b4bac0_100%)] p-5 sm:p-10">
                 {a.id === 'individuals' && <TrackerVisual />}
-                {a.id === 'agents' && <PartnerVisual />}
+                {a.id === 'partners' && <PartnerVisual />}
                 {a.id === 'acsps' && <QueueVisual />}
               </div>
             </TabsContent>
@@ -129,7 +129,7 @@ function VisualCard({ children }: { children: React.ReactNode }) {
 function TrackerVisual() {
   const steps = [
     ['Details confirmed against the register', true],
-    ['Passport chip read', true],
+    ['Document checked in your browser', true],
     ['Liveness and face match', true],
     ['Review by Harcourt Lane Solicitors LLP', false],
     ['Submitted to Companies House by the ACSP', false],
@@ -205,7 +205,11 @@ function QueueVisual() {
                 </span>
                 <span className="block font-mono text-[0.8125rem] text-slate">
                   {c.id} ·{' '}
-                  {c.origin === 'b2c' ? 'Direct client' : 'Referred by Agent'}
+                  {c.source === 'b2c'
+                    ? 'Direct client'
+                    : c.source === 'own_client'
+                      ? 'Own client'
+                      : 'Referred by a Referral Partner'}
                 </span>
               </span>
               <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[0.9375rem] text-ink tabular">

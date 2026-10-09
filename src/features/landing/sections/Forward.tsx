@@ -8,7 +8,6 @@ import {
   Settings,
   Users,
 } from 'lucide-react'
-import { Link } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/visual/Avatar'
@@ -66,7 +65,7 @@ function LaptopDashboard() {
             <div className="mt-3 grid grid-cols-3 gap-2">
               {[
                 ['12', 'Verifications in progress'],
-                ['8', 'Codes recorded this month'],
+                ['8', 'References recorded this month'],
                 ['15', 'Filings completed this month'],
               ].map(([n, l]) => (
                 <div key={l} className="rounded-lg border border-line p-2">
@@ -101,7 +100,7 @@ function LaptopDashboard() {
 }
 
 export function Forward() {
-  const { setPersona } = useDemoStore()
+  const { setGuided } = useDemoStore()
   return (
     <section
       aria-labelledby="forward-title"
@@ -122,14 +121,12 @@ export function Forward() {
             Less complexity. More progress.
           </p>
           <Button
-            asChild
             size="lg"
+            onClick={() => setGuided({ on: true, step: 0 })}
             className="mt-9 h-14 rounded-full bg-highlight px-9 text-lg text-ink hover:bg-[#ffcf26]"
           >
-            <Link to="/partner" onClick={() => setPersona('partner')}>
-              Get started
-              <ArrowRight aria-hidden="true" />
-            </Link>
+            Start the guided demo
+            <ArrowRight aria-hidden="true" />
           </Button>
         </div>
         <LaptopDashboard />

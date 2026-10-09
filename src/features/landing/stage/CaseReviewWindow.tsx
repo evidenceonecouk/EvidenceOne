@@ -10,6 +10,10 @@ import {
 } from 'lucide-react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
 import { Wordmark } from '@/components/brand/Wordmark'
+import { DEFAULT_BILLING_SETTINGS, splitPayment } from '@/lib/fees'
+
+const split = splitPayment(150, 'referred', DEFAULT_BILLING_SETTINGS)
+const gbp = (n: number) => `£${n.toFixed(2)}`
 
 /*
   A static, high-fidelity rendering of the ACSP case review screen for the
@@ -17,7 +21,6 @@ import { Wordmark } from '@/components/brand/Wordmark'
 */
 
 const checks = [
-  ['Passport chip read', 'Signature valid'],
   ['Document authenticity', 'Genuine'],
   ['Liveness', 'Live person'],
   ['Face match', '97.1%'],
@@ -28,21 +31,18 @@ const rows = [
   {
     field: 'Full name',
     applicant: 'Aidan Patrick Corrigan',
-    chip: 'AIDAN PATRICK CORRIGAN',
     register: 'CORRIGAN, Aiden Patrick',
     mismatch: true,
   },
   {
     field: 'Date of birth',
     applicant: '14 March 1979',
-    chip: '14 March 1979',
     register: 'March 1979',
     mismatch: false,
   },
   {
     field: 'Appointment',
     applicant: 'Director',
-    chip: 'Not shown',
     register: 'Director, 2008',
     mismatch: false,
   },
@@ -65,7 +65,7 @@ export function CaseReviewWindow() {
         <span className="size-3 rounded-full bg-[#dcdfe1]" />
         <div className="mx-auto flex h-7 w-[420px] items-center justify-center gap-1.5 rounded-md bg-paper text-[12px] text-slate ring-1 ring-line">
           <Lock className="size-3" />
-          app.evidenceone.co.uk/acsp/cases/EO-2026-000127
+          evidenceone.co.uk/acsp/cases/EO-2026-000127
         </div>
         <span className="w-[52px]" />
       </div>
@@ -124,12 +124,12 @@ export function CaseReviewWindow() {
             </h3>
             <span className="inline-flex items-center gap-1 rounded-full border border-info/25 bg-info-wash px-2 py-0.5 text-[12px] font-medium text-info">
               <CirclePause className="size-3.5" />
-              Paused: register mismatch
+              Flagged: register difference
             </span>
           </div>
           <p className="mt-1 text-[13px] text-slate">
             Director · CORRIGAN MARINE SERVICES LTD · 99630741 · Referred by
-            Belgrave Family Office
+            Meridian Gulf Corporate Services
           </p>
 
           <div className="mt-5 grid grid-cols-[1fr_250px] gap-4">
@@ -141,19 +141,13 @@ export function CaseReviewWindow() {
                     Register comparison
                   </span>
                   <span className="font-mono text-[10px] tracking-[0.1em] text-slate uppercase">
-                    Exact match required
+                    Differences are flagged
                   </span>
                 </header>
                 <table className="w-full text-left text-[12px]">
                   <thead className="text-slate">
                     <tr>
-                      {[
-                        'Field',
-                        'Applicant',
-                        'Passport chip',
-                        'Register',
-                        '',
-                      ].map((h) => (
+                      {['Field', 'Applicant', 'Register', ''].map((h) => (
                         <th key={h} className="px-3 py-2 font-normal">
                           {h}
                         </th>
@@ -168,9 +162,6 @@ export function CaseReviewWindow() {
                       >
                         <td className="px-3 py-2.5 font-medium">{r.field}</td>
                         <td className="px-3 py-2.5">{r.applicant}</td>
-                        <td className="px-3 py-2.5 font-mono text-[10.5px] leading-tight">
-                          {r.chip}
-                        </td>
                         <td className="px-3 py-2.5">
                           {r.mismatch ? (
                             <>
@@ -188,7 +179,7 @@ export function CaseReviewWindow() {
                           {r.mismatch ? (
                             <span className="inline-flex items-center gap-1 font-medium text-info">
                               <FileWarning className="size-3.5" />
-                              Mismatch
+                              Flagged
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-approve">
@@ -207,18 +198,20 @@ export function CaseReviewWindow() {
               <section className="rounded-xl border border-line bg-[#f7f8f8] p-4">
                 <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.12em] text-slate uppercase">
                   <Sparkles className="size-3.5" />
-                  Evidence One Intelligence · Advisory only
+                  AI observation. Advisory only. · Model tag: eo-advisory
                 </p>
                 <p className="mt-2 text-[14px] font-medium">
-                  Name does not match the Companies House register
+                  First name differs from the Companies House register
                 </p>
                 <p className="mt-1 text-[12.5px] leading-relaxed text-graphite">
-                  The passport chip reads AIDAN. The register holds AIDEN.
-                  Identity details must match the register exactly, so this
-                  verification is paused until the register is corrected.
+                  The details given read AIDAN. The register holds AIDEN. The
+                  difference is flagged for your decision, not halted. Record a
+                  decision and a reason, then choose whether to report it to
+                  Companies House.
                 </p>
                 <p className="mt-2 text-[11px] text-slate">
-                  Source: passport chip data, Companies House officer record
+                  Source: confirmed details, Companies House officer record ·
+                  REG-11
                 </p>
               </section>
 
@@ -229,11 +222,11 @@ export function CaseReviewWindow() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-medium">
-                    Correction task FL-2026-000042 · Form ACSP04
+                    Correction task FL-2026-000042
                   </p>
                   <p className="text-[12px] text-slate">
-                    First name: Aiden to Aidan. Route A resumes once the
-                    register is updated.
+                    First name: Aiden to Aidan. A separate task if the register
+                    is wrong. It does not block your decision.
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1 text-[12px] font-medium">
@@ -288,9 +281,27 @@ export function CaseReviewWindow() {
                   </div>
                 </div>
                 <p className="mt-2.5 text-[11px] leading-snug text-slate">
-                  Approve unlocks once the register matches the identity
-                  document.
+                  Approve unlocks once the Mandatory decision on the register
+                  difference has a recorded reason.
                 </p>
+              </section>
+
+              <section className="rounded-xl border border-line p-4">
+                <p className="text-[13px] font-medium">Payment to the ACSP</p>
+                <dl className="mt-2.5 space-y-1.5 text-[12px]">
+                  <div className="flex justify-between">
+                    <dt className="text-slate">ACSP Professional Fee</dt>
+                    <dd className="tabular">{gbp(split.gross)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate">Platform Fee (referred)</dt>
+                    <dd className="tabular">{gbp(split.platformFeeGross)}</dd>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <dt>Net to the ACSP</dt>
+                    <dd className="tabular">{gbp(split.net)}</dd>
+                  </div>
+                </dl>
               </section>
             </div>
           </div>
