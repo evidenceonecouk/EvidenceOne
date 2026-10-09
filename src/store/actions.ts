@@ -1,7 +1,17 @@
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { paramDefs, RULE_SET_NAME, settingDefs } from '@/data/rules'
 import type { AuditInput } from '@/lib/audit'
-import { formatDate, formatMoney, fullName } from '@/lib/format'
+import { addDays, formatDate, formatMoney, fullName } from '@/lib/format'
+import { splitPayment } from '@/lib/fees'
+import {
+  buildClientInvoice,
+  consentRequiredBy,
+  DEMO_REFERRAL_COMMISSION,
+  nextInvoiceNumber,
+  partnerReceivesCommission,
+} from '@/lib/invoicing'
+import { suggestAcsps } from '@/lib/matching'
+import { defaultCriteria } from '@/lib/matchCriteria'
 import { currentRuleSet, draftRuleSet, evaluateCase } from '@/lib/rules'
 import type {
   AiObservation,
@@ -18,6 +28,7 @@ import type {
   Payment,
   PaymentMethod,
   Person,
+  ReferralRecord,
   RuleDecision,
   RuleSettings,
   RuleSetVersion,
@@ -271,7 +282,7 @@ export function requestAmendment(
   }))
   const registerCheck =
     field === 'Name' || field === 'Date of birth'
-      ? ' Checked early against REG-11 and REG-12: if the register is wrong, a Route B correction is raised before the verification completes.'
+      ? ' Checked early against the register: a difference is flagged to the ACSP and never stops the verification. If the register itself is wrong, a register correction (Route B) can start before the identity checks.'
       : ''
   return {
     data: {
@@ -295,21 +306,122 @@ export function requestAmendment(
   }
 }
 
-/** Payment comes after personal information and before the identity checks. */
+export interface PaymentOptions {
+  /** The referral arrangement disclosure was shown and acknowledged, or consent given, before payment. */
+  disclosure?: { acknowledgedAt: string; consentAt?: string }
+}
+
+/**
+  Payment comes after the person has instructed the named ACSP and before the
+  identity checks. The client pays the ACSP: Evidence One collects the payment as
+  the ACSP's disclosed agent, by split payment, with the ACSP as merchant of
+  record. The platform fee (referred and B2C cases only) is deducted from the
+  payment, never added on top. The client's invoice is issued in the ACSP's name.
+*/
 export function recordPayment(
   data: DemoData,
   caseId: string,
   payment: Payment,
+  options: PaymentOptions = {},
 ): ActionResult {
   const vc = data.cases.find((c) => c.id === caseId)
   if (!vc) return { data, audit: [] }
-  const now = new Date().toISOString()
+  const acsp = data.acsps.find(
+    (a) => a.id === (payment.payeeAcspId ?? vc.acspId),
+  )
+  if (!acsp) return { data, audit: [] }
+  const nowDate = new Date()
+  const now = nowDate.toISOString()
+  const name = personName(data, vc.personId)
+  const split = splitPayment(payment.amount, vc.source, data.billing.settings)
+  const paidBy =
+    payment.method === 'agent_payment_code'
+      ? (payment.payerName ?? 'Referral Partner')
+      : name
+  const invoice = buildClientInvoice({
+    id: nextInvoiceNumber(acsp, data.billing, nowDate.getFullYear()),
+    acsp,
+    caseId,
+    clientName: name,
+    gross: payment.amount,
+    vatRate: data.billing.settings.vatRate,
+    paidBy,
+    issuedAt: now,
+  })
+  const full: Payment = {
+    ...payment,
+    payeeAcspId: acsp.id,
+    paidAt: payment.paidAt ?? now,
+    providerFee: split.providerFee,
+    platformFee: split.platformFee,
+    platformFeeVat: split.platformFeeVat,
+    netPayout: split.net,
+    payoutAt: addDays(now, 2),
+    clientInvoiceId: invoice.id,
+  }
   const next = patchCase(data, caseId, (c) => ({
     ...c,
     status: c.status === 'invited' ? 'in_progress' : c.status,
-    payment,
-    journey: { ...c.journey, paid: true, payment },
+    payment: full,
+    journey: { ...c.journey, paid: true, payment: full },
   }))
+
+  // Referral commissions are Off at launch. When On, the nine-field referral record is kept.
+  const partner = data.partners.find((p) => p.id === vc.partnerId)
+  const commissionsOn = currentRuleSet(data).settings.referral_commissions
+  const record: ReferralRecord | undefined =
+    commissionsOn && partnerReceivesCommission(partner) && options.disclosure
+      ? {
+          referral_partner: partner!.name,
+          regulator: partner!.referralPayment.regulator!,
+          commission_type: DEMO_REFERRAL_COMMISSION.type,
+          commission_amount: DEMO_REFERRAL_COMMISSION.amount,
+          disclosure_version: DEMO_REFERRAL_COMMISSION.disclosureVersion,
+          disclosed_at: options.disclosure.acknowledgedAt,
+          consent_required: consentRequiredBy(
+            partner!.referralPayment.regulator,
+          ),
+          consent_at: options.disclosure.consentAt,
+          payment_at: full.paidAt,
+        }
+      : undefined
+
+  const platformLine =
+    split.platformFee > 0
+      ? ` Platform fee of ${formatMoney(split.platformFee)} plus VAT deducted automatically.`
+      : ' No platform fee: the ACSP’s own client.'
+  const audit: AuditInput[] = [
+    {
+      at: now,
+      actor: name,
+      actorType: 'person',
+      action: 'payment.completed',
+      caseId,
+      detail:
+        (payment.method === 'agent_payment_code'
+          ? `Paid by ${payment.payerName} on the client’s behalf with single-use Agent Payment Code ${payment.code}.`
+          : `Paid ${formatMoney(payment.amount)} to ${acsp.name} by card. Reference ${payment.reference}.`) +
+        ` Evidence One collected it as ${acsp.name}’s disclosed agent, with ${acsp.name} as merchant of record.${platformLine} Net ${formatMoney(split.net)} to ${acsp.name}’s own payment account.`,
+    },
+    {
+      at: now,
+      actor: 'Evidence One',
+      actorType: 'system',
+      action: 'invoice.issued',
+      caseId,
+      detail: `Invoice ${invoice.id} issued in the name of ${acsp.name} (${acsp.profile.vatNumber ? `VAT ${acsp.profile.vatNumber}` : 'not VAT registered'}), generated by Evidence One on its behalf.`,
+    },
+  ]
+  if (record)
+    audit.push({
+      at: now,
+      actor: 'Evidence One',
+      actorType: 'system',
+      action: 'referral.recorded',
+      caseId,
+      detail: `Referral record kept for ${record.referral_partner}: disclosure ${record.disclosure_version} shown on ${formatDate(record.disclosed_at!)}${record.consent_at ? ', consent given' : record.consent_required ? ', consent required' : ', acknowledged'}.`,
+    })
+
   return {
     data: {
       ...next,
@@ -318,21 +430,39 @@ export function recordPayment(
           ? { ...i, paymentCodeUsedAt: now }
           : i,
       ),
-    },
-    audit: [
-      {
-        at: now,
-        actor: personName(data, vc.personId),
-        actorType: 'person',
-        action: 'payment.completed',
-        caseId,
-        detail:
-          payment.method === 'agent_payment_code'
-            ? `Paid by ${payment.payerName} with single-use Agent Payment Code ${payment.code}.`
-            : `Paid ${formatMoney(payment.amount)} by card. Reference ${payment.reference}.`,
+      billing: {
+        ...next.billing,
+        clientInvoices: [...next.billing.clientInvoices, invoice],
       },
-    ],
+      referralRecords: record
+        ? [...next.referralRecords, record]
+        : next.referralRecords,
+    },
+    audit,
   }
+}
+
+/** The person who sent the invite is told that the register already shows this identity as verified (REG-04). */
+export function inviterNotice(
+  data: DemoData,
+  vc: VerificationCase,
+  kind: 'shown' | 'stopped',
+): AuditInput[] {
+  const invite = data.invites.find((i) => i.caseId === vc.id)
+  const partner = data.partners.find(
+    (p) => p.id === (invite?.partnerId ?? vc.partnerId),
+  )
+  if (!partner) return []
+  return [
+    {
+      at: new Date().toISOString(),
+      actor: 'Evidence One',
+      actorType: 'system',
+      action: 'notification.sent',
+      caseId: vc.id,
+      detail: `Email sent to ${partner.contactName}, ${partner.name}: the register already shows ${personName(data, vc.personId)} as verified${kind === 'stopped' ? ' and they chose to stop before payment' : '. They were told before payment and may continue or stop'}. Status only, no documents.`,
+    },
+  ]
 }
 
 /** REG-04: the register already shows the person as verified and they choose to stop. */
@@ -359,6 +489,7 @@ export function stopAlreadyVerified(
         detail:
           'Stopped before payment after REG-04: the register already shows this identity as verified. Nothing was paid. Record retained for 7 years from closure.',
       },
+      ...inviterNotice(data, vc, 'stopped'),
     ],
   }
 }
@@ -662,7 +793,7 @@ function syntheticDocument(person: Person, type: IdDocumentType): IdDocument {
 
 /* B2C: a member of the public who comes to Evidence One directly */
 
-/** The ACSP furthest below its share of this month's direct cases gets the next one. */
+/** Deprecated rota, kept only for the Admin console. B2C clients are now suggested ACSPs on clear criteria. */
 export function nextB2cAcsp(data: DemoData) {
   return [...data.acsps].sort(
     (a, b) =>
@@ -678,27 +809,39 @@ export const nextCaseId = (data: DemoData) =>
     0,
   )
 
+/**
+  A B2C client comes directly. The case starts with a provisional suggestion from
+  the register details; the person's own answers rank the suggestions again at
+  the suggest step. An administrator confirms the allocation at launch.
+*/
 export function createB2cCase(
   data: DemoData,
   personId: string,
   companyNumber: string,
-  acspId: string,
   caseId = nextCaseId(data),
 ): ActionResult & { caseId: string } {
   const now = new Date().toISOString()
-  const acsp = data.acsps.find((a) => a.id === acspId)
+  const ranked = suggestAcsps(
+    data,
+    defaultCriteria(data, personId, companyNumber),
+  )
+  const suggestedAcspIds = ranked.map((s) => s.acsp.id)
+  const acspId =
+    suggestedAcspIds[0] ??
+    data.acsps.find((a) => a.status === 'active')?.id ??
+    PRIMARY_ACSP_ID
   const vc: VerificationCase = {
     id: caseId,
     route: 'A',
     personId,
     companyNumber,
     origin: 'b2c',
+    source: 'b2c',
     acspId,
     option: 1,
     status: 'in_progress',
     createdAt: now,
     idvt: {
-      nfcChipRead: 'pending',
       documentAuthenticity: 'pending',
       liveness: 'pending',
       faceMatch: 'pending',
@@ -706,18 +849,11 @@ export function createB2cCase(
     },
     observations: [],
     evidence: [],
+    allocation: { source: 'suggested', suggestedAcspIds },
   }
   return {
     caseId,
-    data: {
-      ...data,
-      cases: [...data.cases, vc],
-      acsps: data.acsps.map((a) =>
-        a.id === acspId
-          ? { ...a, b2cAllocatedThisMonth: a.b2cAllocatedThisMonth + 1 }
-          : a,
-      ),
-    },
+    data: { ...data, cases: [...data.cases, vc] },
     audit: [
       {
         at: now,
@@ -726,14 +862,6 @@ export function createB2cCase(
         action: 'b2c.started',
         caseId,
         detail: 'Started a verification directly on Evidence One.',
-      },
-      {
-        at: now,
-        actor: 'Evidence One',
-        actorType: 'system',
-        action: 'b2c.allocated',
-        caseId,
-        detail: `Allocated to ${acsp?.name} by the allocation rota.`,
       },
     ],
   }

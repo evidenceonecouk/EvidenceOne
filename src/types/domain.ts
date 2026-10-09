@@ -560,6 +560,14 @@ export interface JourneyState {
   formerNames?: string[]
   /** Saw the "already verified" notice (REG-04) and chose to continue. */
   alreadyVerifiedAcknowledged?: boolean
+  /** The person who sent the invite was told that the register already shows this identity as verified. */
+  alreadyVerifiedNotifiedAt?: ISODate
+  /** Residence country, issuing country and languages the person gave for ACSP suggestions (B2C and platform-suggested invites). */
+  suggestionAnswers?: {
+    residenceCountry: string
+    issuingCountry: string
+    languages: string[]
+  }
   documentType?: IdDocumentType
   /** Document capture: upload from this computer, continue on the phone's browser, or direct camera on mobile. */
   captureRoute?: 'upload' | 'phone' | 'camera'
