@@ -10,38 +10,32 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Panel, PanelHeader } from '@/components/app/Page'
 import { CompletionTick } from '@/components/brand/CompletionTick'
+import { PendingDecision } from '@/components/PendingDecision'
 import { RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { AiObservationCard } from '@/components/visual/AiObservationCard'
-import { Avatar } from '@/components/visual/Avatar'
-import {
-  CardFront,
-  PassportDataPage,
-} from '@/components/visual/IdDocumentMockup'
-import { Portrait } from '@/components/visual/Portrait'
-import { portraitFor } from '@/data/portraits'
-import {
-  formatAddress,
-  formatDate,
-  formatShortDate,
-  fullName,
-} from '@/lib/format'
-import { documentFacts } from '@/lib/idDocument'
+import { formatAddress, formatDate, formatShortDate, fullName } from '@/lib/format'
 import { NORMALISATION_NOTE } from '@/lib/register'
-import { comparisonRows, documentName, type RuleResult } from '@/lib/rules'
+import {
+  comparisonRows,
+  documentName,
+  ruleSetFor,
+  type RuleResult,
+} from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { recordOption2Check } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import type {
   CaseStep,
   CheckResult,
-  EvidenceItem,
-  IdDocumentType,
   Person,
   RegisterEntry,
   Reviewer,
+  SupportingEvidenceType,
   VerificationCase,
 } from '@/types/domain'
+import { DiscrepancyPrompt } from './DiscrepancyPrompt'
+import { EvidenceThumb } from './EvidenceThumb'
 import { RuleList } from './RuleList'
 
 export interface SectionProps {
@@ -51,6 +45,8 @@ export interface SectionProps {
   results: RuleResult[]
   reviewerId: string
   decidable: boolean
+  /** PEP and sanctions screening is switched on for this ACSP (profile.pepScreening). */
+  pepScreening: boolean
 }
 
 function StepPanel({
@@ -166,6 +162,12 @@ export function RegisterSection(p: SectionProps) {
   const { data } = useDemoStore()
   const { vc, person, entry } = p
   const rows = comparisonRows(person, person.document, entry)
+  const mismatches = rows.filter((r) => r.result === 'mismatch')
+  const differences = mismatches.map((r) =>
+    r.field === 'Full name' && r.note
+      ? `${r.field}: ${r.note.replace(/\.$/, '')}`
+      : `${r.field}: ${r.document} on the document, ${r.register} on the register`,
+  )
   const task = vc.correctionTaskId
     ? data.corrections.find((t) => t.id === vc.correctionTaskId)
     : undefined
@@ -174,7 +176,7 @@ export function RegisterSection(p: SectionProps) {
       id="sec-register"
       kicker="Register"
       title="Register comparison"
-      description="What the person told us, what the document holds and what Companies House holds. Compared by rule, the same way every time."
+      description="What the person told us, what the document holds and what Companies House holds. Compared by rule, the same way every time. A difference is flagged for your decision. It never halts the case."
       step="register"
       p={p}
       actions={
@@ -188,6 +190,15 @@ export function RegisterSection(p: SectionProps) {
         ) : undefined
       }
     >
+      {mismatches.length > 0 && (
+        <DiscrepancyPrompt
+          vc={vc}
+          differences={differences}
+          fields={mismatches.map((r) => r.field)}
+          reviewerId={p.reviewerId}
+          decidable={p.decidable}
+        />
+      )}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[44rem] text-left">
           <thead className="bg-mist/50 text-[0.875rem] text-slate">
@@ -249,7 +260,7 @@ export function RegisterSection(p: SectionProps) {
                   {r.result === 'mismatch' ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-info px-2.5 py-1 text-sm font-medium whitespace-nowrap text-white">
                       <FileWarning className="size-4" aria-hidden="true" />
-                      Differs
+                      Flagged, differs
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 text-[0.9375rem] font-medium text-approve">
@@ -297,83 +308,9 @@ export function RegisterSection(p: SectionProps) {
         </table>
       </div>
       <p className="border-t border-line/70 bg-mist/40 px-5 py-3 text-[0.9375rem] text-graphite sm:px-6">
-        {NORMALISATION_NOTE} The case resumes automatically once the register
-        matches.
+        {NORMALISATION_NOTE}
       </p>
     </StepPanel>
-  )
-}
-
-function EvidenceThumb({
-  item,
-  name,
-  person,
-  docType,
-}: {
-  item: EvidenceItem
-  name: string
-  person?: Person
-  docType?: IdDocumentType
-}) {
-  // The same specimen document and illustrated face the person saw in the app
-  if (person && item.kind === 'identity_document') {
-    const facts = documentFacts(
-      person,
-      docType ?? person.document?.type ?? 'passport',
-    )
-    const look = portraitFor(person)
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-ink">
-        <div className="w-[8.25rem] overflow-hidden rounded-md shadow-[0_8px_20px_-10px_rgb(0_0_0/0.8)]">
-          {facts.type === 'passport' ? (
-            <PassportDataPage facts={facts} look={look} />
-          ) : (
-            <CardFront facts={facts} look={look} />
-          )}
-        </div>
-      </div>
-    )
-  }
-  if (person && item.kind === 'selfie')
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#2a2c30,#17181a)]">
-        <Portrait
-          look={portraitFor(person)}
-          background="#3a3d42"
-          className="h-20 rounded-[50%]"
-        />
-      </div>
-    )
-  if (item.kind === 'identity_document' || item.kind === 'option2_document')
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-ink">
-        <div className="flex h-16 w-12 flex-col justify-between rounded-md border border-white/15 bg-white/[0.06] p-1.5">
-          <span className="h-0.5 w-5 rounded bg-white/30" />
-          <span className="mx-auto grid size-4 grid-cols-2 gap-px rounded-[3px] border border-highlight/70 p-[2px]">
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-            <i className="bg-highlight/80" />
-          </span>
-          <span className="h-0.5 w-7 rounded bg-white/25" />
-        </div>
-      </div>
-    )
-  if (item.kind === 'selfie')
-    return (
-      <div className="flex h-24 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#e4e6e8,#f4f5f6)]">
-        <Avatar seed={name} name={name} size={56} />
-      </div>
-    )
-  return (
-    <div className="flex h-24 items-center justify-center rounded-xl bg-[linear-gradient(140deg,#e9ebed,#f6f7f8)]">
-      <div className="h-16 w-12 space-y-1.5 rounded-md bg-white p-2 shadow-sm">
-        <span className="block h-1.5 w-6 rounded bg-slate/50" />
-        <span className="block h-1 w-full rounded bg-line" />
-        <span className="block h-1 w-8 rounded bg-line" />
-        <span className="block h-1 w-full rounded bg-line" />
-      </div>
-    </div>
   )
 }
 

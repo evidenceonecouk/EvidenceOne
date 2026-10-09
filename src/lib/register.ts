@@ -37,7 +37,7 @@ export function normaliseName(name: string): string {
 }
 
 export const NORMALISATION_NOTE =
-  'Compared after normalisation only: case, spacing, and hyphen and apostrophe forms. Any other difference halts the case and raises a register correction in Route B.'
+  'Compared after normalisation only: case, spacing, and hyphen and apostrophe forms. Any other difference is flagged for your decision and never halts the case.'
 
 export function monthYear(iso: string): string {
   const d = new Date(iso)
