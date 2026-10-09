@@ -1,54 +1,66 @@
 import {
   ArrowRight,
   Building2,
-  FileOutput,
+  CircleCheck,
+  ExternalLink,
   RefreshCw,
-  Waypoints,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
-import { HeroBanner, MonoLabel, Page, Panel } from '@/components/app/Page'
-import { useToast } from '@/components/app/Toaster'
+import {
+  HeroBanner,
+  MonoLabel,
+  Page,
+  Panel,
+  PanelHeader,
+} from '@/components/app/Page'
 import { Stepper } from '@/components/app/Stepper'
+import { useToast } from '@/components/app/Toaster'
+import { PendingDecision } from '@/components/PendingDecision'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { formatDateTime, fullName } from '@/lib/format'
-import { fileCorrection, registerUpdated } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
+import { handOffFiling } from '@/store/acspActions'
+import { registerUpdated } from '@/store/actions'
+import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import { getCompany, getPerson } from '@/store/selectors'
 import type { CorrectionTask } from '@/types/domain'
+import { CopyRow } from './CopyRow'
+import { filingPack } from './filingPack'
+import { openFilingHandoff, WebFilingInterstitial } from './WebFilingHandoff'
 
-const STEPS = [
-  'Task opened',
-  'ACSP04 filed',
-  'Register updated',
-  'Verification resumes',
-]
+const STEPS = ['Prepared and checked', 'Filed by the ACSP', 'Register updated']
 const stepIndex: Record<CorrectionTask['status'], number> = {
-  open: 1,
+  open: 0,
   filed: 2,
-  register_updated: 4,
+  register_updated: 3,
 }
 
-/** Route B: Companies House filings, including the register corrections that unblock Route A. */
+/** Route B: Companies House filings, prepared and checked here, filed by the ACSP from its own WebFiling account. */
 export function Filings() {
   const { data } = useDemoStore()
-  const tasks = [...data.corrections].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
-  )
+  const { acsp } = useActingAcsp()
+  const tasks = data.corrections
+    .filter((t) => {
+      const vc = data.cases.find((c) => c.id === t.caseId)
+      return !vc || vc.acspId === acsp.id
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   return (
     <Page>
       <HeroBanner
         kicker="Route B · Filings"
         title="Register corrections"
-        description="When identity details do not match the register, the verification pauses and an ACSP04 correction is filed here. Once Companies House updates the register, the verification carries on."
-        illustration={
-          <div className="flex size-44 items-center justify-center rounded-[32px] bg-white/70 shadow-[0_20px_40px_-24px_rgb(22_24_27/0.35)]">
-            <Waypoints
-              className="size-20 text-ink"
-              strokeWidth={1.25}
-              aria-hidden="true"
-            />
-          </div>
+        description="Evidence One prepares and checks the filing. You file it from your own Companies House WebFiling account. A register correction does not pause a verification: Route A carries on."
+        meta={
+          <>
+            <PendingDecision code="P2" />
+            <span className="text-base text-slate">
+              How Route B is sold is open: the platform prepares and checks, the
+              ACSP files.
+            </span>
+          </>
         }
       />
       <div className="space-y-6">
@@ -57,8 +69,8 @@ export function Filings() {
         ))}
         {tasks.length === 0 && (
           <Panel className="p-10 text-center text-base text-slate">
-            No filings yet. Corrections appear here when a reviewer pauses a
-            case for a register mismatch.
+            No filings yet. A task appears here when a genuine register
+            correction is needed.
           </Panel>
         )}
       </div>
@@ -68,10 +80,21 @@ export function Filings() {
 
 function TaskCard({ task }: { task: CorrectionTask }) {
   const { data, apply } = useDemoStore()
+  const { reviewer } = useActingAcsp()
   const toast = useToast()
   const person = getPerson(data, task.personId)!
   const company = getCompany(data, task.companyNumber)!
   const name = fullName(person)
+  const { fields, checks } = filingPack(data, task)
+  const [done, setDone] = useState<string[]>([])
+  const [inline, setInline] = useState(false)
+  const toggle = (k: string) =>
+    setDone((d) => (d.includes(k) ? d.filter((x) => x !== k) : [...d, k]))
+
+  const handoff = () => {
+    apply((d) => handOffFiling(d, task.id, reviewer.id))
+    if (!openFilingHandoff(task.id)) setInline(true)
+  }
 
   return (
     <Panel className="overflow-hidden">
@@ -81,20 +104,20 @@ function TaskCard({ task }: { task: CorrectionTask }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-lg font-medium text-ink">
-            {task.id} · Form {task.form} correction
+            {task.id} · Register correction
           </p>
-          <p className="text-[0.9375rem] text-slate">
-            Opened {formatDateTime(task.createdAt)} for case {task.caseId}
+          <p className="text-base text-slate">
+            Opened {formatDateTime(task.createdAt)} from case {task.caseId}
           </p>
         </div>
         <Stepper steps={STEPS} current={stepIndex[task.status]} />
       </div>
-      <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1fr_1fr_auto]">
+      <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-2">
         <div className="flex items-center gap-3">
           <Avatar seed={task.personId} name={name} size={44} />
           <div>
             <p className="text-base font-medium text-ink">{name}</p>
-            <p className="flex items-center gap-1.5 text-[0.9375rem] text-slate">
+            <p className="flex items-center gap-1.5 text-base text-slate">
               <CompanyMark
                 name={company.name}
                 size={18}
@@ -115,56 +138,120 @@ function TaskCard({ task }: { task: CorrectionTask }) {
               {task.correctValue}
             </span>
           </div>
-          <p className="mt-2 text-[0.875rem] text-slate">
-            Correct value taken from the passport chip.
-          </p>
-        </div>
-        <div className="flex flex-col items-stretch gap-2 lg:w-64">
-          {task.status === 'open' && (
-            <Button
-              onClick={() => {
-                apply((d) => fileCorrection(d, task.id, 'rev-marsh'))
-                toast({
-                  title: 'ACSP04 filed',
-                  description:
-                    'Waiting for Companies House to update the register.',
-                })
-              }}
-            >
-              <FileOutput aria-hidden="true" />
-              File ACSP04 correction
-            </Button>
-          )}
-          {task.status === 'filed' && (
-            <>
-              <p className="text-[0.9375rem] text-graphite">
-                Filed {task.filedAt && formatDateTime(task.filedAt)}.
-              </p>
-              <Button
-                onClick={() => {
-                  apply((d) => registerUpdated(d, task.id))
-                  toast({
-                    title: 'Register updated',
-                    description:
-                      'The verification is back in the review queue.',
-                  })
-                }}
-              >
-                <RefreshCw aria-hidden="true" />
-                Simulate register update
-              </Button>
-            </>
-          )}
-          {task.status === 'register_updated' && (
-            <Button asChild variant="outline">
-              <Link to={`/acsp/cases/${task.caseId}`}>
-                <Building2 aria-hidden="true" />
-                Back to the case
-              </Link>
-            </Button>
-          )}
         </div>
       </div>
+
+      {task.status === 'open' && (
+        <div className="space-y-6 border-t border-line/80 p-5 sm:p-6">
+          <div className="overflow-hidden rounded-2xl border border-line/80">
+            <PanelHeader
+              title="Prepared filing"
+              description="Fields in the order WebFiling asks for them. Copy each one, then tick it when entered."
+            />
+            <dl className="divide-y divide-line/70">
+              {fields.map((f) => (
+                <CopyRow
+                  key={f.key}
+                  label={f.label}
+                  value={f.value}
+                  done={done.includes(f.key)}
+                  onToggle={() => toggle(f.key)}
+                />
+              ))}
+            </dl>
+          </div>
+          <div>
+            <h3 className="text-lg font-medium text-ink">Checks passed</h3>
+            <ul className="mt-2 space-y-2">
+              {checks.map((c) => (
+                <li
+                  key={c}
+                  className="flex items-start gap-2.5 text-base text-graphite"
+                >
+                  <CircleCheck
+                    className="mt-0.5 size-5 shrink-0 text-approve"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    <span className="sr-only">Passed: </span>
+                    {c}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex flex-col gap-4 rounded-2xl bg-mist/60 p-5 sm:flex-row sm:items-center">
+            <p className="flex-1 text-base leading-relaxed text-graphite">
+              You sign in to WebFiling with your own GOV.UK One Login and enter
+              the company authentication code yourself. Evidence One never sees
+              either. Filing form shown as {task.form}.{' '}
+              <PendingDecision code="P5" className="ml-1" />
+            </p>
+            <Button size="lg" onClick={handoff}>
+              Continue to Companies House WebFiling
+              <ExternalLink aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {task.status === 'filed' && (
+        <div className="flex flex-col gap-4 border-t border-line/80 p-5 sm:flex-row sm:items-center sm:p-6">
+          <div className="flex-1 text-base text-graphite">
+            <p className="flex items-center gap-2 font-medium text-ink">
+              <CircleCheck className="size-5 text-approve" aria-hidden="true" />
+              Filing accepted
+            </p>
+            <p className="mt-1">
+              Filing reference{' '}
+              <span className="font-mono text-ink">{task.filingReference}</span>
+              , recorded {task.filedAt && formatDateTime(task.filedAt)}. Waiting
+              for Companies House to update the register.
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              apply((d) => registerUpdated(d, task.id))
+              toast({
+                title: 'Register updated',
+                description:
+                  'The register now matches. Route A was not paused.',
+              })
+            }}
+          >
+            <RefreshCw aria-hidden="true" />
+            Simulate register update
+          </Button>
+        </div>
+      )}
+
+      {task.status === 'register_updated' && (
+        <div className="flex flex-col gap-4 border-t border-line/80 p-5 sm:flex-row sm:items-center sm:p-6">
+          <p className="flex-1 text-base text-graphite">
+            Filing reference{' '}
+            <span className="font-mono text-ink">{task.filingReference}</span>.
+            Register updated {task.updatedAt && formatDateTime(task.updatedAt)}.
+          </p>
+          <Button asChild variant="outline">
+            <Link to={`/acsp/cases/${task.caseId}`}>
+              <Building2 aria-hidden="true" />
+              Back to the case
+            </Link>
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={inline} onOpenChange={setInline}>
+        <DialogContent className="rounded-[24px] p-0 sm:max-w-xl">
+          <DialogTitle className="sr-only">
+            Continuing outside Evidence One
+          </DialogTitle>
+          <WebFilingInterstitial
+            taskId={task.id}
+            onDone={() => setInline(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </Panel>
   )
 }

@@ -13,10 +13,10 @@ import { CompletionTick } from '@/components/brand/CompletionTick'
 import { OutcomeChip, RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
+import { PendingDecision } from '@/components/PendingDecision'
 import { formatDateTime, fullName } from '@/lib/format'
 import { handOffCorrection, startCorrection } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
+import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import { getAcsp, getCase, getPerson } from '@/store/selectors'
 import { CopyRow } from './CopyRow'
 import { CORRECT_SERVICE, HandoffInterstitial, openHandoff } from './Handoff'
@@ -26,6 +26,7 @@ import { submissionPack } from './submissionPack'
 export function Correction() {
   const { caseId = '' } = useParams()
   const { data, apply } = useDemoStore()
+  const { reviewer } = useActingAcsp()
   const vc = getCase(data, caseId)
   const person = vc && getPerson(data, vc.personId)
   const acsp = vc && getAcsp(data, vc.acspId)
@@ -83,7 +84,7 @@ export function Correction() {
     })
     let id = ''
     apply((d) => {
-      const r = startCorrection(d, vc.id, fields, PRIMARY_REVIEWER_ID, ref)
+      const r = startCorrection(d, vc.id, fields, reviewer.id, ref)
       id = r.correctionId
       return r
     })
@@ -94,7 +95,7 @@ export function Correction() {
 
   const handoff = () => {
     if (!active) return
-    apply((d) => handOffCorrection(d, vc.id, active.id, PRIMARY_REVIEWER_ID))
+    apply((d) => handOffCorrection(d, vc.id, active.id, reviewer.id))
     if (!openHandoff(vc.id, 'correction', active.id)) setInline(true)
   }
 
@@ -104,7 +105,15 @@ export function Correction() {
       <PageHeader
         kicker={`Correct submitted details · ${vc.id}`}
         title={`Correct ${fullName(person)}’s submitted details`}
-        description={`Against verification reference ${reference}. The outcome is recorded against the original case. This is a correction, never a second submission.`}
+        description={`Against verification reference ${reference}. The outcome is recorded against the original case. This is a correction using ACSP04, never a second submission.`}
+        meta={
+          <>
+            <PendingDecision code="P5" />
+            <span className="text-base text-slate">
+              Which Companies House form ACSP04 means is not yet confirmed.
+            </span>
+          </>
+        }
       />
 
       <div className="space-y-6">
