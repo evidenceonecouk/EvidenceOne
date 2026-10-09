@@ -4,12 +4,9 @@ import {
   ChevronRight,
   Loader2,
   Search,
-  ShieldCheck,
-  Smartphone,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { AttributionNote } from '@/components/AttributionNote'
 import { MonoLabel, Page, PageHeader, Panel } from '@/components/app/Page'
 import { Stepper } from '@/components/app/Stepper'
 import { Button } from '@/components/ui/button'
@@ -18,15 +15,15 @@ import {
   liveSearch,
   type CompanySummary,
 } from '@/lib/companiesHouse'
-import { formatMoney, VERIFICATION_FEE } from '@/lib/format'
+import { LanguageSwitch } from '@/features/individual/language/LanguageSwitch'
 import { cn } from '@/lib/utils'
-import { createB2cCase, nextB2cAcsp, nextCaseId } from '@/store/actions'
+import { createB2cCase, nextCaseId } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import { personStatus, roleLabel } from '@/store/selectors'
 
-const STEPS = ['Your company', 'You', 'Your ACSP']
+const STEPS = ['Your company', 'You']
 
-/** A member of the public starts directly on the Evidence One website, then continues in the app. */
+/** A member of the public starts directly on the Evidence One website and continues in the same browser. */
 export function VerifyStart() {
   const { data, apply } = useDemoStore()
   const navigate = useNavigate()
@@ -63,14 +60,11 @@ export function VerifyStart() {
     company?.source === 'demo'
       ? data.register.filter((r) => r.companyNumber === company.number)
       : []
-  const acsp = nextB2cAcsp(data)
 
   const begin = () => {
     if (!company || !personId) return
     const caseId = nextCaseId(data)
-    apply((d) =>
-      createB2cCase(d, personId, company.number, nextB2cAcsp(d).id, caseId),
-    )
+    apply((d) => createB2cCase(d, personId, company.number, caseId))
     navigate(`/journey/${caseId}/contact`)
   }
 
@@ -79,7 +73,8 @@ export function VerifyStart() {
       <PageHeader
         kicker="Evidence One Verify"
         title="Verify your identity for Companies House"
-        description={`For directors and PSCs. One identity document, about five minutes, and a flat fee of ${formatMoney(VERIFICATION_FEE)}.`}
+        description="For directors and PSCs. One identity document and about five minutes, in your browser. We suggest ACSPs that match you, and you see each ACSP's own fee before you pay."
+        actions={<LanguageSwitch />}
       />
       <div className="mb-8">
         <Stepper steps={STEPS} current={step} />
@@ -218,62 +213,22 @@ export function VerifyStart() {
               })}
             </fieldset>
           )}
+          <p className="mt-5 text-base leading-relaxed text-graphite">
+            Next you confirm your email and mobile, then your details. After
+            that we suggest ACSPs that match your answers, and you choose whom
+            to instruct. The ACSP you instruct is responsible for your
+            verification. Evidence One is its technology provider.
+          </p>
           <div className="mt-6 flex justify-between">
             <Button variant="outline" onClick={() => setStep(0)}>
               Back
             </Button>
-            <Button disabled={!personId} onClick={() => setStep(2)}>
-              Continue
+            <Button disabled={!personId} onClick={begin}>
+              Start
               <ArrowRight aria-hidden="true" />
             </Button>
           </div>
         </Panel>
-      )}
-
-      {step === 2 && company && personId && (
-        <div className="space-y-6">
-          <Panel className="p-5 sm:p-7">
-            <MonoLabel>Allocated to</MonoLabel>
-            <div className="mt-4 flex items-start gap-4">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-ink text-paper">
-                <ShieldCheck className="size-6" aria-hidden="true" />
-              </span>
-              <div>
-                <p className="text-xl font-medium text-ink">{acsp.name}</p>
-                <p className="mt-0.5 text-[0.9375rem] text-slate">
-                  {acsp.kind} · Supervised by {acsp.supervisor} ·{' '}
-                  <span className="font-mono">{acsp.acspNumber}</span>
-                </p>
-              </div>
-            </div>
-            <p className="mt-5 text-base leading-relaxed text-graphite">
-              Evidence One shares direct clients between its ACSPs by rota.{' '}
-              {acsp.name} will review your evidence, make the decision and
-              submit it to Companies House.
-            </p>
-            <AttributionNote acspName={acsp.name} className="mt-5" />
-          </Panel>
-          <Panel className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-7">
-            <Smartphone
-              className="size-8 shrink-0 text-ink"
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            <div className="flex-1">
-              <p className="text-lg font-medium text-ink">
-                Continue in the Evidence One app
-              </p>
-              <p className="mt-1 text-base text-graphite">
-                The app reads your passport chip, which a browser cannot do. We
-                will send you a link.
-              </p>
-            </div>
-            <Button size="lg" onClick={begin}>
-              Open the app
-              <ArrowRight aria-hidden="true" />
-            </Button>
-          </Panel>
-        </div>
       )}
     </Page>
   )

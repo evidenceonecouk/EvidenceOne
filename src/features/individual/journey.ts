@@ -30,7 +30,7 @@ export interface StepSpec {
   caption: { kicker: string; title: string; body: string }
 }
 
-/* Presenter captions shown beside the phone on wide screens. */
+/* Presenter captions shown beside the browser on wide screens. */
 export const steps: StepSpec[] = [
   {
     id: 'invite',
@@ -38,7 +38,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Invite',
       title: 'An invite, pre-filled from the register',
-      body: 'The Agent sent this from the portal. It already knows the company and the role, and the fee can be covered by a single-use Agent Payment Code.',
+      body: 'It opens in the browser, on a laptop or a phone. It already knows the company and the role, and shows who invited you and which ACSP will verify you. If the register already shows you as verified, you are told first.',
     },
   },
   {
@@ -47,7 +47,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Registration',
       title: 'Email and mobile confirmed first',
-      body: 'A one-time code by email and a code by SMS, before anything else. Afterwards the person signs in with a one-time code or a passkey.',
+      body: 'A one-time code by email and a code by SMS, before anything else. Afterwards you sign in with a one-time code or a passkey.',
     },
   },
   {
@@ -56,7 +56,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Register details',
       title: 'Confirm, or ask for an amendment',
-      body: 'Details come from the Companies House register. An amendment to a name or date of birth raises the register check early, so a correction can start before the identity checks.',
+      body: 'Details come from the Companies House register and are compared with it. A difference never stops you: your ACSP sees it and decides.',
     },
   },
   {
@@ -65,7 +65,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Step 1 · Personal information',
       title: 'Name, former names, date of birth and address history',
-      body: 'Former names must be answered, even if the answer is none. The address history is information only: proof of address is asked for later only if a rule calls for it.',
+      body: 'Former names must be answered, even if the answer is none. Proof of your current address is asked for later, once, from everyone.',
     },
   },
   {
@@ -74,7 +74,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Suggested ACSPs',
       title: 'Ranked by clear criteria. Not AI.',
-      body: 'Each suggestion shows its own fee, turnaround and why it matches. The client may ask for a different ACSP once, before instructing.',
+      body: 'Each suggestion shows its own fee, turnaround and why it matches. You may ask for a different ACSP once, before instructing. An administrator confirms the allocation at launch.',
     },
   },
   {
@@ -90,9 +90,9 @@ export const steps: StepSpec[] = [
     id: 'payment',
     stage: 1,
     caption: {
-      kicker: 'Payment',
-      title: 'A flat £49, or paid by the Agent',
-      body: 'Payment comes after personal information and before the identity checks. If the register already shows the person as verified, they are told first (REG-04).',
+      kicker: 'Payment to the ACSP',
+      title: "The ACSP's own fee, collected as its agent",
+      body: "Evidence One collects the payment on the ACSP's behalf. The invoice is issued in the ACSP's name. A Referral Partner may pay with a single-use Agent Payment Code.",
     },
   },
   {
@@ -101,7 +101,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Step 2 · One identity document',
       title: 'Verify with just one document',
-      body: 'Option 1 uses a certified identity provider. If the phone cannot read the chip, a UK photocard driving licence in the browser is offered first. Option 2 is a fallback only.',
+      body: 'Passports, licences, identity cards and residence permits all go through the browser. Upload from this computer, continue on your phone, or use the camera directly on a phone. Option 2 is a fallback only.',
     },
   },
   {
@@ -109,8 +109,8 @@ export const steps: StepSpec[] = [
     stage: 2,
     caption: {
       kicker: 'Step 3 · Is the document real?',
-      title: 'Photo page scan',
-      body: 'The document is uploaded once and passed straight to the identity checks. It is never uploaded twice.',
+      title: 'Document capture',
+      body: 'The document goes straight to the certified identity provider, once. It is never uploaded twice.',
     },
   },
   {
@@ -119,7 +119,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Step 4 · Does it belong to them?',
       title: 'Liveness and face match',
-      body: 'A short selfie video proves a live person is present and matches them to the photo on the document.',
+      body: "A phone camera usually gives a clearer result, and this computer's camera is a supported choice.",
     },
   },
   {
@@ -128,7 +128,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Steps 3 and 4 · Automated checks',
       title: 'Checks run while they wait',
-      body: 'Authenticity, liveness, face match and PEP and sanctions screening by the provider. Then the rules compare the details with the register, the same way every time.',
+      body: 'Document authenticity, liveness, face match and, where the ACSP uses it, PEP and sanctions screening. The rules then compare details with the register, the same way every time.',
     },
   },
   {
@@ -145,8 +145,8 @@ export const steps: StepSpec[] = [
     stage: 2,
     caption: {
       kicker: 'Supporting evidence, only on a trigger',
-      title: 'One supporting document',
-      body: 'Asked for only when a rule calls for it (ADDL-01 to ADDL-03), and never as a second identity document. It must be dated within the period set in the rule set.',
+      title: 'We need one supporting document',
+      body: 'Asked for only when the document has expired beyond its exception or a former name is declared, and never as a second identity document.',
     },
   },
   {
@@ -155,7 +155,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Submit',
       title: 'Check, declare and submit',
-      body: 'Submitting sends the case to the ACSP’s review queue and starts the review target.',
+      body: "Submitting sends the case to the ACSP's review queue.",
     },
   },
   {
@@ -164,7 +164,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Step 5 · A person decides',
       title: 'A clear tracker, start to finish',
-      body: 'The ACSP reviews and decides, then submits to Companies House. Companies House emails the personal code directly to the person; Evidence One never receives it.',
+      body: 'The ACSP reviews and decides, then submits to Companies House. Companies House emails the personal code directly to the person. Evidence One does not receive or keep it.',
     },
   },
   {
@@ -173,7 +173,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Option 2 · Fallback only',
       title: 'A trained person check',
-      body: 'Offered only when Option 1 cannot support the person’s document. Two documents are needed, and the reviewer must hold a current training attestation.',
+      body: "Offered only when Option 1 cannot support the person's document. Two documents are needed, and the reviewer must hold a current training attestation.",
     },
   },
 ]
@@ -207,10 +207,20 @@ export function journeyTriggers(data: DemoData, vc: VerificationCase) {
   )
 }
 
+/** B2C clients, and invites where the Referral Partner let the platform suggest, see suggested ACSPs. */
+export function needsSuggestion(data: DemoData, vc: VerificationCase) {
+  return (
+    vc.origin === 'b2c' ||
+    data.invites.some(
+      (i) => i.caseId === vc.id && i.instructingAcspId === 'platform_suggest',
+    )
+  )
+}
+
 /** The ordered path for this case, skipping steps that do not apply. */
 export function pathFor(data: DemoData, vc: VerificationCase): StepId[] {
   const path: StepId[] = ['invite', 'contact', 'details', 'personal']
-  if (vc.origin === 'b2c') path.push('suggest')
+  if (needsSuggestion(data, vc)) path.push('suggest')
   path.push(
     'instruct',
     'payment',

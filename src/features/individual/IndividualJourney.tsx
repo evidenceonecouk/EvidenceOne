@@ -1,18 +1,17 @@
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { PhoneFrame } from '@/components/phone/PhoneFrame'
 import { useDemoStore } from '@/store/DemoStore'
 import { getCase, getCompany, getPerson } from '@/store/selectors'
 import { nextStep, pathFor, prevStep, stepById, type StepId } from './journey'
 import { AppBar, Lead, Screen, ScreenTitle, JourneyShell } from './JourneyShell'
+import { useJourneyView } from './JourneyView'
 import {
+  AddressStep,
   EvidenceStep,
-  PaymentStep,
   ReviewStep,
   StatusStep,
 } from './steps/FinishSteps'
 import {
   ChecksStep,
-  ChipStep,
   DocumentStep,
   OptionTwoStep,
   ScanStep,
@@ -21,8 +20,11 @@ import {
 import {
   ContactStep,
   DetailsStep,
+  InstructStep,
   InviteStep,
+  PaymentStep,
   PersonalStep,
+  SuggestStep,
 } from './steps/IntroSteps'
 import type { StepProps } from './steps/types'
 
@@ -31,13 +33,15 @@ const screens: Record<StepId, (p: StepProps) => React.ReactNode> = {
   contact: ContactStep,
   details: DetailsStep,
   personal: PersonalStep,
+  suggest: SuggestStep,
+  instruct: InstructStep,
+  payment: PaymentStep,
   document: DocumentStep,
   scan: ScanStep,
-  chip: ChipStep,
   selfie: SelfieStep,
   checks: ChecksStep,
+  address: AddressStep,
   evidence: EvidenceStep,
-  payment: PaymentStep,
   review: ReviewStep,
   status: StatusStep,
   'option-2': OptionTwoStep,
@@ -45,7 +49,16 @@ const screens: Record<StepId, (p: StepProps) => React.ReactNode> = {
 
 const OPEN = ['invited', 'in_progress']
 
-/** The individual's journey in the Evidence One app, one screen per step. */
+/** Renders the step inside the shell, so it can pass the mobile or desktop view to the step. */
+function StepHost({
+  Step,
+  ...props
+}: StepProps & { Step: (p: StepProps) => React.ReactNode }) {
+  const { mode } = useJourneyView()
+  return <Step {...props} viewMode={mode} />
+}
+
+/** The individual's journey in the browser, one screen per step, on a phone or a laptop. */
 export function IndividualJourney() {
   const { caseId = '', step = 'invite' } = useParams()
   const navigate = useNavigate()
@@ -62,19 +75,20 @@ export function IndividualJourney() {
 
   if (!vc || !person || !company || !entry || !spec) {
     return (
-      <div className="mx-auto max-w-[88rem] sm:px-6">
-        <PhoneFrame>
-          <AppBar stage={0} hideProgress />
-          <Screen>
-            <ScreenTitle>This invite link is not valid</ScreenTitle>
-            <Lead>Please ask the Agent who invited you for a new link.</Lead>
-          </Screen>
-        </PhoneFrame>
-      </div>
+      <JourneyShell caseId={caseId}>
+        <AppBar stage={0} hideProgress />
+        <Screen>
+          <ScreenTitle>This invite link is not valid</ScreenTitle>
+          <Lead>
+            Please ask the person who invited you for a new link, or start again
+            at verify.evidenceone.co.uk.
+          </Lead>
+        </Screen>
+      </JourneyShell>
     )
   }
 
-  // Once submitted, or paused for a human check, the app only shows the status tracker.
+  // Once submitted, or paused for a human check, the journey only shows the status tracker.
   const locked = !OPEN.includes(vc.status) || vc.option === 2
   if (locked && step !== 'status')
     return <Navigate to={`/journey/${caseId}/status`} replace />
@@ -96,8 +110,9 @@ export function IndividualJourney() {
         }
         hideProgress={step === 'invite'}
       />
-      <Step
+      <StepHost
         key={step}
+        Step={Step}
         vc={vc}
         person={person}
         company={company}

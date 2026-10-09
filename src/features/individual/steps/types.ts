@@ -13,4 +13,6 @@ export interface StepProps {
   entry: RegisterEntry
   next: () => void
   go: (step: StepId) => void
+  /** Mobile browser or desktop browser view. Without it the window width decides. */
+  viewMode?: 'mobile' | 'desktop'
 }
