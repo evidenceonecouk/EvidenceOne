@@ -5,6 +5,7 @@ import {
   KeyRound,
   Loader2,
   Settings2,
+  UserCheck,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -23,22 +24,29 @@ const workspaces: {
   icon: typeof Briefcase
 }[] = [
   {
-    id: 'reviewer',
-    label: 'Evidence One Compliance',
-    detail: 'Harcourt Lane Solicitors LLP · ACSP Reviewer',
-    icon: Building2,
-  },
-  {
     id: 'partner',
-    label: 'Referral Partner portal',
+    label: 'Referral Partner',
     detail: 'Fenwick & Shaw Chartered Accountants',
     icon: Briefcase,
   },
   {
+    id: 'reviewer',
+    label: 'ACSP',
+    detail: 'Harcourt Lane Solicitors LLP · ACSP Reviewer',
+    icon: Building2,
+  },
+  {
     id: 'platformAdmin',
-    label: 'Administration',
-    detail: 'Evidence One platform · Platform Administrator',
+    label: 'Platform Administrator',
+    detail: 'Evidence One platform · approvals, allocation and monitoring',
     icon: Settings2,
+  },
+  {
+    id: 'superAdmin',
+    label: 'Super Administrator',
+    detail:
+      'Evidence One platform · fees, commissions and rules, with a second approver',
+    icon: UserCheck,
   },
 ]
 
@@ -69,7 +77,7 @@ export function SignIn() {
               Sign in for professionals
             </h1>
             <p className="mt-2 text-base text-graphite">
-              For Agents, ACSP reviewers and administrators. Sign in with a
+              For Referral Partners, ACSPs and platform staff. Sign in with a
               passkey or your authenticator app.
             </p>
             <label
@@ -147,8 +155,10 @@ export function SignIn() {
               </Button>
             )}
             <p className="mt-6 border-t border-line/80 pt-4 text-[0.9375rem] text-slate">
-              Directors and PSCs sign in to the Evidence One app with a one-time
-              code or a passkey.
+              Directors and PSCs sign in in the browser with a one-time code or
+              a passkey. Evidence One never asks for, stores or uses your GOV.UK
+              One Login details. One Login is the ACSP’s own login to Companies
+              House services, never a way to sign in here.
             </p>
           </>
         ) : (
