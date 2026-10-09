@@ -9,7 +9,7 @@ export function ProviderLabel({ className }: { className?: string }) {
   return (
     <p
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] font-medium text-ink',
+        'inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-[0.875rem] font-medium text-ink',
         className,
       )}
     >
