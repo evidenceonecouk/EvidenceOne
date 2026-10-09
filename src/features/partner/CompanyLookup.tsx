@@ -118,7 +118,7 @@ export function CompanyLookup() {
                             <span className="rounded-full bg-mist px-2.5 py-1 text-graphite">
                               {lodged === state.partnerId
                                 ? 'Connected'
-                                : 'Lodged by another Agent'}
+                                : 'Lodged by another Referral Partner'}
                             </span>
                           )}
                         </div>
@@ -301,7 +301,7 @@ function ResultGroup({
                     <span className="hidden rounded-full bg-mist px-3 py-1 text-sm font-medium text-graphite sm:inline">
                       {lodged === partnerId
                         ? 'Connected'
-                        : 'Lodged by another Agent'}
+                        : 'Lodged by another Referral Partner'}
                     </span>
                   )}
                   <ChevronRight
