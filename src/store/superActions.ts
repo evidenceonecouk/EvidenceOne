@@ -252,3 +252,29 @@ export function withdrawApproval(
     ],
   }
 }
+
+/**
+  Records the step-up reference for a step taken through another store action,
+  such as proposing or publishing a rule version, so the reference is in the
+  audit trail beside the action itself.
+*/
+export function recordStepUp(
+  data: DemoData,
+  actor: string,
+  action: string,
+  detail: string,
+  stepUpRef: string,
+): ActionResult {
+  return {
+    data,
+    audit: [
+      {
+        at: new Date().toISOString(),
+        actor,
+        actorType: 'person',
+        action,
+        detail: `${detail} Step-up ${stepUpRef} confirmed.`,
+      },
+    ],
+  }
+}
