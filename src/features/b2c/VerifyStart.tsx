@@ -107,9 +107,9 @@ export function VerifyStart() {
               <button
                 type="button"
                 className="cursor-pointer text-ink underline underline-offset-4"
-                onClick={() => setQuery('Kestrel')}
+                onClick={() => setQuery('Tyne Quay')}
               >
-                Kestrel Bay Catering
+                Tyne Quay Brewing
               </button>
               , a fictional company.
             </p>

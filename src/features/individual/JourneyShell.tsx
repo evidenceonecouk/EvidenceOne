@@ -71,7 +71,7 @@ export function JourneyShell({
 
   if (mode === 'desktop')
     return (
-      <div className="mx-auto grid max-w-[92rem] items-start gap-8 px-0 py-0 sm:px-8 sm:py-7 lg:grid-cols-[19rem_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-[92rem] items-start gap-8 px-0 py-0 sm:px-8 sm:py-7 lg:grid-cols-[21rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <ViewToggle mode={mode} onChange={setMode} />
           <div className="mt-8">{caption}</div>
@@ -145,7 +145,7 @@ export function ViewToggle({
           aria-pressed={mode === m}
           onClick={() => onChange(m)}
           className={cn(
-            'flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3.5 text-[0.9375rem] font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ink',
+            'flex min-h-10 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-[0.9375rem] font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ink',
             mode === m ? 'bg-ink text-paper' : 'text-graphite hover:bg-mist',
           )}
         >
