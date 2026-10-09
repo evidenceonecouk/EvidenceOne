@@ -3,7 +3,6 @@ import {
   ArrowRight,
   BadgeCheck,
   CircleCheck,
-  CirclePause,
   CircleX,
   FileCheck2,
   FileText,
@@ -13,7 +12,6 @@ import {
   ShieldCheck,
   Sparkles,
   UserRoundCog,
-  Waypoints,
 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -33,13 +31,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
-import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
 import { DECLINE_MESSAGE } from '@/data/reasonCodes'
+import { AttributionNote } from '@/components/AttributionNote'
+import { PendingDecision } from '@/components/PendingDecision'
+import { allocationLabel, sourceDetail } from '@/lib/attribution'
 import { highlightCite } from '@/lib/cite'
 import {
   formatDate,
   formatDateTime,
-  formatMoney,
   fullName,
   shortHash,
   timeAgo,
@@ -53,7 +52,7 @@ import {
 } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { decideCase, escalateCase, reviewerName } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
+import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import {
   auditForCase,
   getPartner,
@@ -76,13 +75,15 @@ import {
   ScreeningSection,
   type SectionProps,
 } from './CaseSections'
+import { CaseMessages } from './CaseMessages'
+import { CasePayment } from './CasePayment'
 import { DecisionDialog } from './DecisionDialog'
-
-const REVIEWER = PRIMARY_REVIEWER_ID
 
 export function CaseReview() {
   const { caseId = '' } = useParams()
   const { data, apply } = useDemoStore()
+  const { acsp, reviewer: actingReviewer } = useActingAcsp()
+  const REVIEWER = actingReviewer.id
   const toast = useToast()
   const navigate = useNavigate()
   const [outcome, setOutcome] = useState<DecisionOutcome | null>(null)
@@ -96,7 +97,14 @@ export function CaseReview() {
   const person = vc && getPerson(data, vc.personId)
   const company = vc && getCompany(data, vc.companyNumber)
   const entry = vc && getEntry(data, vc)
-  const results = useMemo(() => (vc ? evaluateCase(data, vc) : []), [data, vc])
+  const pepScreening = acsp.profile.pepScreening
+  const results = useMemo(
+    () =>
+      vc
+        ? evaluateCase(data, vc).filter((r) => pepScreening || r.step !== 'aml')
+        : [],
+    [data, vc, pepScreening],
+  )
 
   if (!vc || !person || !company || !entry) {
     return (
@@ -106,8 +114,26 @@ export function CaseReview() {
     )
   }
 
+  if (vc.acspId !== acsp.id) {
+    const other = data.acsps.find((a) => a.id === vc.acspId)
+    return (
+      <Page width="narrow">
+        <h1 className="text-2xl font-medium text-ink">
+          This case is held by {other?.name ?? 'another ACSP'}
+        </h1>
+        <p className="mt-3 text-base text-graphite">
+          Each ACSP's verification records are kept separate. You can only open
+          cases held by {acsp.name}.
+        </p>
+        <Button asChild variant="outline" className="mt-6">
+          <Link to="/acsp/queue">Back to your review queue</Link>
+        </Button>
+      </Page>
+    )
+  }
+
   const name = fullName(person)
-  const agent = vc.partnerId ? getPartner(data, vc.partnerId) : undefined
+  const partner = vc.partnerId ? getPartner(data, vc.partnerId) : undefined
   const decidable = vc.status === 'in_review' || vc.status === 'info_requested'
   const outstanding = outstandingFor(results)
   const reviewer = data.acsps
@@ -120,6 +146,7 @@ export function CaseReview() {
     results,
     reviewerId: REVIEWER,
     decidable,
+    pepScreening,
   }
   const requestNote = outstanding
     .filter((o) => o.reason === 'request')
@@ -195,14 +222,20 @@ export function CaseReview() {
                 <span>·</span>
                 <span className="font-mono">{vc.id}</span>
                 <span>·</span>
-                <span>
-                  {vc.origin === 'b2c'
-                    ? 'Direct client, allocated by rota'
-                    : `Referred by ${agent?.name}`}
-                </span>
+                <span>{sourceDetail(vc, partner?.name)}</span>
                 <span>·</span>
-                <span>Route A rule set {ruleSetFor(data, vc).version}</span>
+                <span>{allocationLabel(vc)}</span>
+                <span>·</span>
+                <span>
+                  Route A, Option {vc.option}, rule set{' '}
+                  {ruleSetFor(data, vc).version}
+                </span>
               </p>
+              <AttributionNote
+                audience="acsp"
+                acspName={acsp.name}
+                className="mt-2 text-[0.9375rem]"
+              />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
@@ -235,6 +268,12 @@ export function CaseReview() {
             <ScreeningSection {...props} />
             <EvidenceSection {...props} />
             <PersonalSection {...props} />
+            <CaseMessages
+              vc={vc}
+              person={person}
+              acspName={acsp.name}
+              reviewerName={actingReviewer.name}
+            />
             <TimelinePanel caseId={vc.id} />
           </div>
 
@@ -245,22 +284,8 @@ export function CaseReview() {
               decidable={decidable}
               onDecide={setOutcome}
             />
-            {vc.payment && (
-              <Panel className="p-5 sm:p-6">
-                <MonoLabel>Payment</MonoLabel>
-                <p className="mt-3 text-base text-ink">
-                  {formatMoney(vc.payment.amount)} ·{' '}
-                  {vc.payment.method === 'agent_payment_code'
-                    ? `Paid by ${vc.payment.payerName ?? 'the Agent'}`
-                    : 'Paid by card'}
-                </p>
-                <p className="font-mono text-[0.875rem] text-slate">
-                  {vc.payment.code
-                    ? `Single-use code ${vc.payment.code}`
-                    : vc.payment.reference}
-                </p>
-              </Panel>
-            )}
+            <CasePayment vc={vc} acspName={acsp.name} />
+            <CodeReceipt vc={vc} name={name} />
           </div>
         </div>
 
@@ -316,49 +341,10 @@ function DecisionPanel({
 }) {
   const { data } = useDemoStore()
   const [escalating, setEscalating] = useState(false)
-  const task = vc.correctionTaskId
-    ? data.corrections.find((t) => t.id === vc.correctionTaskId)
-    : undefined
   const escalate = currentRuleSet(data).settings.escalate_enabled
 
   let body: ReactNode
-  if (vc.status === 'halted_register_mismatch') {
-    body = (
-      <div className="space-y-4 p-5 sm:p-6">
-        <p className="flex gap-2.5 text-[0.9375rem] leading-relaxed text-graphite">
-          <CirclePause
-            className="mt-0.5 size-5 shrink-0 text-info"
-            aria-hidden="true"
-          />
-          Route A is halted under REG-11 until the register matches the identity
-          document. The correction runs in Route B as form ACSP04, never a
-          resubmission. The case resumes automatically once the register is
-          updated.
-        </p>
-        {task && (
-          <div className="rounded-2xl border border-line bg-mist/50 p-4">
-            <p className="font-mono text-[0.8125rem] text-slate">
-              {task.id} · {task.form} ·{' '}
-              {task.status === 'open'
-                ? 'Open'
-                : 'Filed, waiting for the register'}
-            </p>
-            <p className="mt-1 text-base text-ink">
-              {task.field}:{' '}
-              <span className="font-mono">{task.registerValue}</span> to{' '}
-              <span className="font-mono">{task.correctValue}</span>
-            </p>
-          </div>
-        )}
-        <Button asChild className="w-full">
-          <Link to="/acsp/filings">
-            <Waypoints aria-hidden="true" />
-            Open the Route B task
-          </Link>
-        </Button>
-      </div>
-    )
-  } else if (vc.status === 'approved' || vc.status === 'submission_started') {
+  if (vc.status === 'approved' || vc.status === 'submission_started') {
     body = (
       <div className="space-y-4 p-5 sm:p-6">
         <p className="flex gap-2.5 text-[0.9375rem] text-graphite">
@@ -495,30 +481,18 @@ function DecisionPanel({
             </p>
           )
         )}
-        {blocked ? (
-          <div
-            className="flex items-center justify-between rounded-lg border border-line bg-mist px-4 py-2.5 text-[0.9375rem] text-slate"
-            aria-disabled="true"
-          >
-            <span className="inline-flex items-center gap-2">
-              <CircleCheck className="size-4" aria-hidden="true" />
-              Approve
-            </span>
-            <Lock
-              className="size-4"
-              aria-label="Locked until the items above are cleared"
-            />
-          </div>
-        ) : (
-          <Button
-            className="w-full bg-approve text-white hover:bg-approve/90"
-            disabled={!decidable}
-            onClick={() => onDecide('approve')}
-          >
+        <Button
+          className="w-full bg-approve text-white hover:bg-approve/90 disabled:opacity-60"
+          disabled={!decidable || blocked}
+          onClick={() => onDecide('approve')}
+        >
+          {blocked ? (
+            <Lock aria-hidden="true" />
+          ) : (
             <CircleCheck aria-hidden="true" />
-            Approve
-          </Button>
-        )}
+          )}
+          Approve
+        </Button>
         <Button
           variant="outline"
           className="w-full border-info/40 text-info hover:bg-info-wash"
@@ -578,6 +552,39 @@ function DecisionPanel({
   )
 }
 
+/** Read-only: whether the individual has said the personal code arrived. The code itself is never collected. */
+function CodeReceipt({ vc, name }: { vc: VerificationCase; name: string }) {
+  const r = vc.personalCodeReceipt
+  if (!r && vc.status !== 'confirmed') return null
+  return (
+    <Panel className="p-5 sm:p-6" aria-label="Personal code">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <MonoLabel>Personal code</MonoLabel>
+        <PendingDecision code="M7" />
+      </div>
+      <p className="mt-3 text-[0.9375rem] leading-relaxed text-graphite">
+        Companies House will email the personal code directly to {name}.
+        Evidence One does not receive or keep it.
+      </p>
+      <p className="mt-3 text-base text-ink">
+        {r?.answer === 'yes'
+          ? 'The individual confirmed the code has arrived.'
+          : r?.answer === 'not_yet'
+            ? 'The individual said the code has not arrived yet.'
+            : r
+              ? 'Asked, not yet answered.'
+              : 'Not yet asked.'}
+      </p>
+      {r && (
+        <p className="mt-1 text-[0.8125rem] text-slate">
+          Asked {formatDateTime(r.askedAt)}
+          {r.answeredAt && `. Answered ${formatDateTime(r.answeredAt)}`}
+        </p>
+      )}
+    </Panel>
+  )
+}
+
 function EscalateDialog({
   open,
   vc,
@@ -588,6 +595,7 @@ function EscalateDialog({
   onClose: () => void
 }) {
   const { data, apply } = useDemoStore()
+  const { reviewer } = useActingAcsp()
   const toast = useToast()
   const [note, setNote] = useState('')
   const seniors = data.acsps.flatMap((a) => a.reviewers).filter((r) => r.senior)
@@ -651,7 +659,7 @@ function EscalateDialog({
           <Button
             disabled={!note.trim() || !to}
             onClick={() => {
-              apply((d) => escalateCase(d, vc.id, to, note.trim(), REVIEWER))
+              apply((d) => escalateCase(d, vc.id, to, note.trim(), reviewer.id))
               toast({
                 title: 'Case escalated',
                 description:

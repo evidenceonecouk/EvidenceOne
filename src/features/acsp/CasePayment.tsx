@@ -18,7 +18,11 @@ export function useCasePaymentRows(vc: VerificationCase) {
   const { data } = useDemoStore()
   const p = vc.payment
   if (!p) return undefined
-  const split = splitPayment(p.amount, vc.source ?? 'referred', data.billing.settings)
+  const split = splitPayment(
+    p.amount,
+    vc.source ?? 'referred',
+    data.billing.settings,
+  )
   const platformFee = p.platformFee ?? split.platformFee
   const platformFeeVat = p.platformFeeVat ?? split.platformFeeVat
   return {
@@ -78,7 +82,10 @@ export function CasePayment({
       </p>
       <dl className="mt-3 divide-y divide-line/70">
         {line('ACSP Professional Fee', gbp(rows.gross), true)}
-        {line('Payment provider fee (borne by the ACSP)', `-${gbp(rows.providerFee)}`)}
+        {line(
+          'Payment provider fee (borne by the ACSP)',
+          `-${gbp(rows.providerFee)}`,
+        )}
         {rows.referred ? (
           <>
             {line(
@@ -98,11 +105,7 @@ export function CasePayment({
             </dd>
           </div>
         )}
-        {line(
-          'Paid out to your payment account',
-          gbp(rows.net),
-          true,
-        )}
+        {line('Paid out to your payment account', gbp(rows.net), true)}
       </dl>
       <p className="mt-3 text-[0.8125rem] leading-snug text-slate">
         {p.reference}

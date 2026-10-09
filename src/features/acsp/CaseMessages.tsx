@@ -154,7 +154,8 @@ export function CaseMessages({
         </div>
       ) : (
         <p className="border-t border-line/70 px-5 py-3 text-[0.9375rem] text-slate sm:px-6">
-          The thread is read-only while the case is {vc.status.replace('_', ' ')}.
+          The thread is read-only while the case is{' '}
+          {vc.status.replace('_', ' ')}.
         </p>
       )}
     </Panel>

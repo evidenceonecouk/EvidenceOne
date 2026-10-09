@@ -237,11 +237,14 @@ export function DiscrepancyPrompt({
             <Button
               disabled={!field}
               onClick={() => {
-                apply((d) => raiseRegisterCorrection(d, vc.id, field, reviewerId))
+                apply((d) =>
+                  raiseRegisterCorrection(d, vc.id, field, reviewerId),
+                )
                 setCorrecting(false)
                 toast({
                   title: 'Route B task raised',
-                  description: 'Recorded in the audit trail. The case carries on.',
+                  description:
+                    'Recorded in the audit trail. The case carries on.',
                 })
               }}
             >

@@ -14,7 +14,12 @@ import { PendingDecision } from '@/components/PendingDecision'
 import { RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { AiObservationCard } from '@/components/visual/AiObservationCard'
-import { formatAddress, formatDate, formatShortDate, fullName } from '@/lib/format'
+import {
+  formatAddress,
+  formatDate,
+  formatShortDate,
+  fullName,
+} from '@/lib/format'
 import { NORMALISATION_NOTE } from '@/lib/register'
 import {
   comparisonRows,
@@ -314,18 +319,28 @@ export function RegisterSection(p: SectionProps) {
   )
 }
 
+const captureLabel = {
+  upload: 'Uploaded from a computer, in the browser',
+  phone: 'Captured in the phone’s browser, then returned to the case',
+  camera: 'Direct camera capture in the mobile browser',
+} as const
+
 export function DocumentSection(p: SectionProps) {
+  const { data } = useDemoStore()
   const { vc, person } = p
   const doc = person.document
   const items = vc.evidence.filter(
     (e) => e.kind === 'identity_document' || e.kind === 'selfie',
   )
+  const setting = ruleSetFor(data, vc).settings.chip_not_read_fallback
+  const isPassport =
+    (vc.journey?.documentType ?? doc?.type) === 'passport' && vc.option === 1
   return (
     <StepPanel
       id="sec-document"
       kicker="Steps 2 and 3"
       title="Identity document"
-      description="One photographic identity document, uploaded once and passed to the identity checks"
+      description="One photographic identity document, captured in the browser and passed to the identity checks"
       step="document"
       p={p}
     >
@@ -337,14 +352,7 @@ export function DocumentSection(p: SectionProps) {
               ['Number', `Held securely, ends ${doc.numberLastTwo}`],
               ['Expires', formatDate(doc.expiresOn)],
               ['Country of issue', doc.issuingCountry],
-              [
-                'Captured',
-                vc.browserCapture
-                  ? 'In the browser, no chip read'
-                  : doc.hasChip
-                    ? 'In the app, chip read'
-                    : 'In the app',
-              ],
+              ['Captured', captureLabel[vc.journey?.captureRoute ?? 'upload']],
               ['Name on document', doc.nameOnDocument],
             ] as const
           ).map(([k, v]) => (
@@ -354,6 +362,14 @@ export function DocumentSection(p: SectionProps) {
             </div>
           ))}
         </dl>
+      )}
+      {isPassport && (
+        <p className="flex flex-wrap items-center gap-2 border-t border-line/70 px-5 py-3 text-[0.9375rem] text-slate sm:px-6">
+          {setting === 'accept_web_result'
+            ? 'Chip not read by Evidence One. Browser route result accepted under the current setting.'
+            : 'Chip not read by Evidence One. The current setting asks for another Option 1 document, then Option 2.'}
+          <PendingDecision code="P1" />
+        </p>
       )}
       {items.length > 0 && (
         <ul className="grid gap-4 border-t border-line/70 p-5 sm:grid-cols-2 sm:p-6">
@@ -377,7 +393,7 @@ export function DocumentSection(p: SectionProps) {
               </p>
               {e.note && (
                 <p className="mt-2 rounded-lg bg-mist px-2.5 py-1.5 text-[0.8125rem] leading-snug text-graphite">
-                  Provider result: {e.note}
+                  Certified identity provider result: {e.note}
                 </p>
               )}
             </li>
@@ -402,17 +418,10 @@ const checkLabel: Record<CheckResult, string> = {
 
 export function IdvtSection(p: SectionProps) {
   const i = p.vc.idvt
+  const mismatch = comparisonRows(p.person, p.person.document, p.entry).some(
+    (r) => r.result === 'mismatch',
+  )
   const rows: [string, string, CheckResult, string?][] = [
-    [
-      'chip',
-      'Passport NFC chip read',
-      i.nfcChipRead,
-      i.nfcChipRead === 'pass'
-        ? 'Signature valid'
-        : p.vc.browserCapture
-          ? 'Not possible in a browser'
-          : undefined,
-    ],
     ['authenticity', 'Document authenticity', i.documentAuthenticity],
     ['liveness', 'Liveness', i.liveness],
     [
@@ -422,11 +431,26 @@ export function IdvtSection(p: SectionProps) {
       i.faceMatchScore ? `${i.faceMatchScore}%` : undefined,
     ],
   ]
+  if (p.pepScreening)
+    rows.push([
+      'screening',
+      'PEP and sanctions screening',
+      i.pepSanctions,
+      i.pepPossibleMatch || i.sanctionsPossibleMatch
+        ? 'Possible match'
+        : undefined,
+    ])
+  rows.push([
+    'register',
+    'Register comparison',
+    mismatch ? 'refer' : 'pass',
+    mismatch ? 'Flagged, see below' : 'Matches',
+  ])
   return (
     <StepPanel
       id="sec-idvt"
       kicker="Steps 3 and 4"
-      title="IDVT checks"
+      title="Identity checks"
       description={`Certified identity provider${i.attempts && i.attempts > 1 ? ` · ${i.attempts} attempts` : ''}`}
       step="idvt"
       p={p}
@@ -445,6 +469,8 @@ export function IdvtSection(p: SectionProps) {
                 className="size-5 text-decline"
                 aria-label="Not passed"
               />
+            ) : result === 'refer' ? (
+              <FileWarning className="size-5 text-info" aria-label="Flagged" />
             ) : (
               <span
                 className="size-5 rounded-full border-[1.5px] border-line"
@@ -458,6 +484,11 @@ export function IdvtSection(p: SectionProps) {
           </li>
         ))}
       </ul>
+      {!p.pepScreening && (
+        <p className="border-t border-line/70 px-5 py-3 text-[0.875rem] text-slate sm:px-6">
+          PEP and sanctions screening is switched off for your firm.
+        </p>
+      )}
       {i.providerReference && (
         <p className="border-t border-line/70 px-5 py-3 font-mono text-[0.8125rem] text-slate sm:px-6">
           Provider reference {i.providerReference}
@@ -469,6 +500,7 @@ export function IdvtSection(p: SectionProps) {
 
 export function ScreeningSection(p: SectionProps) {
   const i = p.vc.idvt
+  if (!p.pepScreening) return null
   return (
     <StepPanel
       id="sec-aml"
@@ -511,40 +543,95 @@ export function ScreeningSection(p: SectionProps) {
   )
 }
 
+const supportingLabel: Record<SupportingEvidenceType, string> = {
+  bank_statement: 'Bank or credit card statement',
+  utility_bill: 'Utility or council tax bill',
+  insurance: 'Insurance policy document',
+  passport_use: 'Evidence of recent passport use',
+}
+
 export function EvidenceSection(p: SectionProps) {
+  const { data } = useDemoStore()
+  const months = ruleSetFor(data, p.vc).params.supporting_evidence_months
   const items = p.vc.evidence.filter((e) => e.kind === 'address_evidence')
   const hasResults =
     p.results.some((r) => r.step === 'evidence') ||
     p.vc.observations.some((o) => o.step === 'evidence')
-  if (!hasResults) return null
+  if (!hasResults && items.length === 0) return null
+  const since = new Date()
+  since.setMonth(since.getMonth() - months)
   return (
     <StepPanel
       id="sec-evidence"
-      kicker="Only when a trigger applies"
-      title="Supporting evidence"
-      description="One supporting document, never a second identity document"
+      kicker="Proof of address from everyone"
+      title="Proof of address and supporting evidence"
+      description={`Proof of current address dated within ${months} months (ADDL-02). One supporting document only when the document is expired (ADDL-01) or a name change is declared (ADDL-03), never a second identity document.`}
       step="evidence"
       p={p}
+      actions={<PendingDecision code="P3" />}
     >
       {items.length > 0 && (
         <ul className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-          {items.map((e) => (
-            <li
-              key={e.id}
-              data-cite={`evidence:${e.id}`}
-              className="rounded-2xl border border-line bg-white p-3"
-            >
-              <EvidenceThumb item={e} name="" />
-              <p className="mt-3 text-[0.9375rem] font-medium text-ink">
-                {e.label}
-              </p>
-              <p className="text-[0.875rem] text-slate">
-                Uploaded {formatShortDate(e.uploadedAt)}
-                {e.documentDate &&
-                  ` · dated ${formatShortDate(e.documentDate)}`}
-              </p>
-            </li>
-          ))}
+          {items.map((e) => {
+            const within = e.documentDate
+              ? new Date(e.documentDate) >= since
+              : undefined
+            return (
+              <li
+                key={e.id}
+                data-cite={`evidence:${e.id}`}
+                className="rounded-2xl border border-line bg-white p-3"
+              >
+                <EvidenceThumb item={e} name="" />
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-[0.9375rem] font-medium text-ink">
+                  {e.label}
+                  {e.redaction && (
+                    <span className="rounded-full border border-line bg-mist px-2 py-0.5 text-[0.75rem] font-medium text-graphite">
+                      Option O3
+                    </span>
+                  )}
+                </p>
+                <p className="text-[0.875rem] text-slate">
+                  {e.supportingType &&
+                    `${supportingLabel[e.supportingType]} · `}
+                  Uploaded {formatShortDate(e.uploadedAt)}
+                  {e.documentDate &&
+                    ` · dated ${formatShortDate(e.documentDate)}`}
+                </p>
+                {within !== undefined && (
+                  <p
+                    className={cn(
+                      'mt-1.5 inline-flex items-center gap-1.5 text-[0.875rem] font-medium',
+                      within ? 'text-approve' : 'text-info',
+                    )}
+                  >
+                    {within ? (
+                      <CircleCheck className="size-4" aria-hidden="true" />
+                    ) : (
+                      <FileWarning className="size-4" aria-hidden="true" />
+                    )}
+                    {within
+                      ? `Dated within ${months} months`
+                      : `Older than ${months} months`}
+                  </p>
+                )}
+                {e.redaction && (
+                  <div className="mt-2 rounded-lg bg-mist px-2.5 py-2 text-[0.8125rem] leading-snug text-graphite">
+                    <p>
+                      Redacted copy only. Amounts and payees were masked by the
+                      individual, who confirmed the redaction on{' '}
+                      {formatShortDate(e.redaction.confirmedAt)}. You never see
+                      the original.
+                    </p>
+                    <p className="mt-1">
+                      Masked: {e.redaction.masked.join(', ')}. AI observation.
+                      Advisory only.
+                    </p>
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </StepPanel>

@@ -27,7 +27,10 @@ function RedactedStatement() {
         {rows.map((w, i) => (
           <span key={i} className="flex items-center gap-1">
             <span className="h-1 w-4 rounded bg-slate/50" />
-            <span className="h-1.5 rounded-sm bg-ink" style={{ width: `${w * 4}px` }} />
+            <span
+              className="h-1.5 rounded-sm bg-ink"
+              style={{ width: `${w * 4}px` }}
+            />
             <span className="ml-auto h-1.5 w-4 rounded-sm bg-ink" />
           </span>
         ))}
