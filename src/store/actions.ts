@@ -1625,7 +1625,7 @@ export function setAllocationShare(
     audit: [
       {
         at: new Date().toISOString(),
-        actor: 'Platform administrator',
+        actor: 'Marcus Adeyemi, Platform Administrator',
         actorType: 'person',
         action: 'admin.allocation.updated',
         detail: `B2C allocation weight for ${acsp.name} set to ${next}.`,
