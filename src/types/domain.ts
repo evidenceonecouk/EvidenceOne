@@ -456,7 +456,7 @@ export interface VerificationCase {
   route: 'A'
   personId: string
   companyNumber: string
-  origin: 'partner_invite' | 'b2c'
+  origin: 'partner_invite' | 'b2c' | 'acsp_invite'
   /** Drives the fee: referred and B2C carry the platform fee, an ACSP's own client does not. */
   source: CaseSource
   partnerId?: string
@@ -619,6 +619,8 @@ export interface AuditEvent {
   actorType: AuditActorType
   action: string
   caseId?: string
+  /** Which hash chain the event belongs to: an ACSP id, or 'platform'. One chain per ACSP. */
+  acspId?: string
   detail: string
   prevHash: string
   hash: string

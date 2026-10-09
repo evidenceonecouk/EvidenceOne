@@ -114,7 +114,7 @@ function reducer(state: DemoState, action: Action): DemoState {
         data = {
           ...data,
           audit: action.audit.reduce(
-            (chain, e) => appendAudit(chain, e),
+            (chain, e) => appendAudit(chain, e, data.cases),
             data.audit,
           ),
         }
@@ -124,7 +124,7 @@ function reducer(state: DemoState, action: Action): DemoState {
     case 'apply': {
       const result = action.action(state.data)
       const audit = result.audit.reduce(
-        (chain, e) => appendAudit(chain, e),
+        (chain, e) => appendAudit(chain, e, result.data.cases),
         result.data.audit,
       )
       return { ...state, data: { ...result.data, audit } }
