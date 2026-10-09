@@ -5,7 +5,6 @@ import { formatDate, formatMoney, fullName } from '@/lib/format'
 import { currentRuleSet, draftRuleSet, evaluateCase } from '@/lib/rules'
 import type {
   AiObservation,
-  CorrectionTask,
   DecisionOutcome,
   DemoData,
   EvidenceItem,
@@ -885,7 +884,7 @@ export function recordOption2Check(
       label: 'UK passport',
       expiresOn: person.document?.expiresOn,
     },
-    { group: 'B' as const, label: 'Bank statement, dated within 3 months' },
+    { group: 'B' as const, label: 'Bank statement, dated within 6 months' },
   ]
   return {
     data: patchCase(data, caseId, (c) => ({
@@ -916,61 +915,6 @@ export function recordOption2Check(
         caseId,
         detail:
           'Person check recorded: UK passport (Group A) and bank statement (Group B).',
-      },
-    ],
-  }
-}
-
-export function haltForMismatch(
-  data: DemoData,
-  caseId: string,
-  reviewerId: string,
-): ActionResult {
-  const vc = data.cases.find((c) => c.id === caseId)
-  const person = vc && data.people.find((p) => p.id === vc.personId)
-  const entry =
-    vc &&
-    data.register.find(
-      (r) => r.personId === vc.personId && r.companyNumber === vc.companyNumber,
-    )
-  if (!vc || !person || !entry) return { data, audit: [] }
-  const now = new Date().toISOString()
-  const taskId = nextRef(
-    data.corrections.map((t) => t.id),
-    'FL-2026-',
-    0,
-  )
-  const task: CorrectionTask = {
-    id: taskId,
-    route: 'B',
-    form: 'ACSP04',
-    caseId,
-    companyNumber: vc.companyNumber,
-    personId: vc.personId,
-    field: 'Full name',
-    registerValue: entry.registerName,
-    correctValue: `${person.familyName.toUpperCase()}, ${person.givenNames}`,
-    status: 'open',
-    createdAt: now,
-  }
-  return {
-    data: {
-      ...patchCase(data, caseId, (c) => ({
-        ...c,
-        status: 'halted_register_mismatch',
-        reviewerId,
-        correctionTaskId: taskId,
-      })),
-      corrections: [...data.corrections, task],
-    },
-    audit: [
-      {
-        at: now,
-        actor: reviewerName(data, reviewerId),
-        actorType: 'person',
-        action: 'route_a.halted',
-        caseId,
-        detail: `Route A halted under REG-11. Route B correction task ${taskId} (ACSP04) created.`,
       },
     ],
   }
@@ -1206,6 +1150,10 @@ export function confirmSubmission(
         confirmedAt: now,
         verificationReference: reference,
         referenceSource: source,
+      },
+      // The day after Companies House confirms, the individual is asked whether the code has arrived (M7). Only the question is held, never the code.
+      personalCodeReceipt: c.personalCodeReceipt ?? {
+        askedAt: new Date(Date.now() + 24 * HOUR).toISOString(),
       },
     })),
     audit: [
