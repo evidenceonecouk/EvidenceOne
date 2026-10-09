@@ -51,7 +51,7 @@ import {
   returnDraft,
   submitDraft,
 } from '@/store/actions'
-import { SUPER_ADMINS, useDemoStore } from '@/store/DemoStore'
+import { useDemoStore } from '@/store/DemoStore'
 import type {
   ParamKey,
   RuleOutcome,

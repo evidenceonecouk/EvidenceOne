@@ -11,7 +11,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useToast } from '@/components/app/Toaster'
 import { Button } from '@/components/ui/button'
 import { ModelTag } from '@/components/visual/AiObservationCard'
-import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
 import { highlightCite } from '@/lib/cite'
 import {
   ANSWER_HEADER,
@@ -26,12 +25,8 @@ import {
 } from '@/lib/copilot'
 import { citeKey, type Citation } from '@/lib/rules'
 import { cn } from '@/lib/utils'
-import {
-  logCopilotExchange,
-  reviewerName,
-  sendCopilotDraft,
-} from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
+import { logCopilotExchange, sendCopilotDraft } from '@/store/actions'
+import { SUPER_ADMINS, useActingAcsp, useDemoStore } from '@/store/DemoStore'
 
 interface Exchange {
   id: number
@@ -54,6 +49,7 @@ export function CopilotPanel({
   scope: CopilotScope
 }) {
   const { data, state, apply } = useDemoStore()
+  const { reviewer } = useActingAcsp()
   const [exchanges, setExchanges] = useState<Exchange[]>([])
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -62,9 +58,9 @@ export function CopilotPanel({
     scope.kind === 'case' ? CASE_SUGGESTIONS : RULES_SUGGESTIONS
   const asker =
     state.persona === 'reviewer'
-      ? reviewerName(data, PRIMARY_REVIEWER_ID)
+      ? reviewer.name
       : state.persona === 'superAdmin'
-        ? 'Super Administrator'
+        ? `${SUPER_ADMINS.find((a) => a.seat === state.superAdminSeat)?.name}, Super Administrator`
         : 'Platform Administrator'
 
   useEffect(() => {
@@ -308,6 +304,7 @@ function DraftCard({
   draft: { to: string; body: string }
 }) {
   const { apply } = useDemoStore()
+  const { reviewer: actingReviewer } = useActingAcsp()
   const toast = useToast()
   const [body, setBody] = useState(draft.body)
   const [editing, setEditing] = useState(false)
@@ -358,9 +355,7 @@ function DraftCard({
           <Button
             size="xs"
             onClick={() => {
-              apply((d) =>
-                sendCopilotDraft(d, caseId, body, PRIMARY_REVIEWER_ID),
-              )
+              apply((d) => sendCopilotDraft(d, caseId, body, actingReviewer.id))
               setSent(true)
               setEditing(false)
               toast({
