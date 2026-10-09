@@ -20,7 +20,7 @@ type AudienceFilter = 'all' | PlatformMessage['audience']
 const audiences: AudienceFilter[] = [
   'all',
   'Individual',
-  'Agent',
+  'Referral Partner',
   'ACSP reviewer',
   'Administrator',
 ]
@@ -57,7 +57,7 @@ export function NotificationsPage() {
           <Figure
             label="Bounced"
             value={messages.filter((m) => m.state === 'bounced').length}
-            detail="Agent told to check the address"
+            detail="Referral Partner told to check the address"
           />
         </dl>
       </Panel>

@@ -14,6 +14,7 @@ import { formatDate } from '@/lib/format'
 import { currentRuleSet, draftRuleSet } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
+import { AcspStatusChip } from '@/components/StatusChip'
 import { AdminHeader, StateBadge, type Tone } from './kit'
 
 const DAY = 86_400_000
@@ -32,14 +33,7 @@ export function CompliancePage() {
   const rs = currentRuleSet(data)
   const draft = draftRuleSet(data)
   const chainOk = verifyChain(data.audit)
-  const inReview = data.cases.filter(
-    (c) => c.status === 'in_review' && c.slaDueAt,
-  )
-  const overdue = inReview.filter((c) => new Date(c.slaDueAt!).getTime() < now)
-  const dueSoon = inReview.filter((c) => {
-    const left = new Date(c.slaDueAt!).getTime() - now
-    return left >= 0 && left < 6 * 3_600_000
-  })
+  const inReview = data.cases.filter((c) => c.status === 'in_review')
   const corrections = data.corrections.filter(
     (t) => t.status !== 'register_updated',
   )
@@ -55,9 +49,14 @@ export function CompliancePage() {
       items: [
         {
           label: 'ACSP registration',
-          status: `${data.acsps.length} of ${data.acsps.length} registered`,
-          detail: 'Every ACSP firm holds a current Companies House ACSP number',
-          tone: 'ok',
+          status: `${data.acsps.filter((a) => a.status === 'active').length} of ${data.acsps.length} Active`,
+          detail: `${data.acsps.filter((a) => a.status === 'not_yet_listed').length} Not yet listed, ${data.acsps.filter((a) => a.status === 'suspended' || a.status === 'ceased').length} Suspended or Ceased. Checked against the Companies House published files`,
+          tone: data.acsps.some(
+            (a) => a.status === 'suspended' || a.status === 'ceased',
+          )
+            ? 'attention'
+            : 'ok',
+          to: '/admin/monitoring',
         },
         {
           label: 'AML supervision',
@@ -79,20 +78,17 @@ export function CompliancePage() {
       items: [
         {
           label: 'Rule set in force',
-          status: `Version ${rs.version}`,
+          status: `Rule set ${rs.version}`,
           detail: `Effective ${rs.effectiveFrom ? formatDate(rs.effectiveFrom) : 'now'}${draft ? `. Draft ${draft.version} is ${draft.status === 'pending_approval' ? 'awaiting second approval' : 'in progress'}` : ''}`,
           tone: draft?.status === 'pending_approval' ? 'attention' : 'ok',
           to: '/rules',
         },
         {
-          label: 'Review target',
-          status: overdue.length
-            ? `${overdue.length} past 36 hours`
-            : dueSoon.length
-              ? `${dueSoon.length} due within 6 hours`
-              : 'All within target',
-          detail: `${inReview.length} cases with reviewers now`,
-          tone: overdue.length ? 'action' : dueSoon.length ? 'attention' : 'ok',
+          label: 'Reviews in progress',
+          status: `${inReview.length} with reviewers`,
+          detail:
+            'Reviewers decide each case. No rule and no AI declines a case',
+          tone: 'ok',
         },
         {
           label: 'Register corrections',
@@ -100,8 +96,8 @@ export function CompliancePage() {
             ? `${corrections.length} open`
             : 'None open',
           detail: corrections.length
-            ? 'Route A is paused for these people until the register is updated'
-            : 'Every register matches the evidence',
+            ? 'Genuine register corrections go through Route B. Differences are flagged to the reviewer, never halted'
+            : 'No register correction is open',
           tone: corrections.length ? 'attention' : 'ok',
         },
         {
@@ -184,7 +180,7 @@ export function CompliancePage() {
     <Page>
       <AdminHeader
         title="Compliance"
-        description="Regulatory posture across every ACSP on the platform, kept apart from the operational figures on purpose."
+        description="Regulatory posture across every ACSP on the platform, kept apart from the operational figures on purpose. Case contents and identity evidence are not shown."
       />
 
       <section
@@ -387,9 +383,7 @@ export function CompliancePage() {
                       {a.supervisor}
                     </p>
                   </div>
-                  <span className="font-mono text-[0.8125rem] text-graphite">
-                    {a.acspNumber}
-                  </span>
+                  <AcspStatusChip status={a.status} />
                 </li>
               ))}
             </ul>

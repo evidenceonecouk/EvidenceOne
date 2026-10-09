@@ -53,7 +53,7 @@ export function WhiteLabelPage() {
     <Page>
       <AdminHeader
         title="White label"
-        description="A partner can put its own brand on the journey people see. The regulated parts do not move: the ACSP named, the rules, the decision and the record are the same on every deployment."
+        description="A Referral Partner or ACSP can put its own brand on the journey people see. The regulated parts do not move: the ACSP named, the rules, the decision and the record are the same on every deployment."
       />
 
       <Panel aria-labelledby="dep-title" className="mb-6 overflow-hidden">
@@ -198,7 +198,10 @@ export function WhiteLabelPage() {
 
           <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <Panel aria-labelledby="can-title" className="overflow-hidden">
-              <PanelHeader id="can-title" title="What a partner can change" />
+              <PanelHeader
+                id="can-title"
+                title="What a Referral Partner can change"
+              />
               <ul className="space-y-2.5 p-5 sm:p-6">
                 {partnerCan.map((p) => (
                   <li
@@ -291,9 +294,7 @@ export function WhiteLabelPage() {
                   Start
                 </div>
                 <p className="text-center text-[0.8125rem] text-slate">
-                  {dep.id === 'default'
-                    ? 'Fee £49 · Pay yourself or use a payment code'
-                    : `Fee £49 · Paid by ${dep.name}`}
+                  {`Fee set by ${acsp.name} · Pay yourself or use an Agent Payment Code`}
                 </p>
               </div>
             </div>

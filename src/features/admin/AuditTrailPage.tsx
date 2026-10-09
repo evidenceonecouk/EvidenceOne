@@ -33,6 +33,10 @@ const actorMeta: Record<
 
 type Filter = 'all' | AuditActorType
 
+/** One chain per ACSP plus the platform chain. Events without an acspId belong to the platform chain. */
+const chainKey = (e: AuditEvent) =>
+  (e as AuditEvent & { acspId?: string }).acspId ?? 'platform'
+
 /** Finds the first entry whose hash no longer matches, the way an independent checker would. */
 function firstBreak(chain: AuditEvent[]) {
   for (let i = 1; i <= chain.length; i++)
@@ -42,6 +46,25 @@ function firstBreak(chain: AuditEvent[]) {
 
 export function AuditTrailPage() {
   const { data, apply } = useDemoStore()
+  const chains = useMemo(() => {
+    const map = new Map<string, AuditEvent[]>()
+    for (const e of data.audit) {
+      const k = chainKey(e)
+      map.set(k, [...(map.get(k) ?? []), e])
+    }
+    if (!map.has('platform')) map.set('platform', [])
+    return [...map.entries()].map(([key, events]) => ({
+      key,
+      label:
+        key === 'platform'
+          ? 'Platform chain'
+          : `${data.acsps.find((a) => a.id === key)?.name ?? key} chain`,
+      events,
+      ok: verifyChain(events),
+    }))
+  }, [data.audit, data.acsps])
+  // Administrators read platform events only. Case events sit on each ACSP's own chain.
+  const platform = chains.find((c) => c.key === 'platform')!.events
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [checking, setChecking] = useState(false)
@@ -50,17 +73,17 @@ export function AuditTrailPage() {
     seq: number
     breakAt: number | null
   } | null>(null)
-  const chainOk = useMemo(() => verifyChain(data.audit), [data.audit])
+  const chainOk = chains.every((c) => c.ok)
 
   const counts = useMemo(() => {
     const c = { person: 0, system: 0, ai: 0 }
-    data.audit.forEach((e) => c[e.actorType]++)
+    platform.forEach((e) => c[e.actorType]++)
     return c
-  }, [data.audit])
+  }, [platform])
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return [...data.audit]
+    return [...platform]
       .reverse()
       .filter((e) => filter === 'all' || e.actorType === filter)
       .filter(
@@ -70,15 +93,22 @@ export function AuditTrailPage() {
             s.toLowerCase().includes(q),
           ),
       )
-  }, [data.audit, filter, query])
+  }, [platform, filter, query])
 
   const runCheck = () => {
     setChecking(true)
     window.setTimeout(() => {
-      const ok = verifyChain(data.audit)
-      apply((d) =>
-        recordChainCheck(d, d.audit.length, ok, 'Chain checker, read-only'),
-      )
+      for (const c of chains) {
+        apply((d) =>
+          recordChainCheck(
+            d,
+            c.events.length,
+            verifyChain(c.events),
+            'Chain checker, read-only',
+            c.label.toLowerCase(),
+          ),
+        )
+      }
       setLastCheck(new Date().toISOString())
       setChecking(false)
     }, 900)
@@ -86,20 +116,21 @@ export function AuditTrailPage() {
 
   // Edits one entry in a copy of the chain and re-checks it. The real chain is never changed.
   const simulateTamper = () => {
-    const target = data.audit[Math.max(0, data.audit.length - 12)]
-    const copy = data.audit.map((e) =>
+    const target = platform[Math.max(0, platform.length - 12)]
+    if (!target) return
+    const copy = platform.map((e) =>
       e.seq === target.seq ? { ...e, detail: `${e.detail} (edited)` } : e,
     )
     setTamper({ seq: target.seq, breakAt: firstBreak(copy) })
   }
 
-  const latest = data.audit[data.audit.length - 1]
+  const latest = platform[platform.length - 1]
 
   return (
     <Page>
       <AdminHeader
         title="Audit trail"
-        description="Every action on the platform, append-only. Each entry's hash includes the one before it, so changing any entry breaks every entry after it."
+        description="An immutable timeline of platform events, append-only. Each entry's hash includes the one before it, so changing any entry breaks every entry after it. There is one chain per ACSP and one for the platform. Case events stay on each ACSP's own chain."
         actions={
           <>
             <Button variant="outline" onClick={simulateTamper}>
@@ -150,14 +181,18 @@ export function AuditTrailPage() {
               {chainOk ? 'Chain verified' : 'Chain broken'}
             </h2>
             <p className="mt-1 text-[0.9375rem] text-graphite">
-              {data.audit.length} entries from genesis to{' '}
-              <span className="font-mono">{shortHash(latest.hash)}</span>.{' '}
+              {platform.length} platform entries from genesis to{' '}
+              <span className="font-mono">
+                {latest ? shortHash(latest.hash) : 'none'}
+              </span>
+              .{' '}
               {lastCheck
                 ? `Checked ${timeAgo(lastCheck)} by an independent read-only job.`
-                : 'Re-checked automatically every night at 05:00 by an independent read-only job.'}
+                : 'Every chain is re-checked automatically every night at 05:00 by an independent read-only job.'}
             </p>
             <p className="mt-1 text-[0.9375rem] text-graphite">
-              Daily anchor written to write-once storage, kept for 7 years.
+              Daily anchors for each chain are written to write-once storage,
+              kept for 7 years.
             </p>
           </div>
           <dl className="grid grid-cols-3 gap-6">
@@ -174,7 +209,7 @@ export function AuditTrailPage() {
           </dl>
         </div>
 
-        <ChainStrip chain={data.audit} brokenFrom={tamper?.breakAt ?? null} />
+        <ChainStrip chain={platform} brokenFrom={tamper?.breakAt ?? null} />
       </section>
 
       {tamper && (
@@ -205,11 +240,55 @@ export function AuditTrailPage() {
         </section>
       )}
 
+      <Panel aria-labelledby="chains-title" className="mb-6 overflow-hidden">
+        <PanelHeader
+          id="chains-title"
+          title="Independent chain check"
+          description="Each chain is checked on its own"
+        />
+        <ul className="divide-y divide-line/70">
+          {chains.map((c) => (
+            <li
+              key={c.key}
+              className="flex flex-wrap items-center gap-4 px-5 py-3.5 sm:px-6"
+            >
+              <span className="min-w-0 flex-1 text-[0.9375rem] font-medium text-ink">
+                {c.label}
+              </span>
+              <span className="text-[0.875rem] text-slate tabular">
+                {c.events.length} entries
+                {c.events.length > 0 && (
+                  <>
+                    , head{' '}
+                    <span className="font-mono">
+                      {shortHash(c.events[c.events.length - 1].hash)}
+                    </span>
+                  </>
+                )}
+              </span>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1.5 text-[0.875rem] font-medium',
+                  c.ok ? 'text-approve' : 'text-decline',
+                )}
+              >
+                {c.ok ? (
+                  <ShieldCheck className="size-4" aria-hidden="true" />
+                ) : (
+                  <ShieldX className="size-4" aria-hidden="true" />
+                )}
+                {c.ok ? 'Intact' : 'Broken'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+
       <Panel aria-labelledby="entries-title" className="overflow-hidden">
         <PanelHeader
           id="entries-title"
           title="Entries"
-          description={`${rows.length} shown, newest first`}
+          description={`Platform events, ${rows.length} shown, newest first`}
         />
         <div className="flex flex-col gap-3 border-b border-line/70 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
           <div
@@ -346,9 +425,10 @@ export function AuditTrailPage() {
           </table>
         </div>
         <p className="border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
-          No role can edit or delete an entry, including administrators. The AI
-          service account can only add observations.{' '}
-          <MonoLabel className="ml-1">Synthetic data</MonoLabel>
+          No role can edit or delete an entry, including the Platform
+          Administrator and the Super Administrator. They read platform events
+          only, not case contents. The AI service account can only add
+          observations. <MonoLabel className="ml-1">Synthetic data</MonoLabel>
         </p>
       </Panel>
     </Page>
