@@ -1,6 +1,6 @@
 import { useFitScale } from '@/hooks/useFitScale'
 import { CaseReviewWindow } from './CaseReviewWindow'
-import { PhoneChipScan } from './PhoneChipScan'
+import { BrowserCapture } from './BrowserCapture'
 
 const BASE_W = 1310
 const BASE_H = 640
@@ -15,7 +15,7 @@ export function ProductStage() {
     <div className="mx-auto max-w-[88rem] px-4 sm:px-6">
       <figure
         className="grain relative overflow-hidden rounded-[28px] bg-[#111214] px-4 pt-10 sm:px-10 sm:pt-16"
-        aria-label="The ACSP case review screen, with the passport chip scan in the Evidence One app"
+        aria-label="The ACSP case review screen, with the individual's document capture in a browser window"
       >
         <div
           aria-hidden="true"
@@ -43,16 +43,16 @@ export function ProductStage() {
               <CaseReviewWindow />
             </div>
             <div className="absolute bottom-[-60px] left-0 z-10">
-              <PhoneChipScan />
+              <BrowserCapture />
             </div>
           </div>
         </div>
-        {/* Small screens: the app on its own, at full size */}
+        {/* Small screens: the browser window on its own, at full size */}
         <div
           aria-hidden="true"
           className="relative -mb-24 flex justify-center sm:hidden"
         >
-          <PhoneChipScan />
+          <BrowserCapture className="w-full max-w-[22rem]" />
         </div>
       </figure>
     </div>

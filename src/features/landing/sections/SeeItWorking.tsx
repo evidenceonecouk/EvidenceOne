@@ -5,17 +5,17 @@ import { RuleKicker } from './Hero'
 const capabilities = [
   'Companies House identity standard',
   'Option 1 certified IDVT',
-  'Passport chip read in the app',
+  'Browser capture, desktop and mobile',
   'Liveness and face match',
   'PEP and sanctions screening',
-  'Exact register match',
-  'ACSP04 corrections',
+  'Register comparison',
+  'Route B filings',
   'GOV.UK One Login handoff',
   'Seven-year records',
   'Hash-chained audit trail',
 ]
 
-/** The real product, shown working: case review with the app's chip scan in front. */
+/** The real product, shown working: case review with the browser capture in front. */
 export function SeeItWorking() {
   return (
     <section aria-labelledby="see-title" className="bg-white pt-24">

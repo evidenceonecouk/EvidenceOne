@@ -34,7 +34,7 @@ const steps: {
     icon: UserRound,
     label: 'Verify',
     title: 'Verify your client',
-    body: 'Identity verification with one document and a complete audit trail.',
+    body: 'Identity verification in the browser with one document, and a complete audit trail.',
     to: '/journey/EO-2026-000135/invite',
     persona: 'individual',
   },
@@ -43,7 +43,7 @@ const steps: {
     icon: FileText,
     label: 'Submit',
     title: 'Submit to Companies House',
-    body: 'A ready-to-copy pack for GOV.UK One Login, then the Companies House verification reference recorded.',
+    body: 'A prepared submission, handed off to your own GOV.UK One Login, then the Companies House verification reference recorded.',
     to: '/acsp/queue',
     persona: 'reviewer',
   },
@@ -63,7 +63,6 @@ export function Steps() {
   const { setPersona } = useDemoStore()
   return (
     <section
-      id="how-it-works"
       aria-labelledby="steps-title"
       className="scroll-mt-20 bg-[#f4f4f3] pb-20"
     >
@@ -141,16 +140,16 @@ export function Steps() {
 }
 
 const forAcsps = [
-  'Use Evidence One for your clients',
+  'Use Evidence One for your own clients',
+  'Receive referred and direct clients',
   'Verify, submit and file',
   'Secure audit trail and records',
-  'Grow your practice',
 ]
 const forPartners = [
-  'Find a verified ACSP',
-  'Complete your Companies House requirements',
-  'Track progress in one place',
-  'A simple and secure process',
+  'Invite directors and PSCs from the register',
+  'Choose the ACSP, or let the platform suggest one',
+  'Follow status and check results in one place',
+  'You are never presented as the verifying ACSP',
 ]
 
 function CheckList({ items }: { items: string[] }) {
@@ -187,7 +186,7 @@ export function Hub() {
       className="scroll-mt-20 bg-[#f4f4f3] pb-20"
     >
       <h2 id="hub-title" className="sr-only">
-        How Evidence One connects ACSPs, partners and Companies House
+        How Evidence One connects ACSPs, Referral Partners and Companies House
       </h2>
       <div className={container}>
         <div className="grid gap-10 rounded-[28px] border border-line bg-white/60 p-7 sm:p-10 lg:grid-cols-[1fr_1.35fr_1fr] lg:gap-8">
@@ -204,7 +203,7 @@ export function Hub() {
             />
             <CheckList items={forAcsps} />
             <Button asChild size="lg" className="mt-8 h-13 rounded-full px-7">
-              <Link to="/acsp/queue" onClick={() => setPersona('reviewer')}>
+              <Link to="/join/acsp" onClick={() => setPersona('reviewer')}>
                 Join as an ACSP
                 <ArrowRight aria-hidden="true" />
               </Link>
@@ -220,7 +219,7 @@ export function Hub() {
               />
               <div>
                 <p className="text-[0.8125rem] font-semibold tracking-[0.2em] text-ink uppercase">
-                  Businesses and partners
+                  Clients and Referral Partners
                 </p>
                 <p className="text-[0.9375rem] text-graphite">
                   Need Companies House services
@@ -265,27 +264,36 @@ export function Hub() {
 
           <div id="for-partners" className="scroll-mt-20">
             <p className="text-[0.875rem] font-semibold tracking-[0.24em] text-ink uppercase">
-              For partners
+              For Referral Partners
             </p>
             <p className="mt-2 text-[1.375rem] tracking-[-0.02em] text-graphite">
-              Need an ACSP?
+              Bring your clients
             </p>
             <span
               aria-hidden="true"
               className="mt-4 block h-px w-full bg-line"
             />
             <CheckList items={forPartners} />
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="mt-8 h-13 rounded-full border-ink/25 px-7"
-            >
-              <Link to="/partner" onClick={() => setPersona('partner')}>
-                Find an ACSP
-                <ArrowRight aria-hidden="true" />
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="h-13 rounded-full border-ink/25 px-7"
+              >
+                <Link to="/join/partner" onClick={() => setPersona('partner')}>
+                  Join as a Referral Partner
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+              <Link
+                to="/partner"
+                onClick={() => setPersona('partner')}
+                className="text-base font-medium text-ink underline underline-offset-4"
+              >
+                Open the partner portal
               </Link>
-            </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -11,12 +11,12 @@ const products = [
   {
     id: 'verify',
     name: 'Verify',
-    line: 'Identity verification in the app. One document, a chip read, a liveness check and a face match.',
+    line: 'Identity verification in the browser. One document, a liveness check and a face match, on desktop and mobile.',
   },
   {
     id: 'compliance',
     name: 'Compliance',
-    line: 'Review queues, exact register comparison and Route B correction tasks that unblock paused cases.',
+    line: 'Review queues, register comparison that flags differences for the reviewer, and Route B correction tasks.',
   },
   {
     id: 'intelligence',
@@ -146,7 +146,7 @@ function Glass({
 }
 
 const checkTiles = [
-  ['Chip read', 'Signature valid'],
+  ['Register comparison', 'Flagged: 1'],
   ['Authenticity', 'Genuine document'],
   ['Liveness', 'Live person'],
   ['Face match', '98.6%'],
@@ -169,7 +169,7 @@ function VerifyPanel() {
       </div>
       <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-white/10 px-5 py-4 text-base text-paper/80 sm:flex-row sm:items-center sm:justify-between">
         <span>
-          UK passport · chip read in the app · one document was enough
+          Passport · captured in the browser · one document was enough
         </span>
         <span className="font-mono text-[0.8125rem] text-paper/55">
           Certified identity provider · Option 1
@@ -181,9 +181,9 @@ function VerifyPanel() {
 
 const flow = [
   { label: 'Identity checks complete', state: 'done' },
-  { label: 'Register mismatch found', state: 'flag' },
-  { label: 'ACSP04 correction filed', state: 'current' },
-  { label: 'Verification resumes', state: 'next' },
+  { label: 'Register difference flagged', state: 'flag' },
+  { label: 'Reviewer records a decision', state: 'current' },
+  { label: 'Prompt to report logged', state: 'next' },
 ] as const
 
 function CompliancePanel() {
@@ -196,12 +196,12 @@ function CompliancePanel() {
               Aidan Corrigan · CORRIGAN MARINE SERVICES LTD
             </p>
             <p className="text-[0.9375rem] text-slate">
-              Passport chip: AIDAN · Register: AIDEN
+              Details given: AIDAN · Register: AIDEN
             </p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-info/25 bg-info-wash px-3 py-1 text-sm font-medium text-info">
             <CirclePause className="size-4" aria-hidden="true" />
-            Route A paused
+            Flagged for decision
           </span>
         </div>
         <ol className="mt-6 grid gap-4 sm:grid-cols-4">
@@ -232,15 +232,15 @@ function CompliancePanel() {
               </div>
               <p className="mt-3 text-[0.9375rem] leading-snug">{f.label}</p>
               <p className="mt-0.5 font-mono text-[0.75rem] tracking-[0.08em] text-slate uppercase">
-                {i < 2 ? 'Route A' : i === 2 ? 'Route B' : 'Route A'}
+                Route A
               </p>
             </li>
           ))}
         </ol>
       </div>
       <p className="mt-4 text-base text-paper/70">
-        A mismatch is never a resubmission. The register is corrected, then the
-        verification carries on.
+        A difference is flagged, never halted. The reviewer records a decision
+        and a reason, and the prompt to report it to Companies House is logged.
       </p>
     </Glass>
   )
@@ -249,15 +249,15 @@ function CompliancePanel() {
 function IntelligencePanel() {
   const observations = [
     {
-      title: 'Council tax bill appears older than 3 months',
+      title: 'Proof of address appears older than six months',
       detail:
-        'The issue date read from the bill is about five months before upload. Rule ADDL-11 asks for a more recent supporting document.',
-      source: 'Council tax bill, issue date (AI extraction) · explains ADDL-11',
+        'The issue date read from the bill is about seven months before upload. Rule ADDL-02 asks for a document dated within six months.',
+      source: 'Council tax bill, issue date (AI extraction) · explains ADDL-02',
     },
     {
       title: 'First name spelt differently on the register',
       detail:
-        'The passport chip reads AIDAN and the register holds AIDEN. Normalisation does not remove a spelling difference, so REG-11 halts the case.',
+        'The details given read AIDAN and the register holds AIDEN. Normalisation does not remove a spelling difference, so REG-11 flags it for a reviewer decision.',
       source: 'Register comparison result · explains REG-11',
     },
   ]

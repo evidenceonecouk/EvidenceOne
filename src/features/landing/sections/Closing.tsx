@@ -7,29 +7,29 @@ const standards = [
     'Digital verification is the default. A trained human check is a fallback only.',
   ],
   [
-    'Chip',
-    'Passport NFC read',
-    'Read in the app, where a browser cannot reach the chip.',
+    'Browser',
+    'Desktop and mobile',
+    'Document, liveness and face match in the browser, with no app to install.',
   ],
   [
     'Screening',
     'PEP and sanctions',
-    'Every person screened, every result shown to the reviewer.',
+    'Where switched on for the ACSP, with every result shown to the reviewer.',
   ],
   [
     'Register',
-    'Exact match',
-    'Name and date of birth compared with Companies House.',
+    'Differences flagged',
+    'Details compared with Companies House. The reviewer decides on any difference.',
   ],
   [
     'Route B',
-    'ACSP04 corrections',
-    'Mismatches corrected on the register, never resubmitted.',
+    'Register corrections',
+    'Genuine register corrections are filed separately, never as a resubmission.',
   ],
   [
     'Submission',
     'One Login handoff',
-    'A ready-to-copy pack, then the verification reference recorded.',
+    'A prepared submission, then the verification reference recorded.',
   ],
   [
     'Retention',
