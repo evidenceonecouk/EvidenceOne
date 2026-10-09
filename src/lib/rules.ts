@@ -4,7 +4,6 @@ import { formatDate, fullName } from '@/lib/format'
 import {
   historyCovers,
   monthYear,
-  movedWithin,
   normaliseName,
   NORMALISATION_NOTE,
   registerNameToDocumentOrder,
@@ -105,10 +104,34 @@ export function ruleSetFor(
 
 /** The outcome a rule produces under a version, after any decision setting. */
 export function outcomeUnder(ruleId: string, rs: RuleSetVersion): RuleOutcome {
-  if (ruleId === 'REG-13')
-    return rs.settings.nationality_difference === 'halt' ? 'halt' : 'mandatory'
+  if (ruleId === 'IDVT-01')
+    return rs.settings.chip_not_read_fallback === 'accept_web_result'
+      ? 'pass'
+      : 'request'
   return ruleById(ruleId)?.outcome ?? 'flag'
 }
+
+/** Whether Escalate is offered. Takes the data (current version) or one rule set version. */
+export function isEscalateEnabled(x: DemoData | RuleSetVersion): boolean {
+  const rs = 'ruleSets' in x ? currentRuleSet(x) : x
+  return rs.settings.escalate_enabled
+}
+
+/** Whether referral commissions are switched on in the current version. Off at launch. */
+export function referralCommissionsOn(x: DemoData | RuleSetVersion): boolean {
+  const rs = 'ruleSets' in x ? currentRuleSet(x) : x
+  return rs.settings.referral_commissions
+}
+
+/** Rule ADDL-02: every individual provides one proof of current address. Always true. */
+export function needsProofOfAddress(rs?: RuleSetVersion): true {
+  void rs
+  return true
+}
+
+/** Months within which proof of address and supporting evidence must be dated (supporting_evidence_months). */
+export const proofOfAddressMonths = (rs: RuleSetVersion) =>
+  rs.params.supporting_evidence_months
 
 function addMonths(iso: string, months: number): number {
   const d = new Date(iso)
@@ -132,6 +155,93 @@ const issuerAdjective: Record<string, string> = {
 export const documentName = (doc: IdDocument) =>
   `${issuerAdjective[doc.issuingCountry] ?? doc.issuingCountry} ${documentNames[doc.type].toLowerCase()}`
 
+export const REPORT_PROMPT = 'Report this difference to Companies House'
+
+export type DifferenceKind = 'name' | 'dob' | 'nationality' | 'transliteration'
+
+/** One difference between the document and the register (G2-10). Flagged to the reviewer, never a halt. */
+export interface RegisterDifference {
+  kind: DifferenceKind
+  ruleId: 'REG-11' | 'REG-12' | 'REG-13' | 'REG-18'
+  field: string
+  /** As the person declared it. */
+  stated: string
+  documentValue: string
+  registerValue: string
+  note?: string
+  /** One line for the discrepancy report, for example "First name: AIDAN on the document, AIDEN on the register". */
+  summary: string
+}
+
+/**
+  Differences in name, date of birth, nationality or transliteration between the
+  document and the register, after normalisation of case, spacing, hyphens and
+  apostrophes. Used by case review and by submitForReview to raise the flag and
+  the discrepancy report prompt. Empty when everything agrees.
+*/
+export function registerDifferences(
+  person: Person,
+  doc: IdDocument | undefined,
+  entry: RegisterEntry,
+): RegisterDifference[] {
+  if (!doc) return []
+  const out: RegisterDifference[] = []
+  const regName = registerNameToDocumentOrder(entry.registerName)
+  if (normaliseName(regName) !== normaliseName(doc.nameOnDocument)) {
+    const a = doc.nameOnDocument.trim().split(/\s+/)
+    const b = regName.split(/\s+/)
+    const i = a.findIndex(
+      (w, k) => normaliseName(w) !== normaliseName(b[k] ?? ''),
+    )
+    const label =
+      a.length !== b.length || i < 0
+        ? 'Name'
+        : i === 0
+          ? 'First name'
+          : i === a.length - 1
+            ? 'Family name'
+            : 'Middle name'
+    const detail =
+      a.length !== b.length || i < 0
+        ? `${doc.nameOnDocument} on the document, ${regName} on the register`
+        : `${a[i].toUpperCase()} on the document, ${b[i].toUpperCase()} on the register`
+    const translit = !!doc.nonLatinName
+    out.push({
+      kind: translit ? 'transliteration' : 'name',
+      ruleId: translit ? 'REG-18' : 'REG-11',
+      field: translit ? 'Name (transliteration)' : 'Full name',
+      stated: fullName(person),
+      documentValue: doc.nameOnDocument,
+      registerValue: entry.registerName,
+      note: nameDifference(doc.nameOnDocument, regName),
+      summary: `${translit ? `Transliteration, ${label.toLowerCase()}` : label}: ${detail}`,
+    })
+  }
+  if (monthYear(doc.dobOnDocument) !== entry.registerDobMonthYear)
+    out.push({
+      kind: 'dob',
+      ruleId: 'REG-12',
+      field: 'Date of birth',
+      stated: formatDate(person.dateOfBirth),
+      documentValue: formatDate(doc.dobOnDocument),
+      registerValue: entry.registerDobMonthYear,
+      note: 'The public register shows month and year only.',
+      summary: `Date of birth: ${monthYear(doc.dobOnDocument)} on the document, ${entry.registerDobMonthYear} on the register`,
+    })
+  const nat = doc.nationalityOnDocument ?? person.nationality
+  if (nat !== entry.registerNationality)
+    out.push({
+      kind: 'nationality',
+      ruleId: 'REG-13',
+      field: 'Nationality',
+      stated: person.nationality,
+      documentValue: nat,
+      registerValue: entry.registerNationality,
+      summary: `Nationality: ${nat} on the document, ${entry.registerNationality} on the register`,
+    })
+  return out
+}
+
 export interface ComparisonRow {
   field: string
   ruleId: string
@@ -149,20 +259,22 @@ export function comparisonRows(
   entry: RegisterEntry,
 ): ComparisonRow[] {
   if (!doc) return []
-  const regName = registerNameToDocumentOrder(entry.registerName)
-  const nameOk = normaliseName(regName) === normaliseName(doc.nameOnDocument)
-  const dobOk = monthYear(doc.dobOnDocument) === entry.registerDobMonthYear
+  const diffs = registerDifferences(person, doc, entry)
+  const nameDiff = diffs.find(
+    (d) => d.kind === 'name' || d.kind === 'transliteration',
+  )
+  const dobDiff = diffs.find((d) => d.kind === 'dob')
+  const natDiff = diffs.find((d) => d.kind === 'nationality')
   const nat = doc.nationalityOnDocument ?? person.nationality
-  const natOk = nat === entry.registerNationality
   return [
     {
       field: 'Full name',
-      ruleId: 'REG-11',
+      ruleId: nameDiff?.ruleId ?? 'REG-11',
       stated: fullName(person),
       document: doc.nameOnDocument,
       register: entry.registerName,
-      result: nameOk ? 'match' : 'mismatch',
-      note: nameOk ? undefined : nameDifference(doc.nameOnDocument, regName),
+      result: nameDiff ? 'mismatch' : 'match',
+      note: nameDiff?.note,
     },
     {
       field: 'Date of birth',
@@ -170,7 +282,7 @@ export function comparisonRows(
       stated: formatDate(person.dateOfBirth),
       document: formatDate(doc.dobOnDocument),
       register: entry.registerDobMonthYear,
-      result: dobOk ? 'match' : 'mismatch',
+      result: dobDiff ? 'mismatch' : 'match',
       note: 'The public register shows month and year only.',
     },
     {
@@ -179,7 +291,7 @@ export function comparisonRows(
       stated: person.nationality,
       document: nat,
       register: entry.registerNationality,
-      result: natOk ? 'match' : 'mismatch',
+      result: natDiff ? 'mismatch' : 'match',
     },
   ]
 }
@@ -194,12 +306,43 @@ function nameDifference(docName: string, regName: string): string {
   return `${cap(a[i])} on the document, ${cap(b[i])} on the register.`
 }
 
+/**
+  Whether an identity document is expired beyond its exception (rules DOC-EXP-01
+  to DOC-EXP-03). A passport is asked for another document while
+  expired_passport_handling is "ask_other_document" (H1). Evidence One does not
+  read chips, so the six-month allowance for a validated chip is a reviewer
+  decision when that setting is chosen.
+*/
+export function expiryStatus(
+  doc: Pick<IdDocument, 'type' | 'expiresOn'>,
+  rs: RuleSetVersion,
+  at: number,
+): 'in_date' | 'within_exception' | 'beyond_exception' {
+  if (new Date(doc.expiresOn).getTime() >= at) return 'in_date'
+  if (doc.type === 'passport') {
+    if (rs.settings.expired_passport_handling === 'ask_other_document')
+      return 'beyond_exception'
+    return addMonths(doc.expiresOn, rs.params.passport_expiry_option1) < at
+      ? 'beyond_exception'
+      : 'within_exception'
+  }
+  if (doc.type === 'biometric_residence_permit')
+    return addMonths(doc.expiresOn, rs.params.brp_expiry) < at
+      ? 'beyond_exception'
+      : 'within_exception'
+  return 'beyond_exception'
+}
+
 export interface EvidenceTrigger {
-  ruleId: 'ADDL-01' | 'ADDL-02' | 'ADDL-03'
+  ruleId: 'ADDL-01' | 'ADDL-03'
   reason: string
 }
 
-/** Rules ADDL-01 to ADDL-03: whether this case calls for one supporting document. */
+/**
+  Rules ADDL-01 and ADDL-03, the only triggers for one supporting document ("We
+  need one supporting document"). Proof of current address is separate: it is
+  asked of every individual (ADDL-02, needsProofOfAddress).
+*/
 export function evidenceTriggers(
   person: Person,
   doc: IdDocument | Pick<IdDocument, 'type'> | undefined,
@@ -208,32 +351,15 @@ export function evidenceTriggers(
   now = Date.now(),
 ): EvidenceTrigger[] {
   const out: EvidenceTrigger[] = []
-  const current = person.addressHistory.find((a) => !a.to)
-  const type = doc?.type ?? 'passport'
-  const licenceAddress =
-    doc && 'addressOnDocument' in doc ? doc.addressOnDocument : undefined
-  if (type === 'driving_licence') {
-    if (
-      licenceAddress &&
-      current &&
-      !licenceAddress.startsWith(current.address.line1)
-    )
-      out.push({
-        ruleId: 'ADDL-02',
-        reason:
-          'The driving licence shows a different address from the current address declared.',
-      })
-  } else if (rs.settings.passport_address_evidence === 'always') {
+  if (
+    doc &&
+    'expiresOn' in doc &&
+    expiryStatus(doc, rs, now) === 'beyond_exception'
+  )
     out.push({
-      ruleId: 'ADDL-02',
-      reason: `A ${documentNames[type].toLowerCase()} does not show an address, and this rule set asks every passport holder for current address evidence.`,
+      ruleId: 'ADDL-01',
+      reason: `The ${documentNames[doc.type].toLowerCase()} expired on ${formatDate(doc.expiresOn)}, beyond its exception.`,
     })
-  } else if (movedWithin(person, rs.params.address_history_months, now)) {
-    out.push({
-      ruleId: 'ADDL-02',
-      reason: `The person moved within the last ${rs.params.address_history_months} months and a ${documentNames[type].toLowerCase()} does not show an address.`,
-    })
-  }
   const names = formerNames.length ? formerNames : (person.formerNames ?? [])
   if (names.length)
     out.push({
@@ -249,6 +375,9 @@ const reviewerFor = (data: DemoData, vc: VerificationCase) =>
     .flatMap((a) => a.reviewers)
     .find((r) => r.id === (vc.reviewerId ?? PRIMARY_REVIEWER_ID))
 
+const isNameEvidence = (e: { label: string }) =>
+  /name|marriage|deed poll|certificate/i.test(e.label)
+
 /** Every rule result for a case that has reached the reviewer. */
 export function evaluateCase(
   data: DemoData,
@@ -263,6 +392,7 @@ export function evaluateCase(
   const rs = ruleSetFor(data, vc)
   const P = rs.params
   const doc = person.document
+  const acsp = data.acsps.find((a) => a.id === vc.acspId)
   const results: RuleResult[] = []
   const decisions = vc.ruleDecisions ?? {}
   const add = (
@@ -286,6 +416,7 @@ export function evaluateCase(
     vc.idvt.completedAt ??
     vc.submittedForReviewAt ??
     new Date(now).toISOString()
+  const checkMs = new Date(checkAt).getTime()
   const reached = !!vc.submittedForReviewAt || !!vc.option2
   if (!reached) return []
 
@@ -319,7 +450,7 @@ export function evaluateCase(
     'INFO-04',
     'info',
     'pass',
-    `Email ${person.email} confirmed by one-time code`,
+    `Email ${person.email} confirmed by one-time code and mobile confirmed by SMS code`,
     [declared],
   )
   add(
@@ -350,7 +481,7 @@ export function evaluateCase(
     'INFO-07',
     'info',
     'pass',
-    'Email and mobile are not registered to another individual or to the inviting Agent',
+    'Email and mobile are not registered to another individual or to the inviting Referral Partner',
     [declared],
   )
 
@@ -360,6 +491,11 @@ export function evaluateCase(
     ref: field,
     label: `Register: ${field.toLowerCase()}`,
   })
+  const docCite: Citation = {
+    kind: 'evidence',
+    ref: 'identity_document',
+    label: doc ? documentName(doc) : 'Identity document',
+  }
   const role =
     entry.role === 'director_psc'
       ? 'Both'
@@ -388,63 +524,74 @@ export function evaluateCase(
     'Person on the company’s register at the decision snapshot',
     [regCite('Role')],
   )
-  for (const row of comparisonRows(person, doc, entry)) {
-    const docCite: Citation = {
-      kind: 'evidence',
-      ref: 'identity_document',
-      label: 'Identity document',
-    }
-    if (row.ruleId === 'REG-11') {
-      if (row.result === 'match')
-        add(
-          'REG-11',
-          'register',
-          'pass',
-          'Name on the document matches the register after normalisation',
-          [docCite, regCite('Full name')],
-          NORMALISATION_NOTE,
-        )
-      else {
-        const nonLatin = !!doc?.nonLatinName
-        const outcome: RuleOutcome =
-          nonLatin && rs.settings.non_latin_difference === 'mandatory'
-            ? 'mandatory'
-            : 'halt'
-        add(
-          'REG-11',
-          'register',
-          outcome,
-          `Name on the document differs from the register after normalisation. ${row.note ?? ''}`.trim(),
-          [docCite, regCite('Full name')],
-          nonLatin
-            ? 'The name is transliterated from a non-Latin script.'
-            : NORMALISATION_NOTE,
-        )
-      }
-    } else if (row.ruleId === 'REG-12') {
+  const diffs = registerDifferences(person, doc, entry)
+  const correction = vc.correctionTaskId
+    ? ` A Route B register correction task (${vc.correctionTaskId}) is open for a genuine correction. Route A is not halted.`
+    : ' Route A is not halted.'
+  const flagged = `Flagged for your decision. Consider reporting it to Companies House.${correction}`
+  const reg19: Citation = { kind: 'rule', ref: 'REG-19', label: 'REG-19' }
+  if (doc) {
+    const nameDiff = diffs.find(
+      (d) => d.kind === 'name' || d.kind === 'transliteration',
+    )
+    if (!nameDiff)
       add(
-        'REG-12',
+        'REG-11',
         'register',
-        row.result === 'match' ? 'pass' : 'halt',
-        row.result === 'match'
-          ? `Month and year of birth match the register (${row.register})`
-          : `Month and year of birth differ from the register (${row.register})`,
-        [docCite, regCite('Date of birth')],
+        'pass',
+        'Name on the document matches the register after normalisation',
+        [docCite, regCite('Full name')],
+        NORMALISATION_NOTE,
       )
-    } else {
+    else
       add(
-        'REG-13',
+        nameDiff.ruleId,
         'register',
-        row.result === 'match' ? 'pass' : outcomeUnder('REG-13', rs),
-        row.result === 'match'
-          ? `Nationality matches the register (${row.register})`
-          : `Nationality differs: ${row.document} on the document, ${row.register} on the register`,
-        [docCite, regCite('Nationality')],
+        'mandatory',
+        nameDiff.kind === 'transliteration'
+          ? `Name differs from the register by transliteration. ${nameDiff.note ?? ''}`.trim()
+          : `Name on the document differs from the register after normalisation. ${nameDiff.note ?? ''}`.trim(),
+        [docCite, regCite('Full name'), reg19],
+        flagged,
       )
-    }
+    const dobDiff = diffs.find((d) => d.kind === 'dob')
+    add(
+      'REG-12',
+      'register',
+      dobDiff ? 'mandatory' : 'pass',
+      dobDiff
+        ? `Month and year of birth differ from the register (${dobDiff.registerValue})`
+        : `Month and year of birth match the register (${entry.registerDobMonthYear})`,
+      [docCite, regCite('Date of birth'), ...(dobDiff ? [reg19] : [])],
+      dobDiff ? flagged : undefined,
+    )
+    const natDiff = diffs.find((d) => d.kind === 'nationality')
+    add(
+      'REG-13',
+      'register',
+      natDiff ? 'mandatory' : 'pass',
+      natDiff
+        ? `Nationality differs: ${natDiff.documentValue} on the document, ${natDiff.registerValue} on the register`
+        : `Nationality matches the register (${entry.registerNationality})`,
+      [docCite, regCite('Nationality'), ...(natDiff ? [reg19] : [])],
+      natDiff ? flagged : undefined,
+    )
+  }
+  if (diffs.length) {
+    const rep = vc.discrepancyReport
+    add(
+      'REG-19',
+      'register',
+      'flag',
+      `${REPORT_PROMPT}: ${diffs.map((d) => d.summary).join('; ')}`,
+      [{ kind: 'declared', ref: 'discrepancy', label: 'Discrepancy report' }],
+      rep?.choice
+        ? `Your choice: ${rep.choice === 'will_report' ? 'you will report it to Companies House' : 'you are not reporting it'}, logged on the case${rep.choiceAt ? ` on ${formatDate(rep.choiceAt)}` : ''}. Nothing is filed through an API.`
+        : 'Prompted. No choice is recorded yet. The choice is logged on the case; nothing is filed through an API.',
+    )
   }
   if (
-    new Date(checkAt).getTime() - new Date(entry.appointedOn).getTime() <
+    checkMs - new Date(entry.appointedOn).getTime() <
     P.recent_appointment_days * DAY
   )
     add(
@@ -479,11 +626,6 @@ export function evaluateCase(
 
   // 3 Identity document
   if (doc) {
-    const docCite: Citation = {
-      kind: 'evidence',
-      ref: 'identity_document',
-      label: documentName(doc),
-    }
     add(
       'DOC-01',
       'document',
@@ -491,43 +633,36 @@ export function evaluateCase(
       `${documentName(doc)} is on the accepted list for Option ${vc.option}`,
       [docCite],
     )
-    const expired =
-      new Date(doc.expiresOn).getTime() < new Date(checkAt).getTime()
+    const status = expiryStatus(doc, rs, checkMs)
     if (vc.option === 2) {
       // Option 2 expiry tolerances are tested under OPT-06.
     } else if (doc.type === 'passport') {
-      const beyond =
-        expired &&
-        (addMonths(doc.expiresOn, P.passport_expiry_option1) <
-          new Date(checkAt).getTime() ||
-          vc.idvt.nfcChipRead !== 'pass')
+      const handling: Citation = {
+        kind: 'setting',
+        ref: 'expired_passport_handling',
+        label: 'Setting: expired passports',
+      }
       add(
         'DOC-EXP-01',
         'document',
-        beyond ? 'request' : 'pass',
-        beyond
-          ? `Passport expired ${formatDate(doc.expiresOn)}, beyond the ${P.passport_expiry_option1}-month tolerance for a chip-validated passport`
-          : expired
-            ? `Passport expired ${formatDate(doc.expiresOn)}, within the ${P.passport_expiry_option1}-month tolerance with a validated chip`
-            : `Passport in date at the check, expires ${formatDate(doc.expiresOn)}`,
-        [
-          docCite,
-          {
-            kind: 'param',
-            ref: 'passport_expiry_option1',
-            label: `${P.passport_expiry_option1} months`,
-          },
-        ],
+        status === 'in_date'
+          ? 'pass'
+          : status === 'beyond_exception'
+            ? 'request'
+            : 'mandatory',
+        status === 'in_date'
+          ? `Passport in date at the check, expires ${formatDate(doc.expiresOn)}`
+          : status === 'beyond_exception'
+            ? `Passport expired ${formatDate(doc.expiresOn)}. Until Companies House replies, another document is asked for.`
+            : `Passport expired ${formatDate(doc.expiresOn)}, within ${P.passport_expiry_option1} months. Evidence One does not read the chip, so it is not validated here. Your decision.`,
+        [docCite, handling],
       )
     } else if (doc.type === 'biometric_residence_permit') {
-      const beyond =
-        expired &&
-        addMonths(doc.expiresOn, P.brp_expiry) < new Date(checkAt).getTime()
       add(
         'DOC-EXP-02',
         'document',
-        beyond ? 'request' : 'pass',
-        beyond
+        status === 'beyond_exception' ? 'request' : 'pass',
+        status === 'beyond_exception'
           ? `Permit expired beyond ${P.brp_expiry} months`
           : `Permit within tolerance, expires ${formatDate(doc.expiresOn)}`,
         [
@@ -539,10 +674,10 @@ export function evaluateCase(
       add(
         'DOC-EXP-03',
         'document',
-        expired ? 'request' : 'pass',
-        expired
-          ? `Document expired ${formatDate(doc.expiresOn)}`
-          : `Document in date at the check, expires ${formatDate(doc.expiresOn)}`,
+        status === 'in_date' ? 'pass' : 'request',
+        status === 'in_date'
+          ? `Document in date at the check, expires ${formatDate(doc.expiresOn)}`
+          : `Document expired ${formatDate(doc.expiresOn)}`,
         [docCite],
       )
     }
@@ -551,7 +686,7 @@ export function evaluateCase(
         'DOC-02',
         'document',
         'mandatory',
-        'Provider reports cancellation marks or the document as replaced. Never an automatic rejection.',
+        'Cancellation marks or a replaced document reported. Never an automatic rejection.',
         [docCite],
       )
     if (doc.damaged)
@@ -572,26 +707,33 @@ export function evaluateCase(
     label,
   })
   if (vc.option === 1) {
-    if (doc?.hasChip && !vc.browserCapture)
+    if (doc?.hasChip) {
+      const accept = rs.settings.chip_not_read_fallback === 'accept_web_result'
       add(
         'IDVT-01',
         'idvt',
-        i.nfcChipRead === 'pass' ? 'pass' : 'block',
-        i.nfcChipRead === 'pass'
-          ? 'Chip read in the app and its cryptographic signature validated'
-          : 'Chip signature not validated',
-        [check('chip', 'Chip read')],
+        accept ? 'pass' : 'request',
+        accept
+          ? 'Chip not read by Evidence One. Browser route result accepted under the current setting.'
+          : 'Document has a chip and the chip is not read on the case. Another Option 1 document is needed, then Option 2.',
+        [
+          {
+            kind: 'setting',
+            ref: 'chip_not_read_fallback',
+            label: 'Setting: chip not read',
+          },
+        ],
       )
-    else
-      add(
-        'IDVT-02',
-        'idvt',
-        i.documentAuthenticity === 'pass' ? 'pass' : 'block',
-        i.documentAuthenticity === 'pass'
-          ? 'Physical security features validated by the certified identity provider'
-          : 'Physical security features not validated',
-        [check('authenticity', 'Document authenticity')],
-      )
+    }
+    add(
+      'IDVT-02',
+      'idvt',
+      i.documentAuthenticity === 'pass' ? 'pass' : 'block',
+      i.documentAuthenticity === 'pass'
+        ? 'Document authenticity validated by the certified identity provider on the browser route'
+        : 'Document authenticity not validated',
+      [check('authenticity', 'Document authenticity')],
+    )
     add(
       'IDVT-03',
       'idvt',
@@ -608,15 +750,20 @@ export function evaluateCase(
         : 'Face match not passed',
       [check('face', 'Face match')],
     )
-    const referred = (
-      ['nfcChipRead', 'documentAuthenticity', 'liveness', 'faceMatch'] as const
-    ).filter((k) => i[k] === 'refer')
+    const names = {
+      documentAuthenticity: 'document authenticity',
+      liveness: 'liveness',
+      faceMatch: 'face match',
+    } as const
+    const referred = (Object.keys(names) as (keyof typeof names)[]).filter(
+      (k) => i[k] === 'refer',
+    )
     if (referred.length)
       add(
         'IDVT-05',
         'idvt',
         'mandatory',
-        `The provider returned a result for review on: ${referred.map((k) => ({ nfcChipRead: 'chip read', documentAuthenticity: 'document authenticity', liveness: 'liveness', faceMatch: 'face match' })[k]).join(', ')}`,
+        `The provider returned a result for review on: ${referred.map((k) => names[k]).join(', ')}`,
         [check('authenticity', 'Provider result')],
       )
     if (doc) {
@@ -630,32 +777,23 @@ export function evaluateCase(
         nameDiff || dobDiff
           ? 'Name or date of birth on the document differs from what the individual entered at Step 1'
           : 'Name and date of birth on the document match what the individual entered',
-        [
-          declared,
-          {
-            kind: 'evidence',
-            ref: 'identity_document',
-            label: 'Identity document',
-          },
-        ],
+        [declared, docCite],
       )
     }
   }
   const attempts = i.attempts ?? 1
+  const attemptsCite: Citation = {
+    kind: 'param',
+    ref: 'idvt_attempts',
+    label: `${P.idvt_attempts} attempts`,
+  }
   if (vc.option2?.reason === 'attempts_used' || attempts >= P.idvt_attempts)
     add(
       'IDVT-08',
       'idvt',
       'flag',
       `All ${P.idvt_attempts} attempts at the checks used. Routed to Option 2.`,
-      [
-        check('liveness', 'Attempts'),
-        {
-          kind: 'param',
-          ref: 'idvt_attempts',
-          label: `${P.idvt_attempts} attempts`,
-        },
-      ],
+      [check('liveness', 'Attempts'), attemptsCite],
     )
   else if (vc.option2?.reason === 'unsupported_document')
     add(
@@ -671,18 +809,20 @@ export function evaluateCase(
       'idvt',
       'pass',
       `Checks passed on attempt ${attempts} of ${P.idvt_attempts}`,
-      [
-        {
-          kind: 'param',
-          ref: 'idvt_attempts',
-          label: `${P.idvt_attempts} attempts`,
-        },
-      ],
+      [attemptsCite],
     )
 
-  // 5 PEP and sanctions: supporting evidence for the reviewer, never a decision
+  // 5 PEP and sanctions, where screening is switched on for the ACSP. Evidence for the reviewer, never a decision.
   const scr = check('screening', 'PEP and sanctions screening')
-  if (i.pepSanctions === 'pending')
+  if (acsp && !acsp.profile.pepScreening)
+    add(
+      'AML-01',
+      'aml',
+      'pass',
+      `PEP and sanctions screening is switched off for ${acsp.name}. Rules AML-02 to AML-04 do not apply.`,
+      [scr],
+    )
+  else if (i.pepSanctions === 'pending')
     add('AML-01', 'aml', 'block', 'Screening has not run yet', [scr])
   else {
     add(
@@ -716,114 +856,105 @@ export function evaluateCase(
       ])
   }
 
-  // 6 Supporting evidence, only when a trigger applies
-  const triggers = doc
-    ? evidenceTriggers(person, doc, rs, former, new Date(checkAt).getTime())
-    : []
+  // 6 Proof of address from everyone (ADDL-02), supporting evidence only on ADDL-01 and ADDL-03
   const supporting = vc.evidence.filter((e) => e.kind === 'address_evidence')
-  if (doc && vc.option === 1) {
-    const expiredBeyond = results.some(
-      (x) => x.ruleId.startsWith('DOC-EXP') && x.outcome === 'request',
+  const nameEvidence = supporting.filter(isNameEvidence)
+  const addressEvidence = supporting.filter((e) => !isNameEvidence(e))
+  const months: Citation = {
+    kind: 'param',
+    ref: 'supporting_evidence_months',
+    label: `${P.supporting_evidence_months} months`,
+  }
+  if (needsProofOfAddress(rs)) {
+    const provided =
+      !!vc.journey?.addressProofDone || addressEvidence.length > 0
+    add(
+      'ADDL-02',
+      'evidence',
+      provided ? 'pass' : 'request',
+      provided
+        ? `Proof of current address provided. It must be dated within ${P.supporting_evidence_months} months.`
+        : `We need proof of current address dated within the last ${P.supporting_evidence_months} months`,
+      [
+        months,
+        ...addressEvidence.map((e) => ({
+          kind: 'evidence' as const,
+          ref: e.id,
+          label: e.label,
+        })),
+      ],
     )
-    if (expiredBeyond)
-      add(
-        'ADDL-01',
-        'evidence',
-        'request',
-        'The identity document is expired beyond its exception. Another identity document is needed.',
-        [
-          {
-            kind: 'evidence',
-            ref: 'identity_document',
-            label: 'Identity document',
-          },
-        ],
-      )
-    const addr = triggers.find((t) => t.ruleId === 'ADDL-02')
-    const p = {
-      kind: 'setting' as const,
-      ref: 'passport_address_evidence',
-      label:
-        rs.settings.passport_address_evidence === 'always'
-          ? 'Setting: always'
-          : 'Setting: only when needed',
-    }
-    if (addr)
-      add(
-        'ADDL-02',
-        'evidence',
-        supporting.length ? 'flag' : 'request',
-        supporting.length
-          ? `One supporting document was requested and provided. ${addr.reason}`
-          : `One supporting document is needed for the current address. ${addr.reason}`,
-        [
-          p,
-          ...supporting.map((e) => ({
-            kind: 'evidence' as const,
-            ref: e.id,
-            label: e.label,
-          })),
-        ],
-      )
-    else
-      add(
-        'ADDL-02',
-        'evidence',
-        'pass',
-        doc.type === 'driving_licence'
-          ? 'The driving licence shows the current address. No supporting document needed.'
-          : 'No supporting document needed. The identity document and address history were sufficient.',
-        [p],
-      )
-    const name = triggers.find((t) => t.ruleId === 'ADDL-03')
-    if (name)
-      add(
-        'ADDL-03',
-        'evidence',
-        'request',
-        `Evidence of the name change is needed. ${name.reason}`,
-        [declared],
-      )
+  }
+  const triggers = evidenceTriggers(person, doc, rs, former, checkMs)
+  const expiredTrigger =
+    vc.option === 1 && triggers.find((t) => t.ruleId === 'ADDL-01')
+  const nameTrigger = triggers.find((t) => t.ruleId === 'ADDL-03')
+  const uploaded = !!vc.journey?.evidenceUploaded
+  if (expiredTrigger) {
+    const given = uploaded || supporting.length >= 2
+    add(
+      'ADDL-01',
+      'evidence',
+      given ? 'flag' : 'request',
+      given
+        ? `One supporting document was requested and provided. ${expiredTrigger.reason}`
+        : `We need one supporting document. ${expiredTrigger.reason}`,
+      [docCite],
+    )
+  }
+  if (nameTrigger) {
+    const given = uploaded || nameEvidence.length > 0
+    add(
+      'ADDL-03',
+      'evidence',
+      given ? 'flag' : 'request',
+      given
+        ? `One supporting document was requested and provided. ${nameTrigger.reason}`
+        : `We need one supporting document. ${nameTrigger.reason}`,
+      [
+        declared,
+        ...nameEvidence.map((e) => ({
+          kind: 'evidence' as const,
+          ref: e.id,
+          label: e.label,
+        })),
+      ],
+    )
   }
   for (const e of supporting) {
     const ev: Citation = { kind: 'evidence', ref: e.id, label: e.label }
-    add(
-      'ADDL-10',
-      'evidence',
-      'pass',
-      `${e.label} is an accepted type of supporting document`,
-      [ev],
-    )
-    if (e.documentDate) {
-      const ok =
-        addMonths(e.documentDate, P.supporting_evidence_months) >=
-        new Date(e.uploadedAt).getTime()
+    if (!isNameEvidence(e)) {
       add(
-        'ADDL-11',
+        'ADDL-10',
         'evidence',
-        ok ? 'pass' : 'request',
-        ok
-          ? `Dated ${formatDate(e.documentDate)}, within ${P.supporting_evidence_months} months of upload (date read by AI extraction)`
-          : `Dated ${formatDate(e.documentDate)}, more than ${P.supporting_evidence_months} months before upload (date read by AI extraction). A more recent document is needed.`,
-        [
-          ev,
-          {
-            kind: 'param',
-            ref: 'supporting_evidence_months',
-            label: `${P.supporting_evidence_months} months`,
-          },
-        ],
+        'pass',
+        `${e.label} is an accepted type of supporting document`,
+        [ev],
+      )
+      if (e.documentDate) {
+        const ok =
+          addMonths(e.documentDate, P.supporting_evidence_months) >=
+          new Date(e.uploadedAt).getTime()
+        add(
+          'ADDL-11',
+          'evidence',
+          ok ? 'pass' : 'request',
+          ok
+            ? `Dated ${formatDate(e.documentDate)}, within ${P.supporting_evidence_months} months of upload (date read by AI extraction)`
+            : `Dated ${formatDate(e.documentDate)}, more than ${P.supporting_evidence_months} months before upload (date read by AI extraction). A more recent document is needed.`,
+          [ev, months],
+        )
+      }
+      add(
+        'ADDL-12',
+        'evidence',
+        e.showsAddress === false ? 'mandatory' : 'pass',
+        e.showsAddress === false
+          ? 'The document does not clearly show the declared current address (AI extraction)'
+          : 'Shows the declared current address (AI extraction)',
+        [ev, { kind: 'declared', ref: 'address', label: 'Current address' }],
       )
     }
-    add(
-      'ADDL-12',
-      'evidence',
-      e.showsAddress === false ? 'mandatory' : 'pass',
-      e.showsAddress === false
-        ? 'The document does not clearly show the declared current address (AI extraction)'
-        : 'Shows the declared current address (AI extraction)',
-      [ev, { kind: 'declared', ref: 'address', label: 'Current address' }],
-    )
     add(
       'ADDL-13',
       'evidence',
@@ -850,21 +981,10 @@ export function evaluateCase(
     const reason = {
       attempts_used: 'all attempts at the digital checks were used',
       unsupported_document: 'the provider cannot support the document',
-      no_chip_phone:
-        'the person’s phone cannot read the passport chip and they have no photocard driving licence',
     }[o.reason]
-    if (o.reason === 'no_chip_phone')
-      add(
-        'OPT-02',
-        'option',
-        'mandatory',
-        `Option 2 requested because ${reason}. Your agreement is needed before a person check is used.`,
-        [{ kind: 'declared', ref: 'option2', label: 'Option 2 request' }],
-      )
-    else
-      add('OPT-02', 'option', 'flag', `Option 2 offered because ${reason}`, [
-        { kind: 'declared', ref: 'option2', label: 'Option 2 request' },
-      ])
+    add('OPT-02', 'option', 'flag', `Option 2 offered because ${reason}`, [
+      { kind: 'declared', ref: 'option2', label: 'Option 2 request' },
+    ])
     const reviewer = reviewerFor(data, vc)
     const att = reviewer?.attestation
     const current = att && new Date(att.expiresOn).getTime() > now
@@ -917,6 +1037,72 @@ export function evaluateCase(
       )
     }
   }
+
+  // 8 ACSP, payment, lapse and submission rules that attach to this case
+  const instructedAt = vc.journey?.instructedAt ?? vc.allocation?.instructedAt
+  if (acsp && instructedAt)
+    add(
+      'ACSP-01',
+      'decision',
+      'pass',
+      `${person.givenNames.split(' ')[0]} confirmed they instruct ${acsp.name} on ${formatDate(instructedAt)}`,
+      [{ kind: 'declared', ref: 'instruct', label: 'Instruction recorded' }],
+    )
+  if (vc.payment?.payeeAcspId) {
+    const payee = data.acsps.find((a) => a.id === vc.payment!.payeeAcspId)
+    add(
+      'ACSP-02',
+      'decision',
+      'pass',
+      `Payment of £${vc.payment.amount} to ${payee?.name ?? 'the named ACSP'} as merchant of record, collected by Evidence One as its disclosed agent`,
+      [{ kind: 'declared', ref: 'payment', label: 'Payment record' }],
+    )
+  }
+  if (acsp && ['suspended', 'ceased', 'withdrawn'].includes(acsp.status)) {
+    if (vc.reallocation) {
+      const r = vc.reallocation
+      const to =
+        data.acsps.find((a) => a.id === r.offeredAcspId)?.name ?? 'another ACSP'
+      add(
+        'ACSP-13',
+        'decision',
+        r.individualResponse === 'pending'
+          ? 'request'
+          : r.individualResponse === 'agreed'
+            ? 'pass'
+            : 'flag',
+        r.individualResponse === 'pending'
+          ? `Offered to ${to}. Waiting for the individual to agree or decline.`
+          : r.individualResponse === 'agreed'
+            ? `The individual agreed to move to ${to}.`
+            : `The individual declined the move to ${to}.`,
+      )
+    } else if (
+      ['approved', 'submission_started', 'submitted', 'confirmed'].includes(
+        vc.status,
+      )
+    )
+      add(
+        'ACSP-12',
+        'decision',
+        'flag',
+        `Verified by ${acsp.name}, whose status is now ${acsp.status.replace('_', ' ')}. Listed for follow-up.`,
+      )
+  }
+  if (vc.submission?.verificationReference)
+    add(
+      'SUB-04',
+      'submission',
+      'pass',
+      `Companies House verification reference ${vc.submission.verificationReference} recorded. No personal code is held.`,
+      [
+        {
+          kind: 'declared',
+          ref: 'submission',
+          label: 'Verification reference',
+        },
+      ],
+    )
   return results
 }
 

@@ -2,7 +2,7 @@ import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
 import { ruleById, rules, settingDefs, sourceNames } from '@/data/rules'
 import { formatDate, fullName } from '@/lib/format'
 import {
-  comparisonRows,
+  registerDifferences,
   currentRuleSet,
   draftRuleSet,
   evaluateCase,
@@ -42,13 +42,14 @@ export const CASE_SUGGESTIONS = [
   'What remains outstanding on this case?',
   'Why was this case flagged?',
   'Which evidence supports this?',
+  'What should I do about the register difference?',
   'Identify discrepancies across this file.',
   'Summarise this case.',
   'Draft a message to the individual asking for the outstanding item.',
 ]
 
 export const RULES_SUGGESTIONS = [
-  'What does REG-13 do?',
+  'What does REG-11 do?',
   'Which rules can block approval?',
   'What changed between versions?',
 ]
@@ -111,7 +112,11 @@ export function classify(scope: CopilotScope, q: string): string {
     )
   )
     return 'outstanding'
-  if (/discrepanc|differ|mismatch|inconsisten|conflict/.test(s))
+  if (
+    /report|companies house|register difference|discrepanc|differ|mismatch|inconsisten|conflict/.test(
+      s,
+    )
+  )
     return 'discrepancies'
   if (/summar|overview|brief|recap/.test(s)) return 'summary'
   if (/evidence|support|backs|proof|why .*pass/.test(s)) return 'evidence'
@@ -152,7 +157,6 @@ export function answerQuestion(
 
 const outcomeVerb: Record<string, string> = {
   block: 'blocks approval',
-  halt: 'halted the case',
   request: 'is waiting on a request',
   mandatory: 'needs your Mandatory decision',
   flag: 'raised a flag for you to note',
@@ -196,7 +200,7 @@ function caseAnswer(
       intent,
       statements: [
         {
-          text: `${name} has not finished the app journey yet, so no rules have been evaluated on this case.`,
+          text: `${name} has not finished the journey yet, so no rules have been evaluated on this case.`,
           cites: [{ kind: 'declared', ref: 'personal', label: 'Case status' }],
         },
       ],
@@ -214,7 +218,7 @@ function caseAnswer(
           lead: 'Nothing is outstanding.',
           statements: [
             {
-              text: `No Block, Halt or Request is open, and every Mandatory decision has been recorded under rule set ${rs.version}. The decision is yours.`,
+              text: `No Block or Request is open, and every Mandatory decision has been recorded under rule set ${rs.version}. The decision is yours.`,
               cites: [rule('DEC-02'), version],
             },
           ],
@@ -233,9 +237,7 @@ function caseAnswer(
                 ? 'You recorded that you are not satisfied. Approval stays closed; you can request information or decline.'
                 : o.reason === 'request'
                   ? 'Waiting for the individual.'
-                  : o.reason === 'halt'
-                    ? 'Resumes automatically once the register matches.'
-                    : 'Approval stays closed while this stands. The case can still be declined.'
+                  : 'Approval stays closed while this stands. The case can still be declined.'
           return {
             text: `${o.ruleId} ${outcomeVerb[o.outcome] ?? ''}: ${o.title} ${how}`,
             cites: resultCites(r),
@@ -302,25 +304,20 @@ function caseAnswer(
     }
     case 'discrepancies': {
       const statements: Statement[] = []
-      for (const row of comparisonRows(person, person.document, entry)) {
-        if (row.result === 'mismatch')
-          statements.push({
-            text: `${row.field}: ${row.document} on the document, ${row.register} on the register${row.stated !== row.document ? `, ${row.stated} as stated` : ''}. ${row.note ?? ''}`.trim(),
-            cites: [
-              rule(row.ruleId),
-              {
-                kind: 'register',
-                ref: row.field,
-                label: `Register: ${row.field.toLowerCase()}`,
-              },
-              {
-                kind: 'evidence',
-                ref: 'identity_document',
-                label: 'Identity document',
-              },
-            ],
-          })
-      }
+      const diffs = registerDifferences(person, person.document, entry)
+      if (diffs.length)
+        statements.push({
+          text: `${diffs.map((d) => d.summary).join('; ')}. Flagged for your decision; consider reporting it to Companies House. Route A is not halted, and your choice is logged on the case. Nothing is filed through an API.`,
+          cites: [
+            ...diffs.map((d) => rule(d.ruleId)),
+            rule('REG-19'),
+            {
+              kind: 'register',
+              ref: 'Full name',
+              label: 'Register: full name',
+            },
+          ],
+        })
       for (const r of results.filter(
         (x) =>
           (x.ruleId === 'IDVT-06' && x.outcome !== 'pass') ||
@@ -363,9 +360,7 @@ function caseAnswer(
         .filter((r) => r.step === 'idvt' && r.outcome === 'pass')
         .map((r) => r.ruleId)
       const mandatory = results.filter((r) => r.outcome === 'mandatory')
-      const diffs = comparisonRows(person, person.document, entry).filter(
-        (r) => r.result === 'mismatch',
-      )
+      const diffs = registerDifferences(person, person.document, entry)
       return {
         intent,
         lead: `${name}, ${vc.id}, under rule set ${rs.version}.`,
@@ -394,7 +389,7 @@ function caseAnswer(
           },
           {
             text: diffs.length
-              ? `Discrepancies: ${diffs.map((d) => `${d.field.toLowerCase()} differs from the register`).join('; ')}.`
+              ? `Register differences flagged for your decision: ${diffs.map((d) => d.field.toLowerCase()).join(', ')}. Consider reporting to Companies House.`
               : 'Discrepancies: none between declared data, the document and the register.',
             cites: [rule('REG-11'), rule('REG-12'), rule('REG-13')],
           },
@@ -443,7 +438,7 @@ function caseAnswer(
       const reviewer =
         acsp?.reviewers.find((r) => r.id === PRIMARY_REVIEWER_ID) ??
         acsp?.reviewers[0]
-      const body = `Dear ${first},\n\nYour identity verification is being conducted by ${acsp?.name ?? 'your ACSP'} using the Evidence One platform. To continue, we need the following from you:\n\n${requests.length && !useCustom ? requests.map((o) => `- ${o.title}`).join('\n') : `- ${item}`}\n\nYou can upload it in the Evidence One app without starting again. If you have any questions, reply to this message.\n\nKind regards,\n${reviewer?.name ?? 'ACSP reviewer'}\n${acsp?.name ?? ''}`
+      const body = `Dear ${first},\n\nYour identity verification is being conducted by ${acsp?.name ?? 'your ACSP'} using the Evidence One platform. To continue, we need the following from you:\n\n${requests.length && !useCustom ? requests.map((o) => `- ${o.title}`).join('\n') : `- ${item}`}\n\nYou can upload it from your case link in the browser without starting again. If you have any questions, reply to this message.\n\nKind regards,\n${reviewer?.name ?? 'ACSP reviewer'}\n${acsp?.name ?? ''}`
       return {
         intent,
         lead: 'Here is a draft. Review it before sending.',
@@ -510,7 +505,7 @@ function rulesAnswer(
     if (def.setting) {
       const s = settingDefs.find((x) => x.key === def.setting)!
       statements.push({
-        text: `Its outcome depends on the decision setting "${s.label}", currently ${s.options.find((o) => o.value === rs.settings[def.setting!])?.label}. That setting is pending your decision (${s.decisionPoint}).`,
+        text: `Its outcome depends on the decision setting "${s.label}", currently ${s.options.find((o) => o.value === rs.settings[def.setting!])?.label}. ${s.pending ? `That setting is pending your decision (${s.pending}).` : ''}`,
         cites: [{ kind: 'setting', ref: s.key, label: s.label }],
       })
     }
@@ -523,12 +518,21 @@ function rulesAnswer(
   if (intent === 'blocking') {
     const blocking = rules.filter(
       (r) =>
-        ['block', 'halt'].includes(outcomeUnder(r.id, rs)) &&
-        !['SUB-01', 'SUB-02', 'SUB-03', 'RET-04'].includes(r.id),
+        outcomeUnder(r.id, rs) === 'block' &&
+        r.group !== 'acsp' &&
+        ![
+          'SUB-01',
+          'SUB-02',
+          'SUB-03',
+          'SUB-04',
+          'SUB-05',
+          'RET-04',
+          'MSG-01',
+        ].includes(r.id),
     )
     return {
       intent,
-      lead: `In version ${rs.version}, these rules can stop approval:`,
+      lead: `In version ${rs.version}, these rules can stop approval. No rule halts Route A on a register difference:`,
       statements: [
         ...blocking.map((r) => ({
           text: `${r.id} (${outcomeName[outcomeUnder(r.id, rs)]}): ${r.condition}.`,
@@ -638,6 +642,8 @@ const groupName = (g: string) =>
     evidence: 'Supporting evidence',
     option: 'Option 1 and Option 2',
     decision: 'Decision',
+    acsp: 'ACSPs, allocation and Referral Partners',
+    messages: 'Case messages',
     records: 'Submission and records',
   })[g] ?? g
 

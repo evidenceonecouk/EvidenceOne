@@ -1,6 +1,6 @@
 import {
   ArrowRight,
-  Clock3,
+  CalendarClock,
   FileDiff,
   GitBranch,
   History,
@@ -19,6 +19,7 @@ import { Link } from 'react-router'
 import { HeroBanner, Page, Panel, PanelHeader } from '@/components/app/Page'
 import { SidePanel } from '@/components/app/SidePanel'
 import { useToast } from '@/components/app/Toaster'
+import { PendingDecision } from '@/components/PendingDecision'
 import { OutcomeChip, RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,10 +28,9 @@ import {
   ruleGroups,
   rules,
   RULE_SET_NAME,
-  SECOND_APPROVER,
   settingDefs,
   sourceNames,
-  SUPER_ADMIN,
+  superAdminActor,
   type RuleDef,
   type RuleGroupId,
 } from '@/data/rules'
@@ -85,7 +85,8 @@ export function RulesPage() {
   const [copilot, setCopilot] = useState(false)
   const [openRule, setOpenRule] = useState<RuleDef | null>(null)
   const persona = state.persona
-  const canPropose = persona === 'admin'
+  const seat = state.superAdminSeat
+  const canPropose = persona === 'superAdmin' && seat === 1
   const current = currentRuleSet(data)
   const draft = draftRuleSet(data)
 
@@ -134,7 +135,8 @@ export function RulesPage() {
           }
         />
 
-        <RoleNotice persona={persona} />
+        <RoleNotice persona={persona} seat={seat} />
+        <ReviewTimeline />
         {draft && <DraftPanel draft={draft} current={current} />}
 
         <nav aria-label="On this page" className="mb-6 flex flex-wrap gap-2">
@@ -203,24 +205,37 @@ function StatusPill({ status }: { status: RuleSetStatus }) {
   )
 }
 
-function PendingBadge() {
+/** The review window, a quiet banner. M2, to confirm. */
+function ReviewTimeline() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-highlight-wash px-2 py-0.5 text-[0.8125rem] font-medium whitespace-nowrap text-ink">
-      <Clock3 className="size-3.5" aria-hidden="true" />
-      Pending your decision
-    </span>
+    <p className="mb-4 flex items-start gap-3 rounded-2xl border border-line bg-mist/50 px-5 py-3 text-[0.9375rem] text-graphite">
+      <CalendarClock
+        className="mt-0.5 size-4 shrink-0 text-ink"
+        aria-hidden="true"
+      />
+      <span>
+        Acceptance closes Thursday 15 October 2026; signature is planned for
+        Friday 16 October 2026 (to confirm, M2).
+      </span>
+    </p>
   )
 }
 
-function RoleNotice({ persona }: { persona: string }) {
+function RoleNotice({ persona, seat }: { persona: string; seat: 1 | 2 }) {
   const text =
-    persona === 'admin'
-      ? 'You can propose changes to parameters and decision settings. A change never edits the current version: it creates a draft, which a second approver must publish.'
-      : persona === 'admin2'
-        ? 'You are the second approver. Review the proposed version and publish it with an effective date, or return it. You cannot publish a change you proposed.'
-        : 'Read only. Changes are proposed by an administrator and published by a second approver. Decided cases keep the version applied at their decision.'
+    persona === 'superAdmin' && seat === 1
+      ? 'You are Super Administrator, seat 1. You can propose changes to parameters and decision settings. A change never edits the current version: it creates a draft, which a different Super Administrator must approve and publish.'
+      : persona === 'superAdmin'
+        ? 'You are Super Administrator, seat 2, the second approver. Review the proposed version and publish it with an effective date, or return it. You cannot publish a change you proposed.'
+        : persona === 'platformAdmin'
+          ? 'Read only. Super Administrator only, with a second approver. A Platform Administrator can read the rule set and its history but cannot propose, approve or publish a change.'
+          : 'Read only. Changes are proposed by a Super Administrator and published by a second approver. Decided cases keep the version applied at their decision.'
   const Icon =
-    persona === 'admin' ? Pencil : persona === 'admin2' ? UserCheck : Lock
+    persona === 'superAdmin' && seat === 1
+      ? Pencil
+      : persona === 'superAdmin'
+        ? UserCheck
+        : Lock
   return (
     <p className="mb-6 flex items-start gap-3 rounded-2xl border border-line bg-white px-5 py-4 text-[0.9375rem] leading-relaxed text-graphite">
       <Icon className="mt-0.5 size-4 shrink-0 text-ink" aria-hidden="true" />
@@ -236,7 +251,7 @@ function DraftPanel({
   draft: RuleSetVersion
   current: RuleSetVersion
 }) {
-  const { state, apply, setPersona } = useDemoStore()
+  const { state, apply, setSeat } = useDemoStore()
   const toast = useToast()
   const [effective, setEffective] = useState(() =>
     new Date().toISOString().slice(0, 10),
@@ -244,6 +259,9 @@ function DraftPanel({
   const [note, setNote] = useState('')
   const changes = versionChanges(current, draft)
   const persona = state.persona
+  const seat = state.superAdminSeat
+  const actor = superAdminActor(seat)
+  const isSuper = persona === 'superAdmin'
   const pending = draft.status === 'pending_approval'
 
   return (
@@ -317,12 +335,12 @@ function DraftPanel({
       </div>
 
       <div className="border-t border-line/80 bg-mist/30 px-5 py-4 sm:px-6">
-        {persona === 'admin' && !pending && (
+        {isSuper && seat === 1 && !pending && (
           <div className="flex flex-wrap items-center gap-3">
             <Button
               disabled={!changes.length}
               onClick={() => {
-                apply((d) => submitDraft(d, SUPER_ADMIN))
+                apply((d) => submitDraft(d, actor))
                 toast({
                   title: `Draft ${draft.version} submitted`,
                   description: 'A second approver must review and publish it.',
@@ -334,30 +352,31 @@ function DraftPanel({
             </Button>
             <Button
               variant="ghost"
-              onClick={() => apply((d) => discardDraft(d, SUPER_ADMIN))}
+              onClick={() => apply((d) => discardDraft(d, actor))}
             >
               <Trash2 aria-hidden="true" />
               Discard draft
             </Button>
           </div>
         )}
-        {persona === 'admin' && pending && (
+        {isSuper && seat === 1 && pending && (
           <div className="flex flex-wrap items-center gap-4">
             <p className="flex-1 text-[0.9375rem] text-graphite">
               Submitted {draft.submittedAt && formatDateTime(draft.submittedAt)}
               . You cannot publish your own change. A second approver must
               review it.
             </p>
-            <Button onClick={() => setPersona('admin2')}>
+            <Button onClick={() => setSeat(2)}>
               <UserCheck aria-hidden="true" />
-              Switch to Admin (second approver)
+              Switch to seat 2, the second approver
             </Button>
           </div>
         )}
-        {persona === 'admin2' && pending && (
+        {isSuper && seat === 2 && pending && (
           <div className="space-y-4">
             <p className="text-[0.9375rem] text-graphite">
-              Proposed by {draft.submittedBy}. Reviewing as {SECOND_APPROVER}.
+              Proposed by {draft.submittedBy}. Reviewing as {actor}. Another
+              Super Administrator, not the proposer.
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div>
@@ -376,12 +395,12 @@ function DraftPanel({
                 />
               </div>
               <Button
-                disabled={!effective || draft.submittedBy === SECOND_APPROVER}
+                disabled={!effective || draft.submittedBy === actor}
                 onClick={() => {
                   const at = new Date(
                     `${effective}T${new Date().toISOString().slice(11)}`,
                   ).toISOString()
-                  apply((d) => publishDraft(d, at, SECOND_APPROVER))
+                  apply((d) => publishDraft(d, at, actor))
                   toast({
                     title: `Version ${draft.version} published`,
                     description: `Version ${current.version} is now superseded. New cases use ${draft.version}.`,
@@ -410,9 +429,7 @@ function DraftPanel({
               <Button
                 variant="outline"
                 disabled={!note.trim()}
-                onClick={() =>
-                  apply((d) => returnDraft(d, SECOND_APPROVER, note.trim()))
-                }
+                onClick={() => apply((d) => returnDraft(d, actor, note.trim()))}
               >
                 <Undo2 aria-hidden="true" />
                 Return to draft
@@ -420,16 +437,18 @@ function DraftPanel({
             </div>
           </div>
         )}
-        {persona === 'admin2' && !pending && (
+        {isSuper && seat === 2 && !pending && (
           <p className="text-[0.9375rem] text-graphite">
-            The administrator has not submitted this draft yet.
+            The proposing Super Administrator has not submitted this draft yet.
           </p>
         )}
-        {persona !== 'admin' && persona !== 'admin2' && (
+        {!isSuper && (
           <p className="text-[0.9375rem] text-graphite">
             {pending
               ? 'Waiting for the second approver.'
-              : 'Being prepared by an administrator.'}{' '}
+              : 'Being prepared by a Super Administrator.'}{' '}
+            {persona === 'platformAdmin' &&
+              'Super Administrator only, with a second approver. '}
             Cases keep using version {current.version} until a new version is
             published.
           </p>
@@ -558,6 +577,11 @@ function RulesList({ onOpen }: { onOpen: (r: RuleDef) => void }) {
                             Reads {r.param} = {rs.params[r.param]}
                           </span>
                         )}
+                        {r.pending && (
+                          <span className="mt-1 block">
+                            <PendingDecision code={r.pending} />
+                          </span>
+                        )}
                         {r.setting && (
                           <span className="mt-0.5 block text-[0.8125rem] text-slate">
                             Set by:{' '}
@@ -673,9 +697,11 @@ function RuleDetail({
                         (o) => o.value === rs.settings[def.setting!],
                       )?.label
                   }
-                  <span className="mt-1 block">
-                    <PendingBadge />
-                  </span>
+                  {def.pending && (
+                    <span className="mt-1 block">
+                      <PendingDecision code={def.pending} />
+                    </span>
+                  )}
                 </dd>
               </div>
             )}
@@ -803,7 +829,7 @@ function ParamsPanel({ canEdit }: { canEdit: boolean }) {
                         proposeRuleChange(
                           d,
                           { kind: 'param', key: p.key, value: n },
-                          SUPER_ADMIN,
+                          superAdminActor(1),
                         ),
                       )
                       toast({
@@ -902,18 +928,21 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-base font-medium text-ink">{s.label}</p>
-                <PendingBadge />
+                {s.pending && <PendingDecision code={s.pending} />}
                 <span className="font-mono text-[0.8125rem] text-slate">
-                  {s.rules.join(', ')} · {s.decisionPoint}
+                  {s.rules.join(', ')}
                 </span>
               </div>
               <p className="mt-1 text-[0.9375rem] text-graphite">
                 {s.question}
               </p>
+              <p className="mt-1 text-[0.875rem] leading-relaxed text-slate">
+                {s.help}
+              </p>
               <div
                 role="radiogroup"
                 aria-label={s.label}
-                className="mt-3 inline-flex rounded-xl border border-line bg-mist p-1"
+                className="mt-3 inline-flex max-w-full flex-wrap rounded-xl border border-line bg-mist p-1"
               >
                 {s.options.map((o) => {
                   const on = shown === o.value
@@ -930,7 +959,7 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
                           proposeRuleChange(
                             d,
                             { kind: 'setting', key: s.key, value: o.value },
-                            SUPER_ADMIN,
+                            superAdminActor(1),
                           ),
                         )
                         toast({
@@ -939,13 +968,18 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
                         })
                       }}
                       className={cn(
-                        'h-9 rounded-lg px-3.5 text-[0.9375rem] transition-colors duration-150 disabled:cursor-default',
+                        'min-h-9 rounded-lg px-3.5 py-1.5 text-left text-[0.9375rem] transition-colors duration-150 disabled:cursor-default',
                         on
                           ? 'bg-white font-medium text-ink shadow-sm'
                           : 'text-graphite enabled:cursor-pointer enabled:hover:text-ink',
                       )}
                     >
                       {o.label}
+                      {o.recommended && (
+                        <span className="ml-1.5 text-[0.8125rem] text-slate">
+                          (recommended)
+                        </span>
+                      )}
                     </button>
                   )
                 })}
