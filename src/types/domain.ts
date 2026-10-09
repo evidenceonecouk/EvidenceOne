@@ -568,6 +568,13 @@ export interface JourneyState {
   photoPageDone?: boolean
   selfieDone?: boolean
   checksDone?: boolean
+  /** Failed attempts at the identity checks so far (IDVT-07). After idvt_attempts, Option 2 is offered (IDVT-08). */
+  checkAttempts?: number
+  /** The person holds an eVisa: passport plus any one Group B document until the provider confirms an eVisa check in the browser. */
+  eVisa?: boolean
+  eVisaSecondDocument?: string
+  /** Expired document (DOC-EXP-01, H1): use another document, or continue with one supporting document (ADDL-01, a Request). */
+  expiredChoice?: 'other_document' | 'supporting_document'
   /** The individual confirmed they instruct the named ACSP (rules ACSP-01 and ACSP-02). */
   instructedAt?: ISODate
   /** Proof of current address uploaded (ADDL-02, every individual). */

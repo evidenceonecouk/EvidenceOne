@@ -1,14 +1,4 @@
-/* Simulated capture timings for the chip read and the photo page scan. */
-
-export const CHIP_DURATION = 6800
-
-/** Progress points at which each part of the chip has been read. */
-export const CHIP_AT = {
-  connected: 30,
-  signature: 60,
-  photo: 85,
-  details: 100,
-} as const
+/* Simulated capture timings for the photo page scan. */
 
 export type ScanPhase =
   | 'idle'
