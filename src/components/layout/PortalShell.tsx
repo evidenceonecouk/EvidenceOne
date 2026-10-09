@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   UserCheck,
   Users,
+  UsersRound,
   Waypoints,
   X,
   type LucideIcon,
@@ -78,6 +79,7 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
     const tasks = data.corrections.filter(
       (t) => t.status !== 'register_updated',
     ).length
+    const lapsed = ['suspended', 'ceased', 'withdrawn'].includes(acsp.status)
     return {
       section: 'Compliance',
       items: [
@@ -95,6 +97,15 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
         },
         { to: '/records', label: 'Records', icon: Archive },
         { to: '/acsp/billing', label: 'Billing', icon: Receipt },
+        ...(lapsed
+          ? [
+              {
+                to: '/acsp/affected',
+                label: 'Affected cases',
+                icon: UsersRound,
+              },
+            ]
+          : []),
         { to: '/rules', label: 'Rules', icon: ListChecks },
       ],
     }

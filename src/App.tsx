@@ -62,6 +62,11 @@ const Correction = lazy(() =>
 const HandoffPage = lazy(() =>
   import('@/features/acsp/Handoff').then((m) => ({ default: m.HandoffPage })),
 )
+const WebFilingHandoffPage = lazy(() =>
+  import('@/features/acsp/WebFilingHandoff').then((m) => ({
+    default: m.WebFilingHandoffPage,
+  })),
+)
 const RulesPage = lazy(() =>
   import('@/features/rules/RulesPage').then((m) => ({ default: m.RulesPage })),
 )
@@ -194,6 +199,14 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               {/* Opens in its own window: the Evidence One interstitial before GOV.UK One Login */}
+              <Route
+                path="handoff/filing/:taskId"
+                element={
+                  <Suspense fallback={null}>
+                    <WebFilingHandoffPage />
+                  </Suspense>
+                }
+              />
               <Route
                 path="handoff/:caseId"
                 element={
