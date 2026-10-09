@@ -92,6 +92,13 @@ export const registerDetails: Record<string, DemoRegisterDetails> = {
         description:
           'Appointment of Miss Lucy Rose Ashby as a director on 1 April 2022',
       },
+      {
+        date: '2024-03-05',
+        type: 'AP01',
+        category: 'Officers',
+        description:
+          'Appointment of Mr Bernard Edwin Whitlow as a director on 1 March 2024',
+      },
     ],
     officers: {
       'p-margaret': {
@@ -103,6 +110,10 @@ export const registerDetails: Record<string, DemoRegisterDetails> = {
         countryOfResidence: 'England',
       },
       'p-thomas': { occupation: 'Baker', countryOfResidence: 'England' },
+      'p-bernard': {
+        occupation: 'Retired accountant',
+        countryOfResidence: 'England',
+      },
     },
   },
   '99520316': {
@@ -379,6 +390,163 @@ export const registerDetails: Record<string, DemoRegisterDetails> = {
     ],
     officers: {
       'p-hannah': { occupation: 'Caterer', countryOfResidence: 'Wales' },
+    },
+  },
+  '99927415': {
+    accountingReference: { day: 30, month: 9 },
+    accounts: {
+      lastMadeUpTo: '2025-09-30',
+      lastType: 'Total exemption full',
+      nextMadeUpTo: '2026-09-30',
+      nextDue: '2027-06-30',
+    },
+    confirmationStatement: {
+      lastMadeUpTo: '2026-09-11',
+      nextMadeUpTo: '2027-09-11',
+      nextDue: '2027-09-25',
+    },
+    filings: [
+      {
+        date: '2026-09-18',
+        type: 'CS01',
+        category: 'Confirmation statement',
+        description:
+          'Confirmation statement made on 11 September 2026 with no updates',
+      },
+      {
+        date: '2026-06-24',
+        type: 'AA',
+        category: 'Accounts',
+        description:
+          'Total exemption full accounts made up to 30 September 2025',
+      },
+      {
+        date: '2022-09-12',
+        type: 'NEWINC',
+        category: 'Incorporation',
+        description: 'Incorporation of a private limited company',
+      },
+    ],
+    officers: {
+      'p-dmytro': {
+        occupation: 'Company director',
+        countryOfResidence: 'United Arab Emirates',
+      },
+    },
+  },
+  '99941526': {
+    accountingReference: { day: 31, month: 3 },
+    accounts: {
+      lastMadeUpTo: '2026-03-31',
+      lastType: 'Small',
+      nextMadeUpTo: '2027-03-31',
+      nextDue: '2027-12-31',
+    },
+    confirmationStatement: {
+      lastMadeUpTo: '2026-06-02',
+      nextMadeUpTo: '2027-06-02',
+      nextDue: '2027-06-16',
+    },
+    hasCharges: true,
+    filings: [
+      {
+        date: '2026-06-09',
+        type: 'CS01',
+        category: 'Confirmation statement',
+        description:
+          'Confirmation statement made on 2 June 2026 with no updates',
+      },
+      {
+        date: '2025-04-11',
+        type: 'AP01',
+        category: 'Officers',
+        description:
+          'Appointment of Mr Callum James Frasier as a director on 7 April 2025',
+      },
+      {
+        date: '2014-06-02',
+        type: 'NEWINC',
+        category: 'Incorporation',
+        description: 'Incorporation of a private limited company',
+      },
+    ],
+    officers: {
+      'p-rhys': { occupation: 'Brewer', countryOfResidence: 'England' },
+      'p-eleni': {
+        occupation: 'Operations director',
+        countryOfResidence: 'England',
+      },
+      'p-gareth': { occupation: 'Brewer', countryOfResidence: 'England' },
+      'p-ruth': { occupation: 'Sales manager', countryOfResidence: 'England' },
+      'p-callum': {
+        occupation: 'Production manager',
+        countryOfResidence: 'England',
+      },
+    },
+  },
+  '99938164': {
+    accountingReference: { day: 28, month: 2 },
+    accounts: {
+      lastMadeUpTo: '2026-02-28',
+      lastType: 'Micro-entity',
+      nextMadeUpTo: '2027-02-28',
+      nextDue: '2027-11-30',
+    },
+    confirmationStatement: {
+      lastMadeUpTo: '2026-02-01',
+      nextMadeUpTo: '2027-02-01',
+      nextDue: '2027-02-15',
+    },
+    filings: [
+      {
+        date: '2026-02-12',
+        type: 'CS01',
+        category: 'Confirmation statement',
+        description:
+          'Confirmation statement made on 1 February 2026 with no updates',
+      },
+      {
+        date: '2018-02-01',
+        type: 'NEWINC',
+        category: 'Incorporation',
+        description: 'Incorporation of a private limited company',
+      },
+    ],
+    officers: {
+      'p-joanna': { occupation: 'Joiner', countryOfResidence: 'England' },
+      'p-matteo': { occupation: 'Joiner', countryOfResidence: 'England' },
+    },
+  },
+  '99952087': {
+    accountingReference: { day: 31, month: 7 },
+    accounts: {
+      lastMadeUpTo: '2025-07-31',
+      lastType: 'Micro-entity',
+      nextMadeUpTo: '2026-07-31',
+      nextDue: '2027-04-30',
+    },
+    confirmationStatement: {
+      lastMadeUpTo: '2026-04-08',
+      nextMadeUpTo: '2027-04-08',
+      nextDue: '2027-04-22',
+    },
+    filings: [
+      {
+        date: '2026-04-15',
+        type: 'CS01',
+        category: 'Confirmation statement',
+        description:
+          'Confirmation statement made on 8 April 2026 with no updates',
+      },
+      {
+        date: '2013-04-08',
+        type: 'NEWINC',
+        category: 'Incorporation',
+        description: 'Incorporation of a private limited company',
+      },
+    ],
+    officers: {
+      'p-owen': { occupation: 'Electrician', countryOfResidence: 'England' },
     },
   },
 }

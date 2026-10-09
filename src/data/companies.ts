@@ -55,7 +55,7 @@ export const companies: Company[] = [
     },
     sicCodes: ['33150'],
     sicDescription: 'Repair and maintenance of ships and boats',
-    lodgedByPartnerId: 'partner-belgrave',
+    lodgedByPartnerId: 'partner-meridian',
     connectedAt: '2026-09-02T14:05:00.000Z',
   },
   {
@@ -102,6 +102,70 @@ export const companies: Company[] = [
     },
     sicCodes: ['56210'],
     sicDescription: 'Event catering activities',
+    lodgedByPartnerId: 'partner-fenwick',
+    connectedAt: '2026-09-21T10:12:00.000Z',
+  },
+  {
+    number: '99927415',
+    name: 'BLUE HARBOUR TRADING LTD',
+    type: 'ltd',
+    status: 'active',
+    incorporatedOn: '2022-09-12',
+    registeredOffice: {
+      line1: 'Suite 4, 71 Fenchurch Street',
+      town: 'London',
+      postcode: 'EC3M 4BS',
+      country: 'United Kingdom',
+    },
+    sicCodes: ['46900'],
+    sicDescription: 'Non-specialised wholesale trade',
+    lodgedByPartnerId: 'partner-meridian',
+    connectedAt: '2026-09-24T08:40:00.000Z',
+  },
+  {
+    number: '99941526',
+    name: 'TYNE QUAY BREWING LTD',
+    type: 'ltd',
+    status: 'active',
+    incorporatedOn: '2014-06-02',
+    registeredOffice: {
+      line1: 'Unit 2, Ouseburn Warehouse',
+      town: 'Newcastle upon Tyne',
+      postcode: 'NE1 2PA',
+      country: 'United Kingdom',
+    },
+    sicCodes: ['11050'],
+    sicDescription: 'Manufacture of beer',
+  },
+  {
+    number: '99938164',
+    name: 'PIKE & FERRANTE JOINERY LTD',
+    type: 'ltd',
+    status: 'active',
+    incorporatedOn: '2018-02-01',
+    registeredOffice: {
+      line1: '14 Welford Road Workshops',
+      town: 'Leicester',
+      postcode: 'LE2 7AA',
+      country: 'United Kingdom',
+    },
+    sicCodes: ['43320'],
+    sicDescription: 'Joinery installation',
+  },
+  {
+    number: '99952087',
+    name: 'TREGEAR ELECTRICAL LTD',
+    type: 'ltd',
+    status: 'active',
+    incorporatedOn: '2013-04-08',
+    registeredOffice: {
+      line1: '2 Walcot Yard',
+      town: 'Bath',
+      postcode: 'BA1 5BG',
+      country: 'United Kingdom',
+    },
+    sicCodes: ['43210'],
+    sicDescription: 'Electrical installation',
   },
 ]
 
@@ -134,6 +198,16 @@ export const register: RegisterEntry[] = [
     registerName: 'ASHBY, Thomas James',
     registerNationality: 'British',
     registerDobMonthYear: 'August 1989',
+  },
+
+  {
+    personId: 'p-bernard',
+    companyNumber: '99418027',
+    role: 'director',
+    appointedOn: '2024-03-01',
+    registerName: 'WHITLOW, Bernard Edwin',
+    registerNationality: 'British',
+    registerDobMonthYear: 'February 1958',
   },
 
   // Lumenfield Technologies: growing tech company
@@ -218,13 +292,14 @@ export const register: RegisterEntry[] = [
     natureOfControl: 'Ownership of shares: 75% or more',
   },
 
-  // Holloway & Reid: not yet connected, used in the lookup and connect step
+  // Holloway & Reid: not connected by a Referral Partner. Imogen is Harcourt Lane's own client.
   {
     personId: 'p-imogen',
     companyNumber: '99804613',
     role: 'director_psc',
     appointedOn: '2016-11-14',
     registerName: 'REID, Imogen Clare',
+    // The register holds British; her passport is Irish: a nationality difference flagged for the reviewer.
     registerNationality: 'British',
     registerDobMonthYear: 'April 1983',
     natureOfControl: 'Ownership of shares: more than 25% but not more than 50%',
@@ -240,7 +315,7 @@ export const register: RegisterEntry[] = [
     identityVerified: true,
   },
 
-  // Kestrel Bay Catering: a member of the public who comes to Evidence One directly
+  // Kestrel Bay Catering: lodged by Fenwick & Shaw
   {
     personId: 'p-hannah',
     companyNumber: '99915372',
@@ -249,6 +324,101 @@ export const register: RegisterEntry[] = [
     registerName: 'PRYCE, Hannah Louise',
     registerNationality: 'British',
     registerDobMonthYear: 'October 1988',
+    natureOfControl: 'Ownership of shares: 75% or more',
+  },
+
+  // Blue Harbour Trading: lodged by Meridian Gulf. The register spells the first name DMITRY.
+  {
+    personId: 'p-dmytro',
+    companyNumber: '99927415',
+    role: 'director_psc',
+    appointedOn: '2022-09-12',
+    registerName: 'SHEVCHENKO, Dmitry',
+    registerNationality: 'Ukrainian',
+    registerDobMonthYear: 'April 1986',
+    natureOfControl: 'Ownership of shares: 75% or more',
+  },
+
+  // Tyne Quay Brewing: the people Northbank Compliance verified or opened cases for before it was suspended
+  {
+    personId: 'p-rhys',
+    companyNumber: '99941526',
+    role: 'director_psc',
+    appointedOn: '2014-06-02',
+    registerName: 'CALLOWAY, Rhys Anthony',
+    registerNationality: 'British',
+    registerDobMonthYear: 'September 1974',
+    natureOfControl: 'Ownership of shares: more than 25% but not more than 50%',
+  },
+  {
+    personId: 'p-eleni',
+    companyNumber: '99941526',
+    role: 'director',
+    appointedOn: '2016-03-14',
+    registerName: 'MARKOU, Eleni',
+    registerNationality: 'British',
+    registerDobMonthYear: 'March 1981',
+  },
+  {
+    personId: 'p-gareth',
+    companyNumber: '99941526',
+    role: 'director_psc',
+    appointedOn: '2014-06-02',
+    registerName: 'DOYLE, Gareth Huw',
+    registerNationality: 'British',
+    registerDobMonthYear: 'November 1969',
+    natureOfControl: 'Ownership of shares: more than 25% but not more than 50%',
+  },
+  {
+    personId: 'p-ruth',
+    companyNumber: '99941526',
+    role: 'director',
+    appointedOn: '2023-09-01',
+    registerName: 'ELLERY, Ruth Elaine',
+    registerNationality: 'British',
+    registerDobMonthYear: 'July 1990',
+  },
+  {
+    personId: 'p-callum',
+    companyNumber: '99941526',
+    role: 'director',
+    appointedOn: '2025-04-07',
+    registerName: 'FRASIER, Callum James',
+    registerNationality: 'British',
+    registerDobMonthYear: 'December 1985',
+  },
+
+  // Pike & Ferrante Joinery: a B2C client and a client allocated to Ashdown Trust Services
+  {
+    personId: 'p-joanna',
+    companyNumber: '99938164',
+    role: 'director_psc',
+    appointedOn: '2018-02-01',
+    registerName: 'PIKE, Joanna Claire',
+    registerNationality: 'British',
+    registerDobMonthYear: 'February 1979',
+    natureOfControl: 'Ownership of shares: more than 25% but not more than 50%',
+  },
+  {
+    personId: 'p-matteo',
+    companyNumber: '99938164',
+    role: 'director_psc',
+    appointedOn: '2018-02-01',
+    registerName: 'FERRANTE, Matteo',
+    registerNationality: 'Italian',
+    registerDobMonthYear: 'October 1983',
+    natureOfControl: 'Ownership of shares: more than 25% but not more than 50%',
+  },
+
+  // Tregear Electrical: a B2C client verified by the sole practitioner
+  {
+    personId: 'p-owen',
+    companyNumber: '99952087',
+    role: 'director_psc',
+    appointedOn: '2013-04-08',
+    registerName: 'TREGEAR, Owen David',
+    registerNationality: 'British',
+    registerDobMonthYear: 'June 1977',
     natureOfControl: 'Ownership of shares: 75% or more',
   },
 ]
