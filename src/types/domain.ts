@@ -574,6 +574,8 @@ export interface JourneyState {
   addressProofDone?: boolean
   /** Supporting evidence uploaded for ADDL-01 or ADDL-03. */
   evidenceUploaded?: boolean
+  /** Supporting documents as held for review: the redacted copy only, never the original. */
+  supportingItems?: EvidenceItem[]
   paid?: boolean
   payment?: Payment
 }
