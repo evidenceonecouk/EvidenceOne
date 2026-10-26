@@ -1,7 +1,7 @@
-import { Lock, Waypoints } from 'lucide-react'
+import { EyeOff, Lock, Waypoints } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { Page, PageHeader, Panel } from '@/components/app/Page'
+import { StateScreen } from '@/components/app/StateScreen'
 import { HeldOptionBadge } from '@/components/HeldOption'
 import { Button } from '@/components/ui/button'
 import { hasSubscription } from '@/lib/billing'
@@ -62,37 +62,42 @@ export function RouteBGate({ children }: { children: ReactNode }) {
   const { shown, available } = useRouteB()
   if (!shown)
     return (
-      <Page width="narrow">
-        <PageHeader
-          kicker="Route B · Filings"
-          title="Filings are not shown"
-          description="Route B filings are an option available after go-live. The presenter has hidden the held options."
-        />
-        <Button asChild variant="outline">
-          <Link to="/acsp/queue">Back to the review queue</Link>
-        </Button>
-      </Page>
+      <StateScreen
+        icon={EyeOff}
+        tone="mist"
+        kicker="Route B · Filings"
+        title="Filings are not shown"
+        description="Route B filings are an option available after go-live. The presenter has hidden the held options."
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/acsp/queue">Back to the review queue</Link>
+          </Button>
+        }
+      />
     )
   if (!available)
     return (
-      <Page width="narrow">
-        <PageHeader
-          kicker="Route B · Filings"
-          title={ROUTE_B_SUBSCRIPTION_ONLY}
-          description="Evidence One prepares and checks Companies House filings, and you file them from your own WebFiling account. This is part of the Easy, Pro and Scale packages."
-          meta={<HeldOptionBadge code="O2" />}
-        />
-        <Panel className="flex flex-wrap items-center gap-4 p-5 sm:p-6">
-          <Waypoints className="size-6 text-ink" aria-hidden="true" />
-          <p className="min-w-0 flex-1 text-base text-graphite">
-            Your firm has no subscription package. Referred cases carry the
-            platform fee and need no package.
-          </p>
+      <StateScreen
+        icon={Waypoints}
+        tone="mist"
+        kicker="Route B · Filings"
+        title={ROUTE_B_SUBSCRIPTION_ONLY}
+        description="Evidence One prepares and checks Companies House filings, and you file them from your own WebFiling account. This is part of the Easy, Pro and Scale packages."
+        details={[
+          { label: 'Your plan', value: 'No subscription package' },
+          { label: 'Included in', value: 'Easy, Pro and Scale' },
+          {
+            label: 'Referred cases',
+            value: 'Carry the platform fee and need no package',
+          },
+        ]}
+        note={<HeldOptionBadge code="O2" />}
+        actions={
           <Button asChild>
             <Link to="/acsp/billing">See packages</Link>
           </Button>
-        </Panel>
-      </Page>
+        }
+      />
     )
   return <>{children}</>
 }

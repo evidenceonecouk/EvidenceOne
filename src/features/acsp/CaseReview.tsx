@@ -19,6 +19,7 @@ import {
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
+import { CaseNotFound } from '@/components/app/StateScreen'
 import { SlaPill } from '@/components/app/SlaPill'
 import { StepUpDialog } from '@/components/app/StepUpDialog'
 import { useToast } from '@/components/app/Toaster'
@@ -111,11 +112,7 @@ export function CaseReview() {
   )
 
   if (!vc || !person || !company || !entry) {
-    return (
-      <Page>
-        <p className="text-lg text-ink">Case not found.</p>
-      </Page>
-    )
+    return <CaseNotFound />
   }
 
   if (vc.acspId !== acsp.id)

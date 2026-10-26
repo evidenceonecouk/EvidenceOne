@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, PenLine } from 'lucide-react'
+import { ArrowLeft, ExternalLink, FileX2, PenLine } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
@@ -8,6 +8,7 @@ import {
   Panel,
   PanelHeader,
 } from '@/components/app/Page'
+import { CaseNotFound, StateScreen } from '@/components/app/StateScreen'
 import { StepUpDialog } from '@/components/app/StepUpDialog'
 import { CompletionTick } from '@/components/brand/CompletionTick'
 import { OutcomeChip, RuleIdTag } from '@/components/StatusChip'
@@ -37,7 +38,7 @@ export function Correction() {
   const [done, setDone] = useState<string[]>([])
   const [inline, setInline] = useState(false)
 
-  if (!vc || !person || !acsp) return <Page>Case not found.</Page>
+  if (!vc || !person || !acsp) return <CaseNotFound />
   if (acsp.id !== actingAcsp.id)
     return <AccessRefused caseId={vc.id} area="the correction workspace" />
   const reference = vc.submission?.verificationReference
@@ -52,20 +53,26 @@ export function Correction() {
   )
   if (vc.status !== 'confirmed' || !reference) {
     return (
-      <Page width="narrow">
-        {back}
-        <PageHeader
-          title="Correction not available"
-          description="A correction can only be prepared against a submitted case with a recorded verification reference."
-        />
-        <Panel className="flex flex-wrap items-center gap-3 px-5 py-4 sm:px-6">
+      <StateScreen
+        icon={FileX2}
+        tone="mist"
+        kicker={`Correct submitted details · ${vc.id}`}
+        title="Correction not available"
+        description="A correction can only be prepared against a submitted case with a recorded verification reference."
+        actions={
+          <Button asChild variant="outline">
+            <Link to={`/acsp/cases/${vc.id}`}>Back to the case</Link>
+          </Button>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-mist/60 px-4 py-3">
           <RuleIdTag id="SUB-03" />
           <OutcomeChip outcome="block" />
           <p className="text-[0.9375rem] text-graphite">
             No verification reference is recorded on this case yet.
           </p>
-        </Panel>
-      </Page>
+        </div>
+      </StateScreen>
     )
   }
 

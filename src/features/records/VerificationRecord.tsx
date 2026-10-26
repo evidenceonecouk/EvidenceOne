@@ -2,6 +2,7 @@ import { auditEventKey } from '@/lib/audit'
 import { ArrowLeft, ArrowRight, ShieldCheck, ShieldX } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
+import { CaseNotFound } from '@/components/app/StateScreen'
 import { CaseStatusChip } from '@/components/StatusChip'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { Wordmark } from '@/components/brand/Wordmark'
@@ -42,7 +43,7 @@ export function VerificationRecord() {
       (r) => r.personId === vc.personId && r.companyNumber === vc.companyNumber,
     )
   if (!vc || !person || !company || !entry)
-    return <Page>Record not found.</Page>
+    return <CaseNotFound kind="record" />
   if (vc.acspId !== actingAcsp.id)
     return <AccessRefused caseId={vc.id} area="the verification record" />
 

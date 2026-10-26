@@ -6,6 +6,7 @@ import {
   FileCheck2,
   Loader2,
   LogIn,
+  Hourglass,
   MailCheck,
   PenLine,
   ShieldCheck,
@@ -19,6 +20,7 @@ import {
   Panel,
   PanelHeader,
 } from '@/components/app/Page'
+import { CaseNotFound, StateScreen } from '@/components/app/StateScreen'
 import { Stepper } from '@/components/app/Stepper'
 import { StepUpDialog } from '@/components/app/StepUpDialog'
 import { useToast } from '@/components/app/Toaster'
@@ -81,20 +83,27 @@ export function Submission() {
       setReference(exampleVerificationReference(vc.id))
   }, [vc?.status, vc?.id, reference])
 
-  if (!vc || !person || !acsp) return <Page>Case not found.</Page>
+  if (!vc || !person || !acsp) return <CaseNotFound />
   if (acsp.id !== actingAcsp.id)
     return <AccessRefused caseId={vc.id} area="the submission workspace" />
   if (!isApprovedOrLater(vc.status)) {
     return (
-      <Page width="narrow">
-        <PageHeader
-          title="Not ready to submit"
-          description="The submission workspace opens only after the ACSP has approved the case."
-        />
-        <Button asChild variant="outline">
-          <Link to={`/acsp/cases/${vc.id}`}>Back to the case</Link>
-        </Button>
-      </Page>
+      <StateScreen
+        icon={Hourglass}
+        tone="mist"
+        kicker={`Submission workspace · ${vc.id}`}
+        title="Not ready to submit"
+        description="The submission workspace opens only after the ACSP has approved the case. Approve the case first, then come back here to submit to Companies House."
+        details={[
+          { label: 'Case reference', value: vc.id, mono: true },
+          { label: 'Opens at', value: 'Approved' },
+        ]}
+        actions={
+          <Button asChild>
+            <Link to={`/acsp/cases/${vc.id}`}>Back to the case</Link>
+          </Button>
+        }
+      />
     )
   }
 
