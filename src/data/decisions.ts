@@ -12,17 +12,26 @@ export interface DecidedPoint {
   decided: string
 }
 
+export interface ChangedPoint {
+  code?: string
+  title: string
+  summary: string
+}
+
 export interface OpenPoint {
   code?: string
   title: string
   summary: string
+  /** Awaiting a provider, not the client. Shows \"Subject to provider confirmation\". */
+  providerConfirmation?: boolean
 }
 
 export const decidedPoints: DecidedPoint[] = [
   {
     code: 'H1',
     title: 'Expired passports',
-    summary: 'Not accepted. The person is asked for another document.',
+    summary:
+      'Not accepted. The person is asked for another document. The client has asked the identity provider what it supports. Subject to provider confirmation.',
     decided: '19 Oct',
   },
   {
@@ -81,11 +90,11 @@ export const decidedPoints: DecidedPoint[] = [
     decided: '19 Oct',
   },
   {
-    code: 'P4',
-    title: 'Passing codes to the ACSP',
+    code: 'G2-12, G2-18',
+    title: 'Messages carry no codes',
     summary:
-      'Through a dedicated code message in the case messages, deleted automatically 30 days after the ACSP marks it received.',
-    decided: '19 and 20 Oct',
+      'Case messages are for verification-related communication only. Evidence One does not ask for, collect or intentionally store Companies House codes. Companies House sends the personal code to the person.',
+    decided: '23 Oct',
   },
   {
     code: 'P6',
@@ -155,7 +164,53 @@ export const decidedPoints: DecidedPoint[] = [
   },
 ]
 
+/** Decided earlier, then changed by the client. Shown apart from Decided. */
+export const changedPoints: ChangedPoint[] = [
+  {
+    code: 'P4',
+    title: 'Codes through case messages',
+    summary:
+      'Decided 19 and 20 October. Reversed by the client on 23 October: not part of Gate 2, and may return later if ACSPs show a genuine commercial need.',
+  },
+]
+
 export const openPoints: OpenPoint[] = [
+  {
+    code: 'G2-02',
+    title: 'Connect payments at ACSP onboarding',
+    summary:
+      'The ACSP connects payments through the secure payment provider’s own onboarding. Payments activate only when the provider’s requirements and Evidence One’s approval are both met. Subject to the payment provider’s confirmation.',
+    providerConfirmation: true,
+  },
+  {
+    code: 'G2-14',
+    title: 'Option 2 through the identity provider',
+    summary:
+      'The provider’s manual document review does the supported checks and returns findings. The ACSP completes any additional checks and keeps the decision. Whether it replaces an ACSP-run trained check is still open.',
+    providerConfirmation: true,
+  },
+  {
+    code: 'G2-08, G2-09',
+    title: 'Expired and non-biometric passports, optional checks, PEP pricing',
+    summary:
+      'Held for the identity provider’s answers. H1 stays as decided meanwhile: expired passports are not accepted, and every expiry allowance is 0. Raised by the client on 22 and 23 October.',
+    providerConfirmation: true,
+  },
+  {
+    title: 'Register correction fee flow',
+    summary:
+      'Who carries out the correction and by which route, who pays the add-on under an Agent Payment Code, the Partner status mapping, the second authorisation, and one £69 fee per case. Design interpretations to confirm.',
+  },
+  {
+    title: 'Code-like text in messages',
+    summary:
+      'Whether text that looks like a code should block the message until it is edited, rather than send with a warning. Design interpretation; wording to confirm.',
+  },
+  {
+    title: 'ACSP without active payments',
+    summary:
+      'Whether an ACSP whose payments are not active is excluded from allocation and referral matching (MATCH-09). The demo assumes yes.',
+  },
   {
     code: 'P5',
     title: 'Which form “ACSP04” means',
@@ -169,7 +224,7 @@ export const openPoints: OpenPoint[] = [
   {
     title: 'No smartphone or tablet',
     summary:
-      'A person with neither is offered Option 2, a request to the ACSP for a trained human check. Raised on 23 October.',
+      'A person with neither is offered Option 2, handled through the identity provider’s manual document review, with the ACSP completing any further checks and deciding. Subject to the provider confirming it can. Raised on 23 October.',
   },
   {
     title: 'Chip not read',

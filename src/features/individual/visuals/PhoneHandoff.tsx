@@ -1,3 +1,4 @@
+import { ProviderConfirmation } from '@/components/ProviderConfirmation'
 import { Loader2, MessageSquareText, Smartphone } from 'lucide-react'
 import { useState } from 'react'
 import { PendingDecision } from '@/components/PendingDecision'
@@ -161,6 +162,7 @@ export function PhoneHandoff({
             I do not have a smartphone or tablet
           </Button>
           <PendingDecision />
+          <ProviderConfirmation className="ml-2" />
         </div>
       )}
     </div>

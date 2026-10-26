@@ -28,7 +28,7 @@ import {
   PanelHeader,
   StatTile,
 } from '@/components/app/Page'
-import { PartnerCheckChip, PartnerStatusChip } from '@/components/StatusChip'
+import { PartnerCheckLine, PartnerStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { formatShortDate, shortHash, timeAgo } from '@/lib/format'
@@ -57,7 +57,7 @@ import { useActingPartnerUser } from './usePartnerUser'
 
 /* One column template shared by the header row and every person row, so all companies line up. */
 const ROW =
-  'grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 px-6 sm:grid-cols-[2.5rem_minmax(0,1.1fr)_12rem_14rem_minmax(0,1.1fr)]'
+  'grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-4 px-6 lg:grid-cols-[2.5rem_minmax(0,1.2fr)_16rem_15rem_minmax(0,1fr)]'
 
 const segment: Record<PartnerStatus | 'none', string> = {
   completed: 'bg-approve',
@@ -353,18 +353,13 @@ function ChecksCell({
   if (!checks)
     return <span className="text-[0.875rem] text-slate">No checks yet</span>
   return (
-    <dl className="space-y-1">
+    <ul>
       {(Object.keys(partnerCheckLabels) as (keyof PartnerChecks)[]).map((k) => (
-        <div key={k} className="flex items-center justify-between gap-2">
-          <dt className="text-[0.8125rem] leading-tight text-slate">
-            {partnerCheckLabels[k]}
-          </dt>
-          <dd>
-            <PartnerCheckChip result={checks[k]} />
-          </dd>
-        </div>
+        <li key={k}>
+          <PartnerCheckLine label={partnerCheckLabels[k]} result={checks[k]} />
+        </li>
       ))}
-    </dl>
+    </ul>
   )
 }
 
@@ -458,7 +453,7 @@ function CompanyBlock({ company }: { company: Company }) {
           role="row"
           className={cn(
             ROW,
-            'hidden h-10 border-y border-line/80 bg-[#f8f8f7] text-[0.8125rem] font-medium tracking-[0.04em] text-slate uppercase sm:grid',
+            'hidden h-10 border-y border-line/80 bg-[#f8f8f7] text-[0.8125rem] font-medium tracking-[0.04em] text-slate uppercase lg:grid',
           )}
         >
           <span role="columnheader">
@@ -477,7 +472,7 @@ function CompanyBlock({ company }: { company: Company }) {
               role="row"
               className={cn(
                 ROW,
-                'min-h-[4.5rem] border-t border-line/70 py-3 transition-colors duration-150 first-of-type:border-t-0 sm:first-of-type:border-t',
+                'min-h-[4.5rem] border-t border-line/70 py-3 transition-colors duration-150 first-of-type:border-t-0 lg:first-of-type:border-t',
                 isSelected ? 'bg-mist' : 'hover:bg-[#fafaf9]',
               )}
             >
@@ -501,19 +496,19 @@ function CompanyBlock({ company }: { company: Company }) {
                   <span className="block truncate text-[0.875rem] text-slate">
                     {roleLabel[r.role]}
                   </span>
-                  <span className="mt-1.5 block sm:hidden">
+                  <span className="mt-1.5 block lg:hidden">
                     <StatusCell row={r} />
                   </span>
                 </span>
               </span>
-              <span role="cell" className="hidden sm:block">
+              <span role="cell" className="hidden lg:block">
                 <StatusCell row={r} />
                 <FlagTags flags={r.flags} />
               </span>
-              <span role="cell" className="hidden sm:block">
+              <span role="cell" className="hidden lg:block">
                 <ChecksCell checks={r.checks} statusOnly={statusOnly} />
               </span>
-              <span role="cell" className="hidden min-w-0 sm:block">
+              <span role="cell" className="hidden min-w-0 lg:block">
                 <span className="line-clamp-2 text-[0.9375rem] text-graphite">
                   {r.detail}
                 </span>

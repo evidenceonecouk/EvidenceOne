@@ -1,3 +1,4 @@
+import { AuditExport } from './AuditExport'
 import {
   Archive,
   ChevronRight,
@@ -17,7 +18,7 @@ import { getCompany, getPerson } from '@/store/selectors'
 /** Every closed verification, with the seven-year retention date counted from the decision. */
 export function RecordsIndex() {
   const { data } = useDemoStore()
-  const { acsp } = useActingAcsp()
+  const { acsp, reviewer } = useActingAcsp()
   const records = data.cases
     .filter((c) => c.acspId === acsp.id)
     .filter((c) =>
@@ -44,6 +45,14 @@ export function RecordsIndex() {
     <Page>
       <HeroBanner
         kicker="Evidence One File"
+        actions={
+          <AuditExport
+            acspId={acsp.id}
+            actor={reviewer.name}
+            reviewerId={reviewer.id}
+            label="Export my audit chain"
+          />
+        }
         title="Verification records"
         description={`Approved, declined and abandoned verifications held by ${acsp.name} are all kept for seven years from the decision. Nothing is deleted automatically. Each ACSP's records are kept separate.`}
         illustration={

@@ -1,3 +1,4 @@
+import { defaultDocuments } from './documentRules'
 import type {
   CaseStep,
   ParamKey,
@@ -84,6 +85,8 @@ export interface RuleDef {
   setting?: SettingKey
   /** Call-agenda code (for example "P5") where the client has not decided. Shows "Pending your decision". An empty string shows the badge without a code. */
   pending?: string
+  /** Awaiting the identity provider's answer, not the client's. Shows "Subject to provider confirmation". */
+  providerConfirmation?: boolean
 }
 
 const r = (
@@ -678,21 +681,30 @@ export const rules: RuleDef[] = [
     'Client determination, 26 September',
     ['C'],
     ['idvt.attempts', 'idvt.supported'],
-    { outcomeNote: 'Offer Option 2' },
+    {
+      outcomeNote:
+        'Offer Option 2, through the identity provider’s manual document review',
+      providerConfirmation: true,
+    },
   ),
   r(
     'OPT-03',
     'option',
-    'Option 2 in use and the reviewer has no current training attestation',
+    'Option 2 in use and the ACSP has not completed its additional checks and recorded why it is satisfied. The identity provider’s trained reviewers check the documents and return findings; the ACSP completes any additional checks and keeps the final decision',
     'block',
-    'IDV Standard, Step 3; D6 Part 5, position 4',
-    ['S'],
-    ['reviewer.attestation'],
+    'Design, proposed from the client’s email of 23 October',
+    ['Design'],
+    ['option2.provider_findings', 'option2.additional_checks'],
+    {
+      outcomeNote:
+        'Approve stays disabled until the checklist is complete. Subject to the identity provider confirming it can',
+      providerConfirmation: true,
+    },
   ),
   r(
     'OPT-04',
     'option',
-    'Option 2 documents are not two from Group A, or one from Group A and one from Group B',
+    'Option 2 documents are not two from Option 2 Group A, or one from Group A and one from Group B',
     'request',
     'IDV Standard, Option 2',
     ['S'],
@@ -1005,6 +1017,62 @@ export const rules: RuleDef[] = [
     },
   ),
   r(
+    'REG-20',
+    'register',
+    'The ACSP decided a register difference needs correcting before approval and raised a correction fee. The case waits for the register to be corrected, expected within the correction turnaround. The ACSP carries out the correction at Companies House outside the platform and ticks Register corrected. Approve stays disabled until then. This is an outcome of the Mandatory decision, not a Halt',
+    'block',
+    PROPOSED,
+    ['Design'],
+    ['case.register_correction', 'param.correction_turnaround_hours'],
+    {
+      outcomeNote:
+        'Approve disabled until Register corrected is ticked. Design interpretation: who carries out the correction and by which route is to be confirmed with the client',
+      pending: '',
+    },
+  ),
+  r(
+    'REG-21',
+    'register',
+    'The client approves the revised total: the verification fee plus the correction add-on, which is part of the ACSP Professional Fee shown as its own line. Approving is a second authorisation and nothing is taken. Declining returns the case to the reviewer',
+    'request',
+    PROPOSED,
+    ['Design'],
+    ['case.register_correction', 'payment.add_on'],
+    {
+      outcomeNote:
+        'A request to the client. Design interpretation: second authorisation. Who pays the add-on under an Agent Payment Code is not decided',
+      pending: '',
+    },
+  ),
+  r(
+    'REG-22',
+    'register',
+    'On Approve, with step-up, the payment is taken once: the verification fee and the correction add-on go to the ACSP, and the £69 plus VAT platform fee is deducted once, on referred and B2C cases only, never per correction. A decline or an ACSP lapse releases both authorisations',
+    'pass',
+    PROPOSED,
+    ['Design'],
+    ['payment.total', 'payment.platform_fee'],
+    {
+      outcomeNote:
+        'Own-client cases carry no £69. Design interpretation: one £69 per case',
+      pending: '',
+    },
+  ),
+  r(
+    'MATCH-09',
+    'acsp',
+    'The ACSP’s payments are active: the secure payment provider shows it as Eligible and Evidence One has approved it. An ACSP without active payments cannot be allocated paid cases and is not offered in referral matching',
+    'block',
+    PROPOSED,
+    ['Design'],
+    ['acsp.payments.provider_status', 'acsp.payments.evidence_one_approved'],
+    {
+      outcomeNote:
+        'Not eligible otherwise. Whether an ACSP without active payments is excluded from allocation has not been decided by the client',
+      pending: '',
+    },
+  ),
+  r(
     'REF-01',
     'acsp',
     'Referral commissions are Off at launch. While referral_commissions is Off nothing is disclosed and no commission is credited',
@@ -1255,27 +1323,14 @@ export const rules: RuleDef[] = [
   r(
     'MSG-01',
     'messages',
-    'The individual may pass the personal code or the company authentication code to the allocated ACSP as a code message. Only the allocated ACSP reviewer and the individual can open it. The text is deleted automatically 30 days after the ACSP marks it received. It is never exported and never shown to Referral Partners, platform administrators, the Copilot or any AI feature. The audit trail records sent, viewed, received and deleted, never the code',
+    'Messages must not carry Companies House codes or credentials. Messages are for verification-related communication only. Evidence One does not ask for, collect or intentionally store personal codes, company authentication codes, passwords or other access credentials. Companies House sends the personal code directly to the person. A warning is always shown under the composer',
     'pass',
-    'C, 19 and 20 October',
-    ['C'],
-    ['message.kind', 'message.received_at', 'audit.code_message'],
-    {
-      outcomeNote:
-        'Enforced. Deleted 30 days after "Code received". Never exported',
-    },
-  ),
-  r(
-    'MSG-03',
-    'messages',
-    'An ordinary message that looks like a code shows a gentle prompt to send it as a code message instead. The message is not blocked',
-    'pass',
-    'C, 19 and 20 October',
+    'C, 23 October',
     ['C'],
     ['message.body'],
     {
       outcomeNote:
-        '"This looks like a code. Send it as a code message so only [ACSP] can see it and it is deleted after 30 days."',
+        'Enforced. Text that looks like a code is not sent until the person edits it, and the flagged text is not saved (design interpretation, confirm the wording with the client)',
     },
   ),
   r(
@@ -1472,12 +1527,20 @@ export const paramDefs: ParamDef[] = [
     max: 12,
   },
   {
-    key: 'code_message_retention_days',
-    label: 'Code message deleted after',
-    unit: 'days',
-    basis: 'C, 19 and 20 October',
-    min: 30,
-    max: 30,
+    key: 'correction_turnaround_hours_min',
+    label: 'Register correction expected, earliest',
+    unit: 'hours',
+    basis: PROPOSED,
+    min: 1,
+    max: 168,
+  },
+  {
+    key: 'correction_turnaround_hours_max',
+    label: 'Register correction expected, latest',
+    unit: 'hours',
+    basis: PROPOSED,
+    min: 1,
+    max: 168,
   },
 ]
 
@@ -1496,6 +1559,8 @@ export interface SettingDef {
   rules: string[]
   /** Call-agenda code. Present where the client has not decided: shows "Pending your decision". */
   pending?: string
+  /** Awaiting the identity provider's answer, not the client's. Shows "Subject to provider confirmation". */
+  providerConfirmation?: boolean
   /** Plain-English help shown under the setting. */
   help: string
 }
@@ -1513,7 +1578,7 @@ export const settingDefs: SettingDef[] = [
       },
     ],
     rules: ['SUB-06'],
-    help: 'Decided on 19 October (M7). The prompt asks only whether the code has arrived, answered Yes or Not yet, and never asks for the code. The individual may pass a code to the ACSP as a code message (MSG-01).',
+    help: 'Decided on 19 October (M7). The prompt asks only whether the code has arrived, answered Yes or Not yet, and never asks for the code. Messages carry no codes (MSG-01).',
   },
   {
     key: 'address_check_replaces_proof',
@@ -1533,7 +1598,28 @@ export const settingDefs: SettingDef[] = [
     ],
     rules: ['ADDL-02'],
     pending: '',
+    providerConfirmation: true,
     help: 'Off by default: proof of address is requested from every individual. The electronic address check runs only where the ACSP switched it on.',
+  },
+  {
+    key: 'expired_document_allowance',
+    label: 'Expired documents',
+    question:
+      'Whether an expired document is accepted within the allowance set for it in the document lists',
+    options: [
+      {
+        value: false,
+        label: 'No: an expired passport is not accepted',
+        recommended: true,
+      },
+      {
+        value: true,
+        label: 'Yes: apply the allowance in the document lists',
+      },
+    ],
+    rules: ['DOC-EXP-01', 'DOC-EXP-02', 'DOC-EXP-03'],
+    providerConfirmation: true,
+    help: 'Expired passports. Decided 19 October: not accepted. The client has asked the identity provider what it supports. Subject to provider confirmation. Every allowance in the document lists is 0 and this setting is off. Nothing here chooses for the client.',
   },
   {
     key: 'escalate_enabled',
@@ -1582,12 +1668,14 @@ export const defaultParams: Record<ParamKey, number> = {
   acsp_status_check_days: 14,
   acsp_reconfirmation_months: 12,
   acsp_register_period_months: 3,
-  code_message_retention_days: 30,
+  correction_turnaround_hours_min: 24,
+  correction_turnaround_hours_max: 48,
 }
 
 export const defaultSettings: RuleSettings = {
   personal_code_prompt: 'day_after_confirmation',
   address_check_replaces_proof: false,
+  expired_document_allowance: false,
   escalate_enabled: false,
   referral_commissions: false,
 }
@@ -1610,6 +1698,7 @@ export function seedRuleSets(): RuleSetVersion[] {
       status: 'superseded',
       params: { ...defaultParams },
       settings: { ...defaultSettings },
+      documents: defaultDocuments(),
       createdAt: '2025-06-16T09:00:00.000Z',
       createdBy: SUPER_ADMIN,
       submittedAt: '2025-06-18T11:30:00.000Z',
@@ -1625,6 +1714,7 @@ export function seedRuleSets(): RuleSetVersion[] {
       status: 'current',
       params: { ...defaultParams },
       settings: { ...defaultSettings },
+      documents: defaultDocuments(),
       createdAt: '2026-09-29T10:00:00.000Z',
       createdBy: SUPER_ADMIN,
       submittedAt: '2026-09-29T16:20:00.000Z',

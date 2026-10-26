@@ -68,7 +68,7 @@ export function CompliancePage() {
           label: 'Option 2 training',
           status: `${attested.length} of ${reviewers.length} reviewers`,
           detail:
-            'Only trained reviewers can carry out an Option 2 person check',
+            'Training attestations are kept. Option 2 documents are checked by the identity provider’s trained reviewers, subject to its confirmation',
           tone: attested.length ? 'ok' : 'attention',
         },
       ],
@@ -140,7 +140,7 @@ export function CompliancePage() {
           label: 'Personal code',
           status: 'Never asked for',
           detail:
-            'Companies House emails it to the individual. The individual may pass it to the ACSP as a code message, which platform staff cannot open and which is deleted 30 days after the ACSP has it',
+            'Companies House emails it to the individual. Messages carry no codes, and Evidence One does not ask for, carry or keep it',
           tone: 'ok',
         },
       ],

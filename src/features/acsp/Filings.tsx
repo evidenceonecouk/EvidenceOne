@@ -1,3 +1,4 @@
+import { LATER_FILING_CODE_LINE } from '@/lib/codeWarning'
 import {
   ArrowRight,
   Building2,
@@ -195,7 +196,7 @@ function TaskCard({ task }: { task: CorrectionTask }) {
             <p className="flex-1 text-base leading-relaxed text-graphite">
               You sign in to WebFiling with your own GOV.UK One Login and enter
               the company authentication code yourself. Evidence One never sees
-              either. Filing form shown as {task.form}.{' '}
+              either. {LATER_FILING_CODE_LINE} Filing form shown as {task.form}.{' '}
               <PendingDecision code="P5" className="ml-1" />
             </p>
             <Button size="lg" onClick={handoff}>

@@ -62,6 +62,7 @@ export function buildClientInvoice(input: {
   vatRate: number
   paidBy: string
   issuedAt: string
+  lines?: ClientInvoice['lines']
 }): ClientInvoice {
   const a = invoiceAmounts(input.acsp, input.gross, input.vatRate)
   return {
@@ -75,6 +76,7 @@ export function buildClientInvoice(input: {
     vat: a.vat,
     gross: a.gross,
     paidBy: input.paidBy,
+    lines: input.lines,
   }
 }
 

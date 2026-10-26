@@ -11,10 +11,17 @@ import { useDemoStore } from '@/store/DemoStore'
 import {
   approveApplication,
   PLATFORM_ADMIN,
+  recordProviderStatus,
   rejectApplication,
   statusOnApproval,
 } from '@/store/platformActions'
-import type { OnboardingApplication } from '@/types/domain'
+import { providerStatusFromAnswer } from '@/lib/payments'
+import type {
+  AcspFirm,
+  OnboardingApplication,
+  PaymentProviderStatus,
+} from '@/types/domain'
+import { PaymentGates } from './PaymentGates'
 import { AdminHeader, Figure, StateBadge } from './kit'
 
 const humanise = (key: string) => {
@@ -34,6 +41,32 @@ const show = (v: string | number | boolean | string[]) =>
     : Array.isArray(v)
       ? v.join(', ') || 'None'
       : String(v)
+
+function ApplicationGates({
+  app,
+  acsp,
+  canAct,
+  onSimulate,
+}: {
+  app: OnboardingApplication
+  acsp?: AcspFirm
+  canAct: boolean
+  onSimulate: (acspId: string, s: PaymentProviderStatus) => void
+}) {
+  if (acsp)
+    return (
+      <PaymentGates
+        providerStatus={acsp.payments.providerStatus}
+        evidenceOneApproved={acsp.payments.evidenceOneApproved}
+        onSimulate={canAct ? (s) => onSimulate(acsp.id, s) : undefined}
+      />
+    )
+  if (app.status === 'rejected') return null
+  const status = providerStatusFromAnswer(
+    app.answers.commercial?.paymentProviderStatus,
+  )
+  return <PaymentGates providerStatus={status} evidenceOneApproved={false} />
+}
 
 export function ApprovalsPage() {
   const { data, state, apply } = useDemoStore()
@@ -184,6 +217,17 @@ export function ApprovalsPage() {
                 <p className="text-[0.9375rem] text-slate">
                   No answers were recorded for this application.
                 </p>
+              )}
+
+              {app.kind === 'acsp' && (
+                <ApplicationGates
+                  app={app}
+                  canAct={canAct}
+                  acsp={data.acsps.find((a) => a.id === app.createdOrgId)}
+                  onSimulate={(acspId, s) =>
+                    apply((d) => recordProviderStatus(d, acspId, s))
+                  }
+                />
               )}
 
               {outcome && (

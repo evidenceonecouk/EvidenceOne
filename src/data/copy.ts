@@ -20,14 +20,23 @@ export const footerCopy = {
   legal: `${company.name}. Registered in England and Wales, company number ${company.number}. Registered office ${company.registeredOffice}.`,
 }
 
+/** Hero portrait: the simulated check labels and the picture description. The person shown is fictional (AI-generated). */
+export const heroScan = {
+  alt: 'A fictional person whose face is being scanned, shown as an illustration of a live identity check.',
+  checks: [
+    'DOCUMENT AUTHENTIC',
+    'LIVENESS PASSED',
+    'FACE MATCH 98.6%',
+    'PEP AND SANCTIONS CLEAR',
+    'REGISTER MATCH',
+    'READY FOR ACSP REVIEW',
+  ],
+}
+
 export const heroCopy = {
   kicker: 'Alongside the free GOV.UK ID Check app',
-  titleLines: [
-    'Verify with an ACSP,',
-    'in your browser,',
-    'with help in your language.',
-  ],
-  lead: 'You choose a named ACSP, a regulated professional, who carries out your identity verification for Companies House. Evidence One is their technology provider.',
+  titleLines: ['Verify with an ACSP,', 'in your browser.'],
+  lead: 'A named, regulated ACSP carries out your identity verification for Companies House. Evidence One is their technology provider.',
   facts: [
     'One document, in your browser',
     'Decided by a named, regulated ACSP',
@@ -80,7 +89,7 @@ export const alongsideCopy = {
     'Professionals who look after several directors and people with significant control use Evidence One to send invites, follow every case in one place and keep an audit trail.',
 }
 
-/** "Who does what": the four cards, in order, then the language help panel. */
+/** "Who does what": the four cards, in order. */
 export const modelCopy = {
   kicker: 'Who does what',
   title: 'A named ACSP verifies you. The platform keeps the evidence.',
@@ -102,11 +111,6 @@ export const modelCopy = {
       body: 'AI observations are labelled and advisory only, and AI is never applied to your identity document. Only the ACSP reviewer can approve, request information or decline. Matching and rules are the same every time.',
     },
   ],
-  languages: {
-    title: 'Help in your language',
-    lead: 'Available on every screen of your journey, at any time.',
-    note: 'AI translation. Advisory only. English is the version of record.',
-  },
 }
 
 /** "Verify. Submit. File.", the hub for ACSPs and Referral Partners, and the trust strip. */
@@ -213,79 +217,6 @@ export const platformCopy = {
     'A difference is flagged, never halted. The reviewer records a decision and a reason, and the prompt to report it to Companies House is logged.',
   intelligenceCaption:
     'AI cannot approve or decline. Only an ACSP reviewer can.',
-}
-
-/** "Made for everyone in the chain": one tab per audience. */
-export const audiencesCopy = {
-  title: 'Made for everyone in the chain',
-  tabs: {
-    individuals: {
-      tab: 'Directors and PSCs',
-      title: 'In your browser, on a laptop or a phone',
-      body: 'Open your invite, check the details held on the register, instruct your named ACSP and authorise its fee, taken only when it approves, then capture one identity document and a short liveness check. Follow every step until your ACSP submits to Companies House, which emails the personal code directly to you.',
-      cta: 'Try the individual journey',
-    },
-    partners: {
-      tab: 'Referral Partners',
-      title: 'Every client company in one view',
-      body: 'Connect companies from the register, see who still needs to verify, and invite several directors at once, with an Agent Payment Code if you pay for them. You see status and check results only, never documents.',
-      cta: 'Open the Referral Partner portal',
-    },
-    acsps: {
-      tab: 'ACSPs',
-      title: 'Decide with the evidence in front of you',
-      body: 'A review queue with a 36-hour review target, every rule result with its ID, Mandatory decisions you record, an ACSP Copilot that cites its sources, then a submission workspace ready for GOV.UK One Login.',
-      cta: 'Open the review queue',
-    },
-  },
-}
-
-/** "Designed around the rules that matter": the standards grid. */
-export const closingCopy = {
-  title: 'Designed around the rules that matter',
-  lead: 'Built to the Companies House identity verification standard, with every rule visible to the reviewer.',
-  standards: [
-    {
-      kicker: 'Option 1',
-      title: 'Certified IDVT',
-      body: 'Digital verification is the default. A trained human check is a fallback only.',
-    },
-    {
-      kicker: 'Browser',
-      title: 'Desktop and mobile',
-      body: 'Document, chip where it applies, liveness and face match, in the browser and on your phone.',
-    },
-    {
-      kicker: 'Screening',
-      title: 'PEP and sanctions',
-      body: 'Where switched on for the ACSP, with every result shown to the reviewer.',
-    },
-    {
-      kicker: 'Register',
-      title: 'Differences flagged',
-      body: 'Details compared with Companies House. The reviewer decides on any difference.',
-    },
-    {
-      kicker: 'Route B',
-      title: 'Register corrections',
-      body: 'Genuine register corrections are filed separately, never as a resubmission.',
-    },
-    {
-      kicker: 'Submission',
-      title: 'One Login handoff',
-      body: 'A prepared submission, then the verification reference recorded.',
-    },
-    {
-      kicker: 'Retention',
-      title: 'Seven years',
-      body: 'Counted from the decision. Failed attempts kept too.',
-    },
-    {
-      kicker: 'Access',
-      title: 'WCAG 2.2 AA',
-      body: 'Large type, strong contrast and full keyboard use.',
-    },
-  ],
 }
 
 /** "The product": heading above the product stage and the capabilities marquee. */

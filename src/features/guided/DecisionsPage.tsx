@@ -1,8 +1,12 @@
 import { CheckCircle2 } from 'lucide-react'
 import { Page, PageHeader, Panel, PanelHeader } from '@/components/app/Page'
 import { PendingDecision } from '@/components/PendingDecision'
-import { decidedPoints, openPoints } from '@/data/decisions'
-import { identityPresenterNotes } from '@/data/presenterNotes'
+import { ProviderConfirmation } from '@/components/ProviderConfirmation'
+import { changedPoints, decidedPoints, openPoints } from '@/data/decisions'
+import {
+  identityPresenterNotes,
+  platformPresenterNotes,
+} from '@/data/presenterNotes'
 
 /*
   Presenter only. Not linked from any persona navigation: it opens from the
@@ -46,7 +50,11 @@ export function DecisionsPage() {
                     {p.summary}
                   </p>
                 </div>
-                <PendingDecision code={p.code} className="w-fit" />
+                {p.providerConfirmation ? (
+                  <ProviderConfirmation className="w-fit" />
+                ) : (
+                  <PendingDecision code={p.code} className="w-fit" />
+                )}
               </li>
             ))}
           </ul>
@@ -66,6 +74,50 @@ export function DecisionsPage() {
                 <p className="mt-1 text-base leading-relaxed text-slate">
                   {n.body}
                 </p>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+        <Panel aria-labelledby="g-notes2">
+          <PanelHeader
+            id="g-notes2"
+            title="Presenter notes: payments, messages and corrections"
+            description="Not shown on any client-facing screen."
+          />
+          <ul className="divide-y divide-line/80">
+            {platformPresenterNotes.map((n) => (
+              <li key={n.title} className="px-5 py-4 sm:px-6">
+                <h3 className="text-[1.0625rem] font-medium text-ink">
+                  {n.title}
+                </h3>
+                <p className="mt-1 text-base leading-relaxed text-slate">
+                  {n.body}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+        <Panel aria-labelledby="g-changed">
+          <PanelHeader
+            id="g-changed"
+            title="Changed after being decided"
+            description="The client reversed or changed these after deciding them."
+          />
+          <ul className="divide-y divide-line/80">
+            {changedPoints.map((p) => (
+              <li
+                key={p.title}
+                className="grid gap-2 px-5 py-4 sm:grid-cols-[4.5rem_1fr] sm:gap-5 sm:px-6"
+              >
+                <Code code={p.code} />
+                <div className="min-w-0">
+                  <h3 className="text-[1.0625rem] font-medium text-ink">
+                    {p.title}
+                  </h3>
+                  <p className="mt-1 text-base leading-relaxed text-slate">
+                    {p.summary}
+                  </p>
+                </div>
               </li>
             ))}
           </ul>

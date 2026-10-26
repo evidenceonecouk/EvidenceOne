@@ -1,3 +1,4 @@
+import { paymentTotal } from '@/lib/fees'
 import { formatMoney } from '@/lib/format'
 import type { Complaint, DemoData } from '@/types/domain'
 import type { ActionResult } from './actions'
@@ -25,7 +26,7 @@ function patchComplaint(
 /** Whether a refund is possible: only a payment that was taken can be refunded. */
 export function refundableAmount(data: DemoData, complaint: Complaint) {
   const vc = data.cases.find((c) => c.id === complaint.caseId)
-  return vc?.payment?.status === 'taken' ? vc.payment.amount : undefined
+  return vc?.payment?.status === 'taken' ? paymentTotal(vc.payment) : undefined
 }
 
 export function refundComplaint(

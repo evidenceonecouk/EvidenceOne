@@ -1,3 +1,4 @@
+import { PROVIDER_STATUS_LABEL } from '@/lib/payments'
 import type {
   AcspFirm,
   AcspStatus,
@@ -9,7 +10,7 @@ import type {
 /*
   ACSP matching and suggestion. Deterministic: structured criteria, no AI. The
   demo shows the criteria and every ACSP with a pass or fail per criterion and
-  the rule ID (MATCH-01 to MATCH-08). An administrator allocates; automatic
+  the rule ID (MATCH-01 to MATCH-09). An administrator allocates; automatic
   allocation is a later phase. For a B2C client the platform suggests matching
   ACSPs, ranked on clear criteria, each with its own fee and turnaround.
   "Ranked by clear criteria. Not AI."
@@ -41,6 +42,7 @@ export type MatchRuleId =
   | 'MATCH-06' // language
   | 'MATCH-07' // higher-risk cases
   | 'MATCH-08' // capacity left today and turnaround
+  | 'MATCH-09' // payments active (Design, proposed)
 
 export interface CriterionResult {
   ruleId: MatchRuleId
@@ -252,6 +254,16 @@ export function matchAcsps(
           ? `Target turnaround ${p.targetTurnaroundHours} hours.`
           : `Target turnaround ${p.targetTurnaroundHours} hours, over the ${criteria.maxTurnaroundHours} hours asked for.`,
       ].join(' '),
+    )
+
+    // MATCH-09 (Design, proposed): payments active
+    add(
+      'MATCH-09',
+      'Payments active',
+      acsp.payments.paymentsActive,
+      acsp.payments.paymentsActive
+        ? 'Payments are active: the secure payment provider shows Eligible and Evidence One has approved.'
+        : `Payments are not active yet (provider status: ${PROVIDER_STATUS_LABEL[acsp.payments.providerStatus]}). Not offered until both the provider and Evidence One have approved.`,
     )
 
     return { acsp, eligible: results.every((r) => r.pass), results }

@@ -1,12 +1,12 @@
 import type { DemoData, ExportRequest, VerificationCase } from '@/types/domain'
 import type { ActionResult } from './actions'
+import { refuseOtherAcsp } from './guards'
 
 /*
   Verification file export (decided 19 October). The ACSP downloads its file
   immediately after pressing Approve. Later, within the seven years, it asks a
   Platform Administrator, who releases the download and never opens the
-  evidence. Every download needs step-up. Code messages are never part of the
-  file.
+  evidence. Every download needs step-up.
 */
 
 /**
@@ -39,7 +39,15 @@ export function requestExport(
   caseId: string,
   requestedBy: string,
   reason: string,
+  reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the export request',
+  )
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   if (!vc) return { data, audit: [] }
   const at = new Date().toISOString()
@@ -106,9 +114,17 @@ export function recordExportDownload(
   id: string,
   actor: string,
   stepUpRef: string,
+  reviewerId: string,
 ): ActionResult {
   const req = (data.exportRequests ?? []).find((x) => x.id === id)
   if (!req || req.status !== 'released') return { data, audit: [] }
+  const refused = refuseOtherAcsp(
+    data,
+    req.caseId,
+    reviewerId,
+    'the export download',
+  )
+  if (refused) return refused
   const at = new Date().toISOString()
   return {
     data: {
@@ -127,6 +143,44 @@ export function recordExportDownload(
         action: 'export.downloaded',
         caseId: req.caseId,
         detail: `${req.id}: verification file downloaded after release. Step-up ${stepUpRef} confirmed.`,
+      },
+    ],
+  }
+}
+
+/**
+  The ACSP exported its own audit trail behind step-up (acceptance scenario 7).
+  The export is recorded in the same chain. Reference only: the file itself is
+  built on screen and never stored.
+*/
+export function recordAuditExport(
+  data: DemoData,
+  caseId: string | undefined,
+  acspId: string,
+  stepUpRef: string,
+  actor: string,
+  reviewerId: string,
+): ActionResult {
+  if (caseId) {
+    const refused = refuseOtherAcsp(
+      data,
+      caseId,
+      reviewerId,
+      'the audit export',
+    )
+    if (refused) return refused
+  }
+  return {
+    data,
+    audit: [
+      {
+        at: new Date().toISOString(),
+        actor,
+        actorType: 'person',
+        action: 'audit.exported',
+        acspId,
+        caseId,
+        detail: `${caseId ? `Audit trail for case ${caseId}` : 'The whole audit chain'} exported as a CSV file. Step-up ${stepUpRef} confirmed. The file holds event types, actors, timestamps and short hashes, and no document content or codes.`,
       },
     ],
   }

@@ -20,6 +20,7 @@ import { HeroBanner, Page, Panel, PanelHeader } from '@/components/app/Page'
 import { SidePanel } from '@/components/app/SidePanel'
 import { useToast } from '@/components/app/Toaster'
 import { PendingDecision } from '@/components/PendingDecision'
+import { ProviderConfirmation } from '@/components/ProviderConfirmation'
 import { OutcomeChip, RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,6 +35,7 @@ import {
   type RuleDef,
   type RuleGroupId,
 } from '@/data/rules'
+import { DocumentLists } from './DocumentLists'
 import { CopilotPanel } from '@/features/copilot/CopilotPanel'
 import { formatDate, formatDateTime, fullName } from '@/lib/format'
 import {
@@ -144,6 +146,7 @@ export function RulesPage() {
             ['#rules-list', 'Rules'],
             ['#rules-params', 'Parameters'],
             ['#rules-settings', 'Decision settings'],
+            ['#rules-documents', 'Document lists'],
             ['#rules-history', 'Version history'],
           ].map(([href, label]) => (
             <a
@@ -166,6 +169,9 @@ export function RulesPage() {
               canEdit={canPropose && draft?.status !== 'pending_approval'}
             />
           </div>
+          <DocumentLists
+            canEdit={canPropose && draft?.status !== 'pending_approval'}
+          />
           <HistoryPanel />
         </div>
 
@@ -582,6 +588,11 @@ function RulesList({ onOpen }: { onOpen: (r: RuleDef) => void }) {
                             <PendingDecision code={r.pending || undefined} />
                           </span>
                         )}
+                        {r.providerConfirmation && (
+                          <span className="mt-1 block">
+                            <ProviderConfirmation />
+                          </span>
+                        )}
                         {r.setting && (
                           <span className="mt-0.5 block text-[0.8125rem] text-slate">
                             Set by:{' '}
@@ -931,6 +942,7 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
                 {s.pending !== undefined && (
                   <PendingDecision code={s.pending || undefined} />
                 )}
+                {s.providerConfirmation && <ProviderConfirmation />}
                 <span className="font-mono text-[0.8125rem] text-slate">
                   {s.rules.join(', ')}
                 </span>

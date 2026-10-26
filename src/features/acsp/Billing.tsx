@@ -264,14 +264,41 @@ function InvoiceDialog({
               </div>
               <div className="overflow-hidden rounded-xl border border-line/80">
                 <dl className="divide-y divide-line/70 text-base">
-                  <div className="flex justify-between gap-4 px-4 py-3">
-                    <dt className="text-graphite">{invoice.description}</dt>
-                    <dd className="tabular text-ink">{gbp(invoice.net)}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4 px-4 py-3">
-                    <dt className="text-slate">VAT at 20%</dt>
-                    <dd className="tabular text-slate">{gbp(invoice.vat)}</dd>
-                  </div>
+                  {invoice.lines ? (
+                    <>
+                      <div className="px-4 py-3 text-graphite">
+                        {invoice.description}
+                      </div>
+                      {invoice.lines.map((l) => (
+                        <div
+                          key={l.description}
+                          className="flex justify-between gap-4 px-4 py-3"
+                        >
+                          <dt className="text-graphite">{l.description}</dt>
+                          <dd className="tabular text-ink">{gbp(l.gross)}</dd>
+                        </div>
+                      ))}
+                      <div className="flex justify-between gap-4 px-4 py-3">
+                        <dt className="text-slate">Of which VAT at 20%</dt>
+                        <dd className="tabular text-slate">
+                          {gbp(invoice.vat)}
+                        </dd>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between gap-4 px-4 py-3">
+                        <dt className="text-graphite">{invoice.description}</dt>
+                        <dd className="tabular text-ink">{gbp(invoice.net)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-4 px-4 py-3">
+                        <dt className="text-slate">VAT at 20%</dt>
+                        <dd className="tabular text-slate">
+                          {gbp(invoice.vat)}
+                        </dd>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between gap-4 bg-mist/50 px-4 py-3 font-medium">
                     <dt className="text-ink">Total paid</dt>
                     <dd className="tabular text-ink">{gbp(invoice.gross)}</dd>

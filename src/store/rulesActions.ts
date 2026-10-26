@@ -1,6 +1,7 @@
 import { fullName } from '@/lib/format'
 import type { DemoData, DiscrepancyReport } from '@/types/domain'
 import type { ActionResult } from './actions'
+import { refuseOtherAcsp } from './guards'
 
 /*
   Rule-related actions. The reviewer's choice on the "Report this difference to
@@ -13,7 +14,17 @@ export function recordDiscrepancyChoice(
   choice: NonNullable<DiscrepancyReport['choice']>,
   reviewerName: string,
   note?: string,
+  reviewerId?: string,
 ): ActionResult {
+  if (reviewerId) {
+    const refused = refuseOtherAcsp(
+      data,
+      caseId,
+      reviewerId,
+      'the discrepancy choice',
+    )
+    if (refused) return refused
+  }
   const vc = data.cases.find((c) => c.id === caseId)
   if (!vc?.discrepancyReport) return { data, audit: [] }
   const at = new Date().toISOString()

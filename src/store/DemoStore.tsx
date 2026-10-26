@@ -21,13 +21,20 @@ import type { ActionResult } from './actions'
 
 /*
   Single demo store. Seeded from src/data, saved to localStorage so a presenter
-  can refresh without losing their place, and reset from the top bar.
+  can refresh without losing their place, and reset from the demo controls panel.
 */
 
 const STORAGE_KEY = 'evidenceone.demo'
-const SCHEMA = 8
+const SCHEMA = 9
 /** A saved demo older than this is reseeded so SLA timers look live again. */
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000
+
+/** The guided demo: the story track, or the Gate 2 acceptance walkthrough. */
+export interface GuidedState {
+  on: boolean
+  step: number
+  track?: 'story' | 'acceptance'
+}
 
 export interface DemoState {
   schema: number
@@ -42,7 +49,7 @@ export interface DemoState {
   /** Language for guidance on individual-facing screens. English is the version of record. */
   language: LanguageCode
   /** Guided demo mode: short captions that step through the story. */
-  guided: { on: boolean; step: number }
+  guided: GuidedState
   /**
     Presenter setting: show the options held until after go-live (O1 language
     help, O2 Route B filings, O3 bank statement redaction), each badged
@@ -60,7 +67,7 @@ type Action =
   | { type: 'setAcsp'; acspId: string }
   | { type: 'setSeat'; seat: 1 | 2 }
   | { type: 'setLanguage'; language: LanguageCode }
-  | { type: 'setGuided'; guided: { on: boolean; step: number } }
+  | { type: 'setGuided'; guided: GuidedState }
   | { type: 'setShowHeldOptions'; show: boolean }
   | {
       type: 'update'
@@ -155,7 +162,7 @@ interface DemoStoreValue {
   setAcsp: (acspId: string) => void
   setSeat: (seat: 1 | 2) => void
   setLanguage: (language: LanguageCode) => void
-  setGuided: (guided: { on: boolean; step: number }) => void
+  setGuided: (guided: GuidedState) => void
   setShowHeldOptions: (show: boolean) => void
   /** Apply an immutable change to the data and append any audit events to the chain. */
   update: (recipe: (data: DemoData) => DemoData, audit?: AuditInput[]) => void
@@ -213,8 +220,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     [],
   )
   const setGuided = useCallback(
-    (guided: { on: boolean; step: number }) =>
-      dispatch({ type: 'setGuided', guided }),
+    (guided: GuidedState) => dispatch({ type: 'setGuided', guided }),
     [],
   )
   const setShowHeldOptions = useCallback(

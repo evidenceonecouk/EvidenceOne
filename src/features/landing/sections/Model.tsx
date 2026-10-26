@@ -5,9 +5,7 @@ import {
   UserRoundCheck,
   type LucideIcon,
 } from 'lucide-react'
-import { HeldOptionBadge } from '@/components/HeldOption'
 import { modelCopy as copy } from '@/data/copy'
-import { languages } from '@/data/i18n'
 import { container } from '../parts'
 import { RuleKicker } from './Hero'
 
@@ -19,9 +17,8 @@ const icons: LucideIcon[] = [
 ]
 const model = copy.cards.map((card, i) => ({ icon: icons[i], ...card }))
 
-/** How the model works in plain words, then the six languages. */
+/** How the model works in plain words. */
 export function Model() {
-  const help = languages.filter((l) => l.code !== 'en')
   return (
     <section
       id="how-it-works"
@@ -67,39 +64,6 @@ export function Model() {
             </li>
           ))}
         </ol>
-
-        <div
-          id="languages"
-          className="mt-8 rounded-[20px] border border-line bg-white/70 p-6 sm:p-8"
-        >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-            <h3 className="flex flex-wrap items-center gap-3 text-[1.375rem] tracking-[-0.02em] text-ink">
-              {copy.languages.title}
-              <HeldOptionBadge code="O1" />
-            </h3>
-            <p className="text-base text-graphite">{copy.languages.lead}</p>
-          </div>
-          <ul className="mt-5 flex flex-wrap gap-2.5">
-            {help.map((l) => (
-              <li
-                key={l.code}
-                className="inline-flex items-baseline gap-2 rounded-full border border-line bg-white px-4 py-2 text-base text-ink"
-              >
-                <span>{l.label}</span>
-                <span
-                  lang={l.code === 'zh' ? 'zh-Hans' : l.code}
-                  dir={l.dir}
-                  className="text-graphite"
-                >
-                  {l.native}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-[0.9375rem] text-graphite">
-            {copy.languages.note}
-          </p>
-        </div>
       </div>
     </section>
   )

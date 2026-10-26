@@ -3,8 +3,8 @@ import { useParams, useSearchParams } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { recordCorrection, returnFromSubmission } from '@/store/actions'
-import { useDemoStore } from '@/store/DemoStore'
-import { reviewerIdFor } from '@/store/reviewActions'
+import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
+import { AccessRefused } from './AccessRefused'
 
 export const SUBMIT_SERVICE =
   'Tell Companies House you’ve verified someone’s identity'
@@ -38,9 +38,11 @@ export function HandoffInterstitial({
   onDone?: () => void
 }) {
   const { data, apply } = useDemoStore()
+  const { acsp: actingAcsp, reviewer: actingReviewer } = useActingAcsp()
   const vc = data.cases.find((c) => c.id === caseId)
   const acspName = data.acsps.find((a) => a.id === vc?.acspId)?.name
-  const reviewerId = vc ? reviewerIdFor(data, vc) : ''
+  // The acting reviewer, so the store can refuse another ACSP's case.
+  const reviewerId = actingReviewer.id
   const service = kind === 'submission' ? SUBMIT_SERVICE : CORRECT_SERVICE
   const back = () => {
     apply((d) =>
@@ -51,6 +53,8 @@ export function HandoffInterstitial({
     if (onDone) onDone()
     else window.setTimeout(() => window.close(), 150)
   }
+  if (vc && vc.acspId !== actingAcsp.id)
+    return <AccessRefused caseId={vc.id} area="the Companies House handoff" />
   return (
     <div className="mx-auto max-w-lg px-6 py-10">
       <Wordmark />

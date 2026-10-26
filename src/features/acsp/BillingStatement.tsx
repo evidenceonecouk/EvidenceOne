@@ -42,13 +42,13 @@ function pdfLines(
   ]
   for (const r of rows)
     lines.push(
-      `${pad(r.caseId, 16)}${pad(r.clientName, 22)}${pad(SOURCE_LABEL[r.source], 12)}${num(gbp(r.gross), 10)}${num(gbp(r.providerFee), 14)}${num(r.source === 'own_client' ? 'None' : gbp(r.platformFeeGross), 14)}${num(gbp(r.net), 14)}  ${r.payoutAt ? formatShortDate(r.payoutAt) : 'Pending'}`,
+      `${pad(r.caseId, 16)}${pad(r.clientName, 22)}${pad(SOURCE_LABEL[r.source], 12)}${num(gbp(r.gross), 10)}${num(gbp(r.providerFee), 14)}${num(r.source === 'own_client' ? 'None' : gbp(r.platformFeeGross), 14)}${num(gbp(r.net), 14)}  ${r.payoutAt ? formatShortDate(r.payoutAt) : 'Pending'}${r.correctionAddOn > 0 ? `  (includes ${gbp(r.correctionAddOn)} register correction)` : ''}`,
     )
   lines.push(
     '',
     `${pad('Totals', 50)}${num(gbp(t.gross), 10)}${num(gbp(t.providerFee), 14)}${num(gbp(t.platformFeeGross), 14)}${num(gbp(t.net), 14)}`,
     '',
-    'Platform fee: GBP 69 plus VAT per referred or B2C case, deducted automatically. Own clients carry no platform fee.',
+    'Platform fee: GBP 69 plus VAT per referred or B2C case, deducted automatically, once per case and never per correction. Own clients carry no platform fee.',
     ...(plan
       ? [
           '',
@@ -183,7 +183,14 @@ export function BillingStatement({ acsp }: { acsp: AcspFirm }) {
                     </Td>
                     <Td>{r.clientName}</Td>
                     <Td muted>{SOURCE_LABEL[r.source]}</Td>
-                    <Td right>{gbp(r.gross)}</Td>
+                    <Td right>
+                      {gbp(r.gross)}
+                      {r.correctionAddOn > 0 && (
+                        <span className="block text-[0.875rem] text-slate">
+                          includes {gbp(r.correctionAddOn)} register correction
+                        </span>
+                      )}
+                    </Td>
                     <Td right muted>
                       {gbp(r.providerFee)}
                     </Td>

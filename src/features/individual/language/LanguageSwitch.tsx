@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Languages } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { languageByCode, languages } from '@/data/i18n'
 import { cn } from '@/lib/utils'
 import { HeldOptionBadge } from '@/components/HeldOption'
@@ -15,10 +15,21 @@ export function LanguageSwitch({ className }: { className?: string }) {
   const [open, setOpen] = useState(false)
   const held = useShowHeldOptions()
   const current = languageByCode(state.language)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Close on a click or tap outside the switch.
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
   // Language help is option O1, held until after go-live. Hidden, the journey runs in English.
   if (!held) return null
   return (
     <div
+      ref={rootRef}
       className={cn('relative', className)}
       onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
     >
@@ -35,7 +46,7 @@ export function LanguageSwitch({ className }: { className?: string }) {
         <ChevronDown className="size-4" aria-hidden="true" />
       </button>
       {open && (
-        <div className="absolute end-0 top-full z-50 mt-1 w-64 rounded-xl border border-line bg-white p-1 shadow-lg">
+        <div className="absolute end-0 top-full z-50 mt-1 w-max min-w-64 rounded-xl border border-line bg-white p-1 shadow-lg">
           <p className="px-2 pt-1.5 pb-1">
             <HeldOptionBadge code="O1" />
           </p>

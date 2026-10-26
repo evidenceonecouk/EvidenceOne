@@ -1,3 +1,5 @@
+import { paymentTotal } from '@/lib/fees'
+import { AccessRefused } from './AccessRefused'
 import { auditEventKey } from '@/lib/audit'
 import {
   ArrowLeft,
@@ -116,31 +118,13 @@ export function CaseReview() {
     )
   }
 
-  if (vc.acspId !== acsp.id) {
-    const other = data.acsps.find((a) => a.id === vc.acspId)
-    return (
-      <Page width="narrow">
-        <h1 className="text-2xl font-medium text-ink">
-          This case is held by {other?.name ?? 'another ACSP'}
-        </h1>
-        <p className="mt-3 text-base text-graphite">
-          Each ACSP's verification records are kept separate. You can only open
-          cases held by {acsp.name}.
-        </p>
-        <Button asChild variant="outline" className="mt-6">
-          <Link to="/acsp/queue">Back to your review queue</Link>
-        </Button>
-      </Page>
-    )
-  }
+  if (vc.acspId !== acsp.id)
+    return <AccessRefused caseId={vc.id} area="the case review" />
 
   const name = fullName(person)
   const partner = vc.partnerId ? getPartner(data, vc.partnerId) : undefined
   const decidable = vc.status === 'in_review' || vc.status === 'info_requested'
   const outstanding = outstandingFor(results)
-  const reviewer = data.acsps
-    .flatMap((a) => a.reviewers)
-    .find((r) => r.id === (vc.reviewerId ?? REVIEWER))
   const props: SectionProps = {
     vc,
     person,
@@ -268,7 +252,7 @@ export function CaseReview() {
         <div className="grid items-start gap-6 xl:grid-cols-[1fr_24rem]">
           <div className="min-w-0 space-y-6">
             <RegisterSection {...props} />
-            <Option2Section {...props} reviewer={reviewer} />
+            <Option2Section {...props} />
             <DocumentSection {...props} />
             {vc.option === 1 && <IdvtSection {...props} />}
             <ScreeningSection {...props} />
@@ -305,7 +289,7 @@ export function CaseReview() {
             vc.payment?.status !== 'authorised'
               ? undefined
               : outcome === 'approve'
-                ? `Approving takes the authorised ${formatMoney(vc.payment.amount)}${vc.source === 'own_client' ? '' : `, deducts the platform fee of ${formatMoney(data.billing.settings.platformFee)} plus VAT`} and issues the client invoice in ${acsp.name}’s name.`
+                ? `Approving takes the authorised ${formatMoney(paymentTotal(vc.payment))}${vc.registerCorrection?.stage === 'register_corrected' ? ' (the verification fee and the register correction add-on)' : ''}${vc.source === 'own_client' ? '' : `, deducts the platform fee of ${formatMoney(data.billing.settings.platformFee)} plus VAT`} and issues the client invoice in ${acsp.name}’s name.`
                 : 'Declining releases the authorisation. Nothing is taken from the client.'
           }
           onClose={() => setOutcome(null)}
@@ -577,7 +561,8 @@ function CodeReceipt({ vc, name }: { vc: VerificationCase; name: string }) {
       <p className="mt-3 text-[0.9375rem] leading-relaxed text-graphite">
         Companies House will email the personal code directly to {name}.
         Evidence One does not receive it from Companies House and never asks for
-        it. {name} may send it to you as a code message in the case messages.
+        it. If you need a code for a later filing, agree with {name} how to pass
+        it to you outside Evidence One.
       </p>
       <p className="mt-3 text-base text-ink">
         {r?.answer === 'yes'

@@ -1,3 +1,5 @@
+import { AccessRefused } from './AccessRefused'
+import { LATER_FILING_CODE_LINE } from '@/lib/codeWarning'
 import {
   ArrowLeft,
   ExternalLink,
@@ -81,14 +83,7 @@ export function Submission() {
 
   if (!vc || !person || !acsp) return <Page>Case not found.</Page>
   if (acsp.id !== actingAcsp.id)
-    return (
-      <Page width="narrow">
-        <p className="text-lg text-ink">
-          This case is held by {acsp.name}. Each ACSP's records are kept
-          separate.
-        </p>
-      </Page>
-    )
+    return <AccessRefused caseId={vc.id} area="the submission workspace" />
   if (!isApprovedOrLater(vc.status)) {
     return (
       <Page width="narrow">
@@ -166,6 +161,7 @@ export function Submission() {
       </div>
 
       <div className="space-y-6">
+        <p className="text-[0.9375rem] text-slate">{LATER_FILING_CODE_LINE}</p>
         <Panel className="flex flex-wrap items-center gap-3 px-5 py-4 sm:px-6">
           <RuleIdTag id="SUB-01" />
           <OutcomeChip outcome={complete ? 'pass' : 'block'} />
@@ -200,7 +196,9 @@ export function Submission() {
                     done={doneKeys.includes(f.key)}
                     disabled={!started || submitted}
                     onToggle={() =>
-                      apply((d) => toggleSubmissionField(d, vc.id, f.key))
+                      apply((d) =>
+                        toggleSubmissionField(d, vc.id, f.key, reviewer.id),
+                      )
                     }
                   />
                 ))}

@@ -184,8 +184,8 @@ export const steps: StepSpec[] = [
     stage: 2,
     caption: {
       kicker: 'Option 2 · Fallback only',
-      title: 'A trained person check',
-      body: "Offered only when Option 1 cannot support the person's document, or the person has no smartphone or tablet (pending the client's decision). Two documents are needed, and the reviewer must hold a current training attestation.",
+      title: 'Option 2 through the identity provider',
+      body: "Offered only when Option 1 cannot support the person's document, or the person has no smartphone or tablet. The certified identity provider's trained reviewers check the documents, subject to the provider confirming it can. The ACSP completes any further checks and makes the decision.",
     },
   },
 ]

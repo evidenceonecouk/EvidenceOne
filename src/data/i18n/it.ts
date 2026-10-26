@@ -43,7 +43,7 @@ export const it: LanguageStrings = {
     status:
       'Questa pagina mostra a che punto è il tuo caso. Decide il tuo ACSP. Companies House ti invierà il codice personale direttamente per e-mail.',
     'option-2':
-      'Se i controlli nel browser non supportano il tuo documento, il tuo ACSP può organizzare un controllo con una persona formata.',
+      'Se i controlli nel browser non supportano il tuo documento, i revisori formati del fornitore di identità certificato possono controllare i tuoi documenti. Il tuo ACSP completa gli eventuali controlli ulteriori e prende la decisione.',
   },
   helper: {
     title: 'Quale documento posso usare?',

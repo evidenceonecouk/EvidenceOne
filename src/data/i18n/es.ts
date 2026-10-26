@@ -43,7 +43,7 @@ export const es: LanguageStrings = {
     status:
       'Esta página muestra en qué punto está su caso. Decide su ACSP. Companies House le enviará el código personal directamente por correo electrónico.',
     'option-2':
-      'Si las comprobaciones en el navegador no admiten su documento, su ACSP puede organizar una comprobación con una persona formada.',
+      'Si las comprobaciones en el navegador no admiten su documento, los revisores formados del proveedor de identidad certificado pueden comprobar sus documentos. Su ACSP completa cualquier comprobación adicional y toma la decisión.',
   },
   helper: {
     title: '¿Qué documento puedo usar?',

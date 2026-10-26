@@ -14,8 +14,8 @@ import { cn } from '@/lib/utils'
 const SCREEN_H = 844
 const BEZEL = 10
 const DEVICE_H = SCREEN_H + BEZEL * 2
-/* Presenter bar (3.5rem) plus breathing room above and below the device. */
-const RESERVED_H = 56 + 56
+/* Breathing room above and below the device. */
+const RESERVED_H = 56
 /* Below this the type gets too small to read; the page scrolls instead. */
 const MIN_SCALE = 0.66
 
@@ -71,7 +71,7 @@ export function PhoneFrame({
   return (
     <div
       className={cn(
-        'flex flex-col items-center sm:min-h-[calc(100dvh-3.5rem)] sm:justify-center sm:py-7',
+        'flex flex-col items-center sm:min-h-dvh sm:justify-center sm:py-7',
         className,
       )}
     >
@@ -81,8 +81,8 @@ export function PhoneFrame({
         style={{ zoom: scale }}
         className={cn(
           'relative flex w-full flex-col overflow-hidden bg-paper',
-          // Phone sized screens: no device chrome, fills the space below the presenter bar
-          'h-[calc(100dvh-3.5rem)]',
+          // Phone sized screens: no device chrome, fills the viewport
+          'h-dvh',
           // Larger screens: device chrome around a real 390 x 844 screen
           'sm:h-[864px] sm:w-[410px] sm:shrink-0 sm:rounded-[3rem] sm:border-[10px] sm:border-ink sm:shadow-[0_40px_80px_-30px_rgb(22_24_27/0.45),0_0_0_1px_rgb(22_24_27/0.08)]',
         )}

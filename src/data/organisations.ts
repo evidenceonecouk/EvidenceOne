@@ -1,3 +1,4 @@
+import { withGates } from '@/lib/payments'
 import type {
   AcspFirm,
   AcspMonitoring,
@@ -62,6 +63,10 @@ export const acsps: AcspFirm[] = [
     acspNumber: 'ACSP-0046-2187',
     status: 'active',
     approval: 'approved',
+    payments: withGates({
+      providerStatus: 'eligible',
+      evidenceOneApproved: true,
+    }),
     reviewers: [
       {
         id: 'rev-marsh',
@@ -140,6 +145,10 @@ export const acsps: AcspFirm[] = [
     acspNumber: 'ACSP-0201-7764',
     status: 'active',
     approval: 'approved',
+    payments: withGates({
+      providerStatus: 'eligible',
+      evidenceOneApproved: true,
+    }),
     reviewers: [
       {
         id: 'rev-pell',
@@ -177,6 +186,10 @@ export const acsps: AcspFirm[] = [
     statusNote:
       'Appears on the Companies House ceased and suspended list published on 1 October 2026. Name match confirmed by an administrator on 5 October 2026.',
     approval: 'approved',
+    payments: withGates({
+      providerStatus: 'eligible',
+      evidenceOneApproved: true,
+    }),
     reviewers: [
       {
         id: 'rev-basu',
@@ -221,6 +234,10 @@ export const acsps: AcspFirm[] = [
     statusNote:
       'Not found on the Companies House published list of ACSPs. Time to register: 3 months. Can become Active when the listing arrives.',
     approval: 'approved',
+    payments: withGates({
+      providerStatus: 'eligible',
+      evidenceOneApproved: true,
+    }),
     reviewers: [
       {
         id: 'rev-ashdown',
@@ -262,6 +279,10 @@ export const acsps: AcspFirm[] = [
     acspNumber: 'ACSP-0377-1205',
     status: 'active',
     approval: 'approved',
+    payments: withGates({
+      providerStatus: 'eligible',
+      evidenceOneApproved: true,
+    }),
     alsoPartnerId: 'partner-fenwick',
     reviewers: [
       {

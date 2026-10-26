@@ -46,8 +46,8 @@ export function Platform() {
         className={`${container} relative grid gap-12 py-24 lg:grid-cols-[17rem_1fr] lg:gap-0 lg:py-32`}
       >
         <div className="lg:border-r lg:border-white/10 lg:pr-10">
-          {/* Pinned at its resting offset: the bars above are 8.5rem tall and the section pads 8rem, so it sticks as the section reaches the header */}
-          <div className="lg:sticky lg:top-[16.5rem]">
+          {/* Pinned at its resting offset: the header above is 5rem tall and the section pads 8rem, so it sticks as the section reaches the header */}
+          <div className="lg:sticky lg:top-[13rem]">
             <h2
               id="platform-title"
               className="text-[2.25rem] leading-[1.1] font-normal tracking-[-0.03em] text-paper"

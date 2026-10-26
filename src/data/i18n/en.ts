@@ -43,7 +43,7 @@ export const en: LanguageStrings = {
     status:
       'This page shows where your case is. Your ACSP decides. Companies House emails the personal code directly to you.',
     'option-2':
-      'If the browser checks cannot support your document, your ACSP can arrange a check with a trained person instead.',
+      'If the browser checks cannot support your document, the certified identity provider’s trained reviewers can check your documents instead. Your ACSP completes any further checks and makes the decision.',
   },
   helper: {
     title: 'Which document can I use?',

@@ -13,6 +13,8 @@ export interface Persona {
   id: PersonaId
   label: string
   shortLabel: string
+  /** A few plain words for the demo controls panel. */
+  hint: string
   description: string
   home: string
   /** Route prefixes that belong to this persona. */
@@ -25,6 +27,7 @@ export const personas: Persona[] = [
     id: 'partner',
     label: 'Referral Partner',
     shortLabel: 'Partner',
+    hint: 'Sends clients for verification',
     description:
       'Accountants, law firms, corporate service providers and introducers who bring client companies to the platform. They see status and check results only.',
     home: '/partner',
@@ -35,6 +38,7 @@ export const personas: Persona[] = [
     id: 'reviewer',
     label: 'ACSP',
     shortLabel: 'ACSP',
+    hint: 'Reviews and approves cases',
     description:
       'The registered ACSP: ACSP Reviewers approve, request information or decline. The ACSP Administrator manages the firm.',
     home: '/acsp/queue',
@@ -45,6 +49,7 @@ export const personas: Persona[] = [
     id: 'individual',
     label: 'Individual',
     shortLabel: 'Individual',
+    hint: 'Verifies their identity',
     description:
       'A director or PSC who has been invited to verify their identity in the browser.',
     home: '/journey/EO-2026-000135/invite',
@@ -55,6 +60,7 @@ export const personas: Persona[] = [
     id: 'b2c',
     label: 'B2C client',
     shortLabel: 'B2C',
+    hint: 'Comes to us directly',
     description:
       'A member of the public who comes to Evidence One directly, is suggested ACSPs and is allocated to one.',
     home: '/verify',
@@ -65,6 +71,7 @@ export const personas: Persona[] = [
     id: 'platformAdmin',
     label: 'Platform Administrator',
     shortLabel: 'Platform Admin',
+    hint: 'Runs the platform day to day',
     description:
       'Approves ACSPs and Referral Partners, manages allocation and monitoring, and reads platform events. Cannot approve a case or read identity evidence.',
     home: '/admin',
@@ -75,6 +82,7 @@ export const personas: Persona[] = [
     id: 'superAdmin',
     label: 'Super Administrator',
     shortLabel: 'Super Admin',
+    hint: 'Sets fees, plans and rules',
     description:
       'Sets the platform fee and subscription plans, switches referral commissions on, and publishes rule sets, each with a second approver.',
     home: '/super',

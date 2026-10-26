@@ -1,10 +1,16 @@
 import { normaliseName, sameName } from '@/lib/acspList'
+import {
+  PROVIDER_STATUS_LABEL,
+  providerStatusFromAnswer,
+  withGates,
+} from '@/lib/payments'
 import type { AuditInput } from '@/lib/audit'
 import { fullName } from '@/lib/format'
 import { suggestAcsps, type MatchCriteria } from '@/lib/matching'
 import type {
   AcspFirm,
   AcspStatus,
+  PaymentProviderStatus,
   DemoData,
   LanguageCode,
   NameMatch,
@@ -86,6 +92,11 @@ export function allocationState(
     return {
       open: false,
       reason: 'Reconfirmation overdue, new allocation paused (ACSP-11)',
+    }
+  if (!acsp.payments.paymentsActive)
+    return {
+      open: false,
+      reason: 'Payments not active, not allocated paid cases (MATCH-09)',
     }
   if (!acsp.profile.acceptingNewCases)
     return { open: false, reason: 'Not accepting new cases' }
@@ -218,6 +229,13 @@ function buildAcsp(
       ? `Approved by ${actor}. Name matched to the Companies House published list of ACSPs.`
       : `Approved by ${actor}. Not found on the Companies House published list of ACSPs. Time to register: 3 months. Can become Active when the listing arrives.`,
     approval: 'approved',
+    payments: withGates({
+      providerStatus: providerStatusFromAnswer(
+        answerOf(app, 'paymentproviderstatus'),
+      ),
+      evidenceOneApproved: true,
+      updatedAt: at,
+    }),
     reviewers: [
       {
         id: `rev-${id.slice(5)}`,
@@ -357,7 +375,7 @@ export function approveApplication(
       actor,
       actorType: 'person',
       action: 'onboarding.acsp_approved',
-      detail: `${app.name} approved as an ACSP (application ${app.id}). Status ${status === 'active' ? 'Active: name found on the Companies House published list' : 'Not yet listed: name not found on the published list. Time to register: 3 months'}.`,
+      detail: `${app.name} approved as an ACSP (application ${app.id}). Status ${status === 'active' ? 'Active: name found on the Companies House published list' : 'Not yet listed: name not found on the published list. Time to register: 3 months'}. Evidence One approval given. Payments ${acsp.payments.paymentsActive ? 'active: the secure payment provider shows Eligible' : `not active yet: the secure payment provider shows ${PROVIDER_STATUS_LABEL[acsp.payments.providerStatus]}`}.`,
     })
   } else {
     const partner = buildPartner(data, app)
@@ -1074,4 +1092,41 @@ export function reallocationRows(data: DemoData, fromAcspId: string) {
       offered: data.acsps.find((a) => a.id === c.reallocation!.offeredAcspId),
       response: c.reallocation!.individualResponse,
     }))
+}
+
+/**
+  Demo only: the secure payment provider reports a new status for an ACSP's
+  connected account (G2-02, subject to the provider's confirmation). Payments
+  become active only when the status is Eligible and Evidence One has approved.
+  No bank detail is ever held here.
+*/
+export function recordProviderStatus(
+  data: DemoData,
+  acspId: string,
+  status: PaymentProviderStatus,
+  actor = 'Secure payment provider (simulated)',
+): ActionResult {
+  const acsp = data.acsps.find((a) => a.id === acspId)
+  if (!acsp) return { data, audit: [] }
+  const at = nowIso()
+  const payments = withGates({
+    ...acsp.payments,
+    providerStatus: status,
+    updatedAt: at,
+  })
+  return {
+    data: {
+      ...data,
+      acsps: data.acsps.map((a) => (a.id === acspId ? { ...a, payments } : a)),
+    },
+    audit: [
+      {
+        at,
+        actor,
+        actorType: 'system',
+        action: 'acsp.payments.provider_status',
+        detail: `${acsp.name}: the secure payment provider reports ${PROVIDER_STATUS_LABEL[status]}. Payments are ${payments.paymentsActive ? 'now active: both the provider and Evidence One have approved' : 'not active: both gates must be met'}. No bank details are held by Evidence One.`,
+      },
+    ],
+  }
 }

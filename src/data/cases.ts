@@ -1,5 +1,9 @@
 import type { AuditInput } from '@/lib/audit'
-import { DEFAULT_BILLING_SETTINGS, splitPayment } from '@/lib/fees'
+import {
+  DEFAULT_BILLING_SETTINGS,
+  paymentTotal,
+  splitPayment,
+} from '@/lib/fees'
 import { SLA_HOURS } from '@/lib/format'
 import type {
   AiObservation,
@@ -126,7 +130,11 @@ export function buildCases(now: number) {
     const approved = c.decision?.outcome === 'approve'
     if (approved) {
       const takenAt = c.decision!.decidedAt
-      const s = splitPayment(p.amount, c.source, DEFAULT_BILLING_SETTINGS)
+      const s = splitPayment(
+        paymentTotal(p),
+        c.source,
+        DEFAULT_BILLING_SETTINGS,
+      )
       const payoutMs = new Date(takenAt).getTime() + 2 * DAY
       const payment: Payment = {
         ...p,
@@ -324,14 +332,14 @@ export function buildCases(now: number) {
         answer: 'yes',
         answeredAt: at(-38 * DAY + 5 * HOUR),
       },
-      // P4: the personal code passed to the ACSP as a code message, received and within its 30 days
+      // An ordinary message exchange. No code is ever sent through messages.
       messages: [
         {
           id: 'msg-EO-2026-000118-1',
           from: 'individual',
           authorName: 'Margaret Ashby',
           at: at(-12 * DAY + 2 * HOUR),
-          body: 'Hello Eleanor. Fenwick & Shaw have asked whether you could link my verified identity to Ashby & Daughters Bakery Ltd for me. Do you need my personal code for that?',
+          body: 'Hello Eleanor. Fenwick & Shaw have asked whether you could link my verified identity to Ashby & Daughters Bakery Ltd for me. Do you need anything from me before then?',
           notifiedAt: at(-12 * DAY + 2 * HOUR + MIN),
         },
         {
@@ -339,7 +347,7 @@ export function buildCases(now: number) {
           from: 'reviewer',
           authorName: 'Eleanor Marsh',
           at: at(-12 * DAY + 5 * HOUR),
-          body: 'Yes, we can do that for you. Please send the personal code as a code message, not as an ordinary message. Only I can open it, and it is deleted 30 days after I mark it received.',
+          body: 'Yes, we can do that for you once your verification is confirmed. If we need a code for that filing, we will agree with you how to pass it on outside Evidence One. Please do not send any codes in this thread.',
           notifiedAt: at(-12 * DAY + 5 * HOUR + MIN),
         },
         {
@@ -347,13 +355,8 @@ export function buildCases(now: number) {
           from: 'individual',
           authorName: 'Margaret Ashby',
           at: at(-11 * DAY - 3 * HOUR),
-          body: 'K7QD4M2XP9R',
+          body: 'Thank you, that is clear. I will wait to hear from you.',
           notifiedAt: at(-11 * DAY - 3 * HOUR + MIN),
-          kind: 'code',
-          codeKind: 'personal_code',
-          receivedAt: at(-11 * DAY),
-          receivedBy: 'Eleanor Marsh',
-          deleteOn: at(19 * DAY),
         },
       ],
     },
@@ -583,7 +586,7 @@ export function buildCases(now: number) {
       ),
     },
 
-    // Sofia Lindqvist: three failed liveness attempts, so Option 2 person check
+    // Sofia Lindqvist: three failed liveness attempts, so Option 2 through the identity provider
     {
       id: 'EO-2026-000132',
       route: 'A',
@@ -619,8 +622,62 @@ export function buildCases(now: number) {
             expiresOn: '2034-07-18',
           },
         ],
+        // The identity provider's manual document review returned its findings.
         checkedAt: at(-30 * HOUR - 40 * MIN),
-        checkedBy: 'rev-marsh',
+        providerFindings: {
+          returnedAt: at(-30 * HOUR - 40 * MIN),
+          checks: [
+            {
+              label: 'Document authenticity and security features',
+              outcome: 'passed',
+            },
+            {
+              label: 'Document not damaged or tampered with',
+              outcome: 'passed',
+            },
+            {
+              label: 'Name and date of birth read from the documents',
+              outcome: 'passed',
+            },
+            {
+              label: 'Photograph compared with the second document',
+              outcome: 'flagged',
+              note: 'Image quality on the second document was low. A reviewer judged it a probable match.',
+            },
+          ],
+          couldNotCheck: [
+            'Current residential address (not shown on the documents)',
+            'Match with the Companies House register',
+          ],
+        },
+        // The ACSP's additional checks are in progress.
+        additionalChecks: [
+          {
+            id: 'ac-findings',
+            label:
+              'I have read the identity provider’s findings and the documents it checked',
+            done: true,
+            doneAt: at(-26 * HOUR),
+          },
+          {
+            id: 'ac-register',
+            label:
+              'I have compared the person’s details with the Companies House register',
+            done: true,
+            doneAt: at(-25 * HOUR),
+          },
+          {
+            id: 'ac-uncheck',
+            label: 'I have dealt with anything the provider could not check',
+            done: false,
+          },
+          {
+            id: 'ac-consistent',
+            label:
+              'The name, date of birth and nationality agree across the documents',
+            done: false,
+          },
+        ],
       },
       allocation: { ...invited, instructedAt: at(-5 * DAY + HOUR) },
       observations: [addrOk('o-132-1', 'The utility bill')],
@@ -628,16 +685,17 @@ export function buildCases(now: number) {
         {
           id: 'ev-132-1',
           kind: 'option2_document',
-          label: 'Swedish passport, seen at the person check',
+          label: 'Swedish passport, checked by the identity provider',
           uploadedAt: at(-30 * HOUR - 40 * MIN),
-          note: 'Checked in person by a trained reviewer.',
+          note: 'Checked by the certified identity provider’s trained reviewers.',
         },
         {
           id: 'ev-132-2',
           kind: 'option2_document',
-          label: 'UK photocard driving licence, seen at the person check',
+          label:
+            'UK photocard driving licence, checked by the identity provider',
           uploadedAt: at(-30 * HOUR - 40 * MIN),
-          note: 'Checked in person by a trained reviewer.',
+          note: 'Checked by the certified identity provider’s trained reviewers.',
         },
         proof('ev-132-3', 'Utility bill', 'utility_bill', -31 * HOUR, 33),
       ],
@@ -698,20 +756,53 @@ export function buildCases(now: number) {
           48,
         ),
       ],
-      payment: pay(
-        'acsp-harcourt',
-        'agent_payment_code',
-        -7 * DAY + 4 * HOUR,
-        'PAY-2026-004127',
-        {
-          code: 'APC-MG-3M8T',
-          payerName: PARTNER_NAME['partner-meridian'],
+      payment: {
+        ...pay(
+          'acsp-harcourt',
+          'agent_payment_code',
+          -7 * DAY + 4 * HOUR,
+          'PAY-2026-004127',
+          {
+            code: 'APC-MG-3M8T',
+            payerName: PARTNER_NAME['partner-meridian'],
+          },
+        ),
+        addOn: {
+          amount: 35,
+          description:
+            'correct the first name on the register from AIDEN to AIDAN',
+          authorisedAt: at(-3 * DAY + 5 * HOUR),
+          reference: 'PAY-2026-004127-ADD',
+          paidBy: 'client',
         },
-      ),
+      },
       correctionTaskId: 'FL-2026-000042',
       discrepancyReport: {
         summary: 'First name: AIDAN on the passport, AIDEN on the register.',
         promptedAt: at(-5 * DAY - 2 * HOUR + MIN),
+      },
+      // G2-10 and G2-13: the ACSP decided the name difference needs correcting before approval.
+      // The client approved the revised total, so the case waits for the register correction.
+      ruleDecisions: {
+        'REG-11': {
+          decision: 'correction_needed',
+          reason:
+            'The register spells the first name AIDEN. The passport shows AIDAN. The register must be corrected before I can approve.',
+          at: at(-3 * DAY),
+          reviewerId: 'rev-marsh',
+        },
+      },
+      registerCorrection: {
+        ruleId: 'REG-11',
+        stage: 'awaiting_register_correction',
+        raisedAt: at(-3 * DAY),
+        raisedBy: 'Eleanor Marsh',
+        amount: 35,
+        description:
+          'correct the first name on the register from AIDEN to AIDAN',
+        clientApprovedAt: at(-3 * DAY + 5 * HOUR),
+        expectedFrom: at(-2 * DAY + 5 * HOUR),
+        expectedBy: at(-1 * DAY + 5 * HOUR),
       },
     },
 
@@ -1057,12 +1148,64 @@ export function buildCases(now: number) {
           30,
         ),
       ],
-      payment: pay(
-        'acsp-pellrowe',
-        'pay_myself',
-        -24 * DAY + HOUR,
-        'PAY-2026-004124',
-      ),
+      payment: {
+        ...pay(
+          'acsp-pellrowe',
+          'pay_myself',
+          -24 * DAY + HOUR,
+          'PAY-2026-004124',
+        ),
+        addOn: {
+          amount: 35,
+          description:
+            'correct the surname on the register from TREGEER to TREGEAR',
+          authorisedAt: at(-23 * DAY + 9 * HOUR),
+          reference: 'PAY-2026-004124-ADD',
+          paidBy: 'client',
+        },
+      },
+      // G2-10 and G2-13: a surname difference was corrected on the register before approval.
+      discrepancyReport: {
+        summary: 'Last name: TREGEAR on the passport, TREGEER on the register.',
+        promptedAt: at(-23 * DAY + 2 * HOUR),
+        choice: 'will_report',
+        choiceNote:
+          'Reported to Companies House while the register was corrected.',
+        choiceAt: at(-23 * DAY + 3 * HOUR),
+        choiceBy: 'Alison Pell',
+      },
+      registerCorrection: {
+        ruleId: 'REG-11',
+        stage: 'register_corrected',
+        raisedAt: at(-23 * DAY + 4 * HOUR),
+        raisedBy: 'Alison Pell',
+        amount: 35,
+        description:
+          'correct the surname on the register from TREGEER to TREGEAR',
+        clientApprovedAt: at(-23 * DAY + 9 * HOUR),
+        expectedFrom: at(-22 * DAY + 9 * HOUR),
+        expectedBy: at(-21 * DAY + 9 * HOUR),
+        registerCorrectedAt: at(-22 * DAY - 4 * HOUR),
+        registerCorrectedBy: 'Alison Pell',
+      },
+      messages: [
+        {
+          id: 'msg-EO-2026-000124-1',
+          from: 'reviewer',
+          authorName: 'Alison Pell',
+          at: at(-23 * DAY + 4 * HOUR),
+          body: 'Hello Owen. The register spells your surname TREGEER. Your passport shows TREGEAR. We need to correct the register before I can approve your verification. The correction costs £35 on top of the verification fee, so the revised total is shown in your case status. You are only charged when I approve your verification.',
+          notifiedAt: at(-23 * DAY + 4 * HOUR + MIN),
+        },
+        {
+          id: 'msg-EO-2026-000124-2',
+          from: 'individual',
+          authorName: 'Owen David Tregear',
+          at: at(-23 * DAY + 9 * HOUR),
+          body: 'Thanks Imogen. I have approved the revised total.',
+          notifiedAt: at(-23 * DAY + 9 * HOUR + MIN),
+        },
+      ],
       decision: {
         outcome: 'approve',
         reasonCode: 'APR-01',
@@ -1746,48 +1889,14 @@ export function buildCases(now: number) {
         `AI observation on ${o.ruleId}: ${o.title}. Advisory only.`,
       )
     for (const m of c.messages ?? []) {
-      if (m.kind !== 'code') {
-        ev(
-          offsetOf(m.at),
-          m.authorName,
-          'person',
-          'case.message.sent',
-          c.id,
-          `Secure message sent ${m.from === 'reviewer' ? 'to the individual' : 'to the ACSP reviewer'}. An email notification was sent. The message text stays in the case thread.`,
-        )
-        continue
-      }
-      // Code messages: sent, viewed and received are recorded, never the code.
-      const kind =
-        m.codeKind === 'company_authentication_code'
-          ? 'company authentication code'
-          : 'personal code'
       ev(
         offsetOf(m.at),
         m.authorName,
         'person',
-        'case.code_message.sent',
+        'case.message.sent',
         c.id,
-        `Code message sent to the allocated ACSP reviewer (${kind}). Only the allocated reviewer and the individual can open it. The code is not recorded in the audit trail.`,
+        `Secure message sent ${m.from === 'reviewer' ? 'to the individual' : 'to the ACSP reviewer'}. An email notification was sent. The message text stays in the case thread.`,
       )
-      if (m.receivedAt && m.receivedBy) {
-        ev(
-          offsetOf(m.receivedAt) - 2 * MIN,
-          m.receivedBy,
-          'person',
-          'case.code_message.viewed',
-          c.id,
-          `The allocated ACSP reviewer opened a code message (${kind}). The code is not recorded in the audit trail.`,
-        )
-        ev(
-          offsetOf(m.receivedAt),
-          m.receivedBy,
-          'person',
-          'case.code_message.received',
-          c.id,
-          `The ACSP marked the code received. The message text will be deleted automatically on ${(m.deleteOn ?? '').slice(0, 10)}, 30 days later. The code is not recorded in the audit trail.`,
-        )
-      }
     }
     if (c.decision && reviewer) {
       if (c.decision.stepUpRef)
@@ -1812,6 +1921,35 @@ export function buildCases(now: number) {
             : `Declined. Reason ${c.decision.reasonCode}. Retention of 7 years starts from this decision.`,
       )
     }
+    if (c.registerCorrection) {
+      const b = c.registerCorrection
+      ev(
+        offsetOf(b.raisedAt),
+        b.raisedBy,
+        'person',
+        'correction.raised',
+        c.id,
+        `Mandatory decision on ${b.ruleId}: correction needed. Register correction fee of ${money(b.amount)} raised on top of the verification fee (${b.description}). Awaiting the client's approval of the revised total. This is not a Halt or a Block.`,
+      )
+      if (b.clientApprovedAt)
+        ev(
+          offsetOf(b.clientApprovedAt),
+          name,
+          'person',
+          'correction.approved_by_client',
+          c.id,
+          `${name} approved the revised total. A second authorisation of ${money(b.amount)} was placed on the card. Nothing is taken until ${acspName} approves.`,
+        )
+      if (b.registerCorrectedAt)
+        ev(
+          offsetOf(b.registerCorrectedAt),
+          b.registerCorrectedBy ?? reviewer ?? acspName,
+          'person',
+          'correction.register_corrected',
+          c.id,
+          'Register corrected. The ACSP carried out the correction at Companies House outside the platform and confirmed it here.',
+        )
+    }
     if (c.payment?.status === 'taken') {
       const p = c.payment
       const fee =
@@ -1824,7 +1962,7 @@ export function buildCases(now: number) {
         'system',
         'payment.taken',
         c.id,
-        `Approved, so ${money(p.amount)} was taken ${p.method === 'agent_payment_code' ? `from ${p.payerName}, paid on the client's behalf` : `from ${name}'s card`}. Evidence One collected it as ${acspName}'s disclosed agent. ${fee} Net ${money(p.netPayout ?? 0)} to the ACSP's own payment account. Invoice ${p.clientInvoiceId} issued in ${acspName}'s name.`,
+        `Approved, so ${money(paymentTotal(p))} was taken ${p.method === 'agent_payment_code' ? `from ${p.payerName}, paid on the client's behalf` : `from ${name}'s card`}${p.addOn ? `: the verification fee of ${money(p.amount)} and the register correction add-on of ${money(p.addOn.amount)}` : ''}. Evidence One collected it as ${acspName}'s disclosed agent. ${fee} Net ${money(p.netPayout ?? 0)} to the ACSP's own payment account. Invoice ${p.clientInvoiceId} issued in ${acspName}'s name.`,
       )
     }
     if (c.payment?.status === 'released') {
@@ -1955,15 +2093,15 @@ export function buildCases(now: number) {
     'system',
     'rules.option2',
     'EO-2026-000132',
-    'IDVT-08: all attempts used. Option 2 offered under OPT-02.',
+    'IDVT-08: all attempts used. Option 2 offered under OPT-02, through the identity provider’s manual document review.',
   )
   ev(
     -30 * HOUR - 40 * MIN,
-    REVIEWER_NAME['rev-marsh'],
-    'person',
-    'option2.check_recorded',
+    'Certified identity provider (simulated)',
+    'system',
+    'option2.provider_findings',
     'EO-2026-000132',
-    'Person check recorded: Swedish passport and UK photocard driving licence (two from Group A). Training attestation TA-2026-0187.',
+    'The identity provider’s manual document review returned its findings: Swedish passport and UK photocard driving licence (two from Group A). The provider does not decide. The ACSP completes its additional checks.',
   )
   ev(
     -64 * DAY,

@@ -1,5 +1,5 @@
 import { MonoLabel, Panel } from '@/components/app/Page'
-import { carriesPlatformFee, splitPayment } from '@/lib/fees'
+import { carriesPlatformFee, paymentTotal, splitPayment } from '@/lib/fees'
 import { CircleCheck, CircleSlash, Clock } from 'lucide-react'
 import { formatDateTime } from '@/lib/format'
 import { PAYMENT_STATUS_LABEL } from '@/lib/paymentStatus'
@@ -21,7 +21,7 @@ export function useCasePaymentRows(vc: VerificationCase) {
   const p = vc.payment
   if (!p) return undefined
   const split = splitPayment(
-    p.amount,
+    paymentTotal(p),
     vc.source ?? 'referred',
     data.billing.settings,
   )
@@ -29,7 +29,8 @@ export function useCasePaymentRows(vc: VerificationCase) {
   const platformFeeVat = p.platformFeeVat ?? split.platformFeeVat
   return {
     payment: p,
-    gross: p.amount,
+    gross: paymentTotal(p),
+    addOn: p.addOn,
     providerFee: p.providerFee ?? split.providerFee,
     platformFee,
     platformFeeVat,
@@ -107,6 +108,26 @@ export function CasePayment({
       ) : (
         <dl className="mt-3 divide-y divide-line/70">
           {line('ACSP Professional Fee', gbp(rows.gross), true)}
+          {rows.addOn && (
+            <>
+              {line('Verification fee', gbp(p.amount))}
+              {line(
+                `Register correction add-on: ${rows.addOn.description}`,
+                gbp(rows.addOn.amount),
+              )}
+              <p className="py-1.5 text-[0.8125rem] text-slate">
+                The add-on is part of your Professional Fee, shown as its own
+                line. It was authorised a second time when the client approved
+                the revised total, {formatDateTime(rows.addOn.authorisedAt)}.
+                The platform fee is deducted once, not per correction. It is
+                paid by the client
+                {p.method === 'agent_payment_code'
+                  ? ' (who pays it under an Agent Payment Code is yet to be decided)'
+                  : ''}
+                .
+              </p>
+            </>
+          )}
           {line(
             'Payment provider fee (borne by the ACSP)',
             `-${gbp(rows.providerFee)}`,

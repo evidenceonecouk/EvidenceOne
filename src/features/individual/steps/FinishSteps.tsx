@@ -1,3 +1,5 @@
+import { paymentTotal } from '@/lib/fees'
+import { CorrectionRequest } from '../CorrectionRequest'
 import { ChevronRight, CreditCard, Info, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { AttributionNote } from '@/components/AttributionNote'
@@ -402,7 +404,9 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
     { label: 'Details and payment authorised', at: 0 },
     {
       label:
-        vc.option === 2 ? 'Person check requested' : 'Identity checks complete',
+        vc.option === 2
+          ? 'Option 2 review requested'
+          : 'Identity checks complete',
       at: 0,
     },
     { label: `Review by ${acsp}`, at: 3 },
@@ -458,11 +462,12 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
             {trackedPayment.status === 'authorised'
               ? `You are only charged when ${acsp} approves your verification.`
               : trackedPayment.status === 'taken'
-                ? `${formatMoney(trackedPayment.amount)} was taken when ${acsp} approved. Your invoice is issued in ${acsp}’s name.`
+                ? `${formatMoney(paymentTotal(trackedPayment))} was taken when ${acsp} approved${trackedPayment.addOn ? `, the verification fee and the register correction` : ''}. Your invoice is issued in ${acsp}’s name.`
                 : 'The authorisation was released.'}
           </span>
         </p>
       )}
+      <CorrectionRequest vc={vc} acsp={acsp} />
       {declined && (
         <p className="mt-3 rounded-2xl bg-decline-wash px-4 py-3 text-[0.9375rem] leading-relaxed text-decline">
           {DECLINE_MESSAGE}
@@ -624,8 +629,9 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
             </div>
           )}
           <p className="mt-2 text-sm text-slate">
-            We never ask for the code. If {acsp} needs it, you can send it as a
-            code message below.
+            We never ask for the code. Please do not send it in the messages. If{' '}
+            {acsp} needs a code for a later filing, agree with them how to pass
+            it on outside Evidence One.
           </p>
         </div>
       )}

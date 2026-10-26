@@ -1,7 +1,9 @@
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { paramDefs, RULE_SET_NAME, settingDefs } from '@/data/rules'
 import type { AuditInput } from '@/lib/audit'
+import { refuseOtherAcsp } from './guards'
 import { looksLikeCode } from '@/lib/codeWarning'
+import { newAdditionalChecks, simulatedFindings } from '@/lib/option2'
 import { fullName } from '@/lib/format'
 import { hasChipStep, securityFeaturesFor } from '@/lib/chip'
 import { computeRegisterDifferences, evidenceLabel } from '@/lib/identityChecks'
@@ -388,7 +390,11 @@ export function requestOption2(
       status: 'in_review',
       submittedForReviewAt: iso(),
       slaDueAt: iso(hours * HOUR),
-      option2: { reason, requestedAt: iso() },
+      option2: {
+        reason,
+        requestedAt: iso(),
+        additionalChecks: newAdditionalChecks(),
+      },
     })),
     audit: [
       {
@@ -397,7 +403,7 @@ export function requestOption2(
         actorType: 'system',
         action: 'rules.option2',
         caseId,
-        detail: `${reason === 'attempts_used' ? 'IDVT-08' : 'OPT-02'}: ${why} Option 2 person check offered. Needs the reviewer’s agreement.${reason === 'no_smartphone' ? ' Pending the client’s decision.' : ''}`,
+        detail: `${reason === 'attempts_used' ? 'IDVT-08' : 'OPT-02'}: ${why} Option 2 offered, through the identity provider’s manual document review. Subject to the provider confirming it can. The ACSP completes any further checks and decides.`,
       },
       {
         at: iso(1000),
@@ -405,7 +411,8 @@ export function requestOption2(
         actorType: 'person',
         action: 'option2.requested',
         caseId,
-        detail: 'Option 2 person check requested. The ACSP will arrange it.',
+        detail:
+          'Option 2 requested. The identity provider’s trained reviewers check the documents and return findings. The ACSP completes any further checks and makes the decision.',
       },
     ],
   }
@@ -744,6 +751,8 @@ export function decideCase(
   reviewerId: string,
   stepUpRef?: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(data, caseId, reviewerId, 'the decision')
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   if (!vc) return { data, audit: [] }
   const now = Date.now()
@@ -815,6 +824,13 @@ export function recordRuleDecision(
   reason: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the Mandatory decision',
+  )
+  if (refused) return refused
   const now = new Date().toISOString()
   return {
     data: patchCase(data, caseId, (c) => ({
@@ -844,6 +860,8 @@ export function escalateCase(
   note: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(data, caseId, reviewerId, 'the escalation')
+  if (refused) return refused
   const now = new Date().toISOString()
   return {
     data: patchCase(data, caseId, (c) => ({
@@ -863,15 +881,27 @@ export function escalateCase(
   }
 }
 
-/** The reviewer records the Option 2 person check: the documents seen in person. */
-export function recordOption2Check(
+/**
+  Simulated: the identity provider's manual document review returns its
+  findings for an Option 2 case (G2-14, subject to the provider confirming it
+  can). The provider never decides; the ACSP keeps the decision.
+*/
+export function returnProviderFindings(
   data: DemoData,
   caseId: string,
   reviewerId: string,
 ): ActionResult {
   const vc = data.cases.find((c) => c.id === caseId)
   const person = vc && data.people.find((p) => p.id === vc.personId)
-  if (!vc || !person) return { data, audit: [] }
+  if (!vc || !person || vc.option !== 2 || !vc.option2)
+    return { data, audit: [] }
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the Option 2 findings',
+  )
+  if (refused) return refused
   const now = new Date().toISOString()
   const documents = [
     {
@@ -888,30 +918,121 @@ export function recordOption2Check(
         ...c.option2!,
         documents,
         checkedAt: now,
-        checkedBy: reviewerId,
+        providerFindings: simulatedFindings(now),
+        additionalChecks: c.option2!.additionalChecks ?? newAdditionalChecks(),
       },
       evidence: [
         ...c.evidence.filter((e) => e.kind !== 'option2_document'),
         ...documents.map((d, i) => ({
           id: `ev-${c.id}-o2-${i}`,
           kind: 'option2_document' as const,
-          label: `${d.label}, seen at the person check`,
+          label: `${d.label}, checked by the identity provider`,
           uploadedAt: now,
-          note: 'Checked in person by a trained reviewer.',
+          note: 'Checked by the certified identity provider’s trained reviewers.',
         })),
       ],
     })),
     audit: [
       {
         at: now,
-        actor: reviewerName(data, reviewerId),
-        actorType: 'person',
-        action: 'option2.check_recorded',
+        actor: 'Certified identity provider (simulated)',
+        actorType: 'system',
+        action: 'option2.provider_findings',
         caseId,
         detail:
-          'Person check recorded: UK passport (Group A) and bank statement (Group B).',
+          'The identity provider’s manual document review returned its findings: UK passport (Group A) and bank statement (Group B). The provider does not decide. Subject to the provider confirming it can. Opened for the ACSP’s additional checks.',
       },
     ],
+  }
+}
+
+/** The ACSP ticks or clears one of its additional checks on an Option 2 case. */
+export function setAdditionalCheck(
+  data: DemoData,
+  caseId: string,
+  checkId: string,
+  done: boolean,
+  reviewerId: string,
+): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  const check = vc?.option2?.additionalChecks?.find((x) => x.id === checkId)
+  if (!vc || !check || check.done === done) return { data, audit: [] }
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the Option 2 additional checks',
+  )
+  if (refused) return refused
+  const now = new Date().toISOString()
+  return {
+    data: patchCase(data, caseId, (c) => ({
+      ...c,
+      option2: {
+        ...c.option2!,
+        additionalChecks: c.option2!.additionalChecks!.map((x) =>
+          x.id === checkId ? { ...x, done, doneAt: done ? now : undefined } : x,
+        ),
+      },
+    })),
+    audit: [
+      {
+        at: now,
+        actor: reviewerName(data, reviewerId),
+        actorType: 'person',
+        action: 'option2.additional_check',
+        caseId,
+        detail: `Additional check ${done ? 'completed' : 'reopened'}: ${check.label}.`,
+      },
+    ],
+  }
+}
+
+/** The ACSP records why it is satisfied, with its additional checks. Not a decision. */
+export function setAdditionalReason(
+  data: DemoData,
+  caseId: string,
+  reason: string,
+  reviewerId: string,
+): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the Option 2 reason',
+  )
+  if (refused) return refused
+  if (!vc?.option2) return { data, audit: [] }
+  const text = reason.trim()
+  const was = !!vc.option2.additionalReason?.trim()
+  const now = new Date().toISOString()
+  return {
+    data: patchCase(data, caseId, (c) => ({
+      ...c,
+      option2: {
+        ...c.option2!,
+        additionalReason: reason,
+        additionalCompletedAt:
+          text && c.option2!.additionalChecks?.every((x) => x.done)
+            ? (c.option2!.additionalCompletedAt ?? now)
+            : undefined,
+      },
+    })),
+    audit:
+      text && !was
+        ? [
+            {
+              at: now,
+              actor: reviewerName(data, reviewerId),
+              actorType: 'person',
+              action: 'option2.additional_reason',
+              caseId,
+              detail:
+                'Reason recorded with the Option 2 additional checks. The final decision stays with the ACSP.',
+            },
+          ]
+        : [],
   }
 }
 
@@ -922,6 +1043,8 @@ export function fileCorrection(
 ): ActionResult {
   const task = data.corrections.find((t) => t.id === taskId)
   if (!task || task.status !== 'open') return { data, audit: [] }
+  const refused = refuseOtherAcsp(data, task.caseId, reviewerId, 'the filing')
+  if (refused) return refused
   const now = new Date().toISOString()
   // A synthetic filing reference. The company authentication code and One Login details are never seen or stored.
   const filingReference = `WF-2026-${syntheticCode(taskId, 6)}`
@@ -1027,6 +1150,13 @@ export function startSubmission(
   reviewerId: string,
   stepUpRef: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the submission workspace',
+  )
+  if (refused) return refused
   const now = new Date().toISOString()
   return {
     data: patchCase(data, caseId, (c) => ({
@@ -1056,7 +1186,15 @@ export function toggleSubmissionField(
   data: DemoData,
   caseId: string,
   key: string,
+  reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the submission pack',
+  )
+  if (refused) return refused
   return {
     data: patchCase(data, caseId, (c) => {
       const done = c.submission?.fieldsDone ?? []
@@ -1079,6 +1217,13 @@ export function handOffSubmission(
   caseId: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the submission handoff',
+  )
+  if (refused) return refused
   const now = new Date().toISOString()
   return {
     data: patchCase(data, caseId, (c) => ({
@@ -1104,6 +1249,13 @@ export function returnFromSubmission(
   caseId: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the submission return',
+  )
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   if (!vc || vc.status !== 'submission_started') return { data, audit: [] }
   const now = new Date().toISOString()
@@ -1134,6 +1286,13 @@ export function confirmSubmission(
   source: 'entered' | 'forwarded_email',
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the submission confirmation',
+  )
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   const person = vc && data.people.find((p) => p.id === vc.personId)
   if (!vc || !person) return { data, audit: [] }
@@ -1174,6 +1333,13 @@ export function startCorrection(
   reviewerId: string,
   stepUpRef: string,
 ): ActionResult & { correctionId: string } {
+  const refusedStart = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the correction',
+  )
+  if (refusedStart) return { ...refusedStart, correctionId: '' }
   const vc = data.cases.find((c) => c.id === caseId)
   const now = new Date().toISOString()
   const existing = vc?.submission?.corrections ?? []
@@ -1228,6 +1394,13 @@ export function handOffCorrection(
   correctionId: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the correction handoff',
+  )
+  if (refused) return refused
   const now = new Date().toISOString()
   return {
     data: patchCorrection(data, caseId, correctionId, { handedOffAt: now }),
@@ -1250,6 +1423,13 @@ export function recordCorrection(
   correctionId: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the correction record',
+  )
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   const corr = vc?.submission?.corrections?.find((x) => x.id === correctionId)
   if (!vc || !corr || corr.recordedAt) return { data, audit: [] }
@@ -1274,7 +1454,10 @@ export function recordExport(
   caseId: string,
   stepUpRef: string,
   actor: string,
+  reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(data, caseId, reviewerId, 'the export')
+  if (refused) return refused
   return {
     data,
     audit: [
@@ -1284,7 +1467,7 @@ export function recordExport(
         actorType: 'person',
         action: 'record.exported',
         caseId,
-        detail: `Verification record exported as PDF. Step-up ${stepUpRef} confirmed. Code messages are never included.`,
+        detail: `Verification record exported as PDF. Step-up ${stepUpRef} confirmed.`,
       },
     ],
   }
@@ -1305,6 +1488,7 @@ const settingLabel = (key: SettingKey, value: RuleSettings[SettingKey]) =>
 export type RuleChange =
   | { kind: 'param'; key: ParamKey; value: number }
   | { kind: 'setting'; key: SettingKey; value: RuleSettings[SettingKey] }
+  | { kind: 'document'; id: string; enabled: boolean }
 
 export function proposeRuleChange(
   data: DemoData,
@@ -1320,23 +1504,33 @@ export function proposeRuleChange(
     status: 'draft',
     params: { ...current.params },
     settings: { ...current.settings },
+    documents: current.documents.map((x) => ({ ...x })),
     createdAt: now,
     createdBy: actor,
   }
   const draft: RuleSetVersion =
     change.kind === 'param'
       ? { ...base, params: { ...base.params, [change.key]: change.value } }
-      : {
-          ...base,
-          settings: {
-            ...base.settings,
-            [change.key]: change.value,
-          } as RuleSettings,
-        }
+      : change.kind === 'document'
+        ? {
+            ...base,
+            documents: base.documents.map((x) =>
+              x.id === change.id ? { ...x, enabled: change.enabled } : x,
+            ),
+          }
+        : {
+            ...base,
+            settings: {
+              ...base.settings,
+              [change.key]: change.value,
+            } as RuleSettings,
+          }
   const label =
     change.kind === 'param'
       ? `${paramDefs.find((p) => p.key === change.key)?.label} set to ${change.value}`
-      : `${settingDefs.find((s) => s.key === change.key)?.label} set to ${settingLabel(change.key, change.value)}`
+      : change.kind === 'document'
+        ? `Document list: ${base.documents.find((x) => x.id === change.id)?.label} switched ${change.enabled ? 'on' : 'off'}`
+        : `${settingDefs.find((s) => s.key === change.key)?.label} set to ${settingLabel(change.key, change.value)}`
   const audit: AuditInput[] = []
   if (!existing)
     audit.push({
@@ -1504,8 +1698,18 @@ export function logCopilotExchange(
     answer: string
     sources: string[]
     reviewer: string
+    reviewerId?: string
   },
 ): ActionResult {
+  if (input.caseId && input.reviewerId) {
+    const refused = refuseOtherAcsp(
+      data,
+      input.caseId,
+      input.reviewerId,
+      'the Copilot',
+    )
+    if (refused) return refused
+  }
   const now = new Date().toISOString()
   const answer =
     input.answer.length > 160
@@ -1532,6 +1736,8 @@ export function sendCopilotDraft(
   body: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(data, caseId, reviewerId, 'a message draft')
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   if (!vc) return { data, audit: [] }
   const now = new Date().toISOString()

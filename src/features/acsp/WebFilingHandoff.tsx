@@ -2,6 +2,7 @@ import { ExternalLink, Undo2 } from 'lucide-react'
 import { useParams } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { HeldOptionBadge } from '@/components/HeldOption'
+import { AccessRefused } from './AccessRefused'
 import { Button } from '@/components/ui/button'
 import { fileCorrection } from '@/store/actions'
 import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
@@ -29,13 +30,16 @@ export function WebFilingInterstitial({
   onDone?: () => void
 }) {
   const { data, apply } = useDemoStore()
-  const { reviewer } = useActingAcsp()
+  const { acsp, reviewer } = useActingAcsp()
   const task = data.corrections.find((t) => t.id === taskId)
+  const holder = data.cases.find((c) => c.id === task?.caseId)?.acspId
   const back = () => {
     apply((d) => fileCorrection(d, taskId, reviewer.id))
     if (onDone) onDone()
     else window.setTimeout(() => window.close(), 150)
   }
+  if (task && holder && holder !== acsp.id)
+    return <AccessRefused caseId={task.caseId} area="the filing handoff" />
   return (
     <div className="mx-auto max-w-lg px-6 py-10">
       <Wordmark />

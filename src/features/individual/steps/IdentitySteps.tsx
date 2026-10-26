@@ -13,7 +13,10 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
 import { PendingDecision } from '@/components/PendingDecision'
+import { ProviderConfirmation } from '@/components/ProviderConfirmation'
+import { option2IndividualLine } from '@/lib/option2'
 import { Button } from '@/components/ui/button'
+import { option1Behind, option1Offers } from '@/data/documentRules'
 import { portraitFor } from '@/data/portraits'
 import { useProgress } from '@/hooks/useProgress'
 import { useSequence } from '@/hooks/useSequence'
@@ -60,25 +63,25 @@ const documents: {
   {
     type: 'passport',
     label: 'Passport',
-    note: 'From any country. If it has a chip, the identity provider’s chip reader reads it.',
+    note: 'If it has a chip, the identity provider’s chip reader reads it.',
     icon: BookUser,
   },
   {
     type: 'driving_licence',
     label: 'Photocard driving licence',
-    note: 'UK. Captured with a phone or tablet camera.',
+    note: 'Captured with a phone or tablet camera.',
     icon: Car,
   },
   {
     type: 'national_identity_card',
     label: 'National identity card',
-    note: 'EU, Norway, Iceland or Liechtenstein',
+    note: 'Captured with a phone or tablet camera.',
     icon: IdCard,
   },
   {
     type: 'biometric_residence_permit',
     label: 'Biometric residence permit',
-    note: 'A card, not an eVisa',
+    note: 'A card, not an eVisa.',
     icon: CreditCard,
   },
 ]
@@ -99,7 +102,11 @@ function RadioMark({ on }: { on: boolean }) {
 
 export function DocumentStep({ vc, next, person, go }: StepProps) {
   const { data, apply } = useDemoStore()
-  const brpMonths = currentRuleSet(data).params.brp_expiry
+  const rs = currentRuleSet(data)
+  const brpMonths = rs.params.brp_expiry
+  // The accepted documents come from the Option 1 list in the rule set (G2-07).
+  const tiles = documents.filter((d) => option1Offers(rs.documents, d.type))
+  const eVisaOffered = option1Offers(rs.documents, 'evisa')
   const [type, setType] = useState<IdDocumentType>(
     vc.journey?.documentType ?? person.document?.type ?? 'passport',
   )
@@ -141,7 +148,7 @@ export function DocumentStep({ vc, next, person, go }: StepProps) {
       <ProviderLabel className="mt-3" />
       <fieldset className="mt-5 space-y-2.5">
         <legend className="sr-only">Identity document</legend>
-        {documents.map((d) => {
+        {tiles.map((d) => {
           const on = !eVisa && type === d.type
           return (
             <label
@@ -169,8 +176,9 @@ export function DocumentStep({ vc, next, person, go }: StepProps) {
                   {d.label}
                 </span>
                 <span className="block text-base leading-snug text-slate">
+                  {option1Behind(rs.documents, d.type).join('; ')}.{' '}
                   {d.type === 'biometric_residence_permit'
-                    ? `${d.note}. Up to ${brpMonths} months expired is accepted.`
+                    ? `Up to ${brpMonths} months expired is accepted.`
                     : d.note}
                 </span>
               </span>
@@ -178,31 +186,37 @@ export function DocumentStep({ vc, next, person, go }: StepProps) {
             </label>
           )
         })}
-        <label
-          className={cn(
-            'flex cursor-pointer items-center gap-3 rounded-2xl border bg-white p-4 transition-[border-color,box-shadow] duration-150 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink',
-            eVisa ? 'border-ink shadow-[0_0_0_1px_var(--ink)]' : 'border-line',
-          )}
-        >
-          <input
-            type="radio"
-            name="doc"
-            className="sr-only"
-            checked={eVisa}
-            onChange={() => setEVisa(true)}
-          />
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-mist text-ink">
-            <BookUser className="size-5" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-medium text-ink">eVisa</span>
-            <span className="block text-base leading-snug text-slate">
-              Checked with the Home Office. Have the passport linked to your
-              eVisa ready.
+        {eVisaOffered && (
+          <label
+            className={cn(
+              'flex cursor-pointer items-center gap-3 rounded-2xl border bg-white p-4 transition-[border-color,box-shadow] duration-150 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink',
+              eVisa
+                ? 'border-ink shadow-[0_0_0_1px_var(--ink)]'
+                : 'border-line',
+            )}
+          >
+            <input
+              type="radio"
+              name="doc"
+              className="sr-only"
+              checked={eVisa}
+              onChange={() => setEVisa(true)}
+            />
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-mist text-ink">
+              <BookUser className="size-5" aria-hidden="true" />
             </span>
-          </span>
-          <RadioMark on={eVisa} />
-        </label>
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-medium text-ink">
+                eVisa
+              </span>
+              <span className="block text-base leading-snug text-slate">
+                Checked with the Home Office. Have the passport linked to your
+                eVisa ready.
+              </span>
+            </span>
+            <RadioMark on={eVisa} />
+          </label>
+        )}
       </fieldset>
     </Screen>
   )
@@ -255,7 +269,7 @@ export function ScanStep({ vc, person, next, go, viewMode }: StepProps) {
 
   const toOption2 = () => {
     apply((d) => requestOption2(d, vc.id, 'no_smartphone'))
-    go('status')
+    go('option-2')
   }
 
   if (!mobile) {
@@ -700,8 +714,8 @@ export function ChecksStep({ vc, next, go, person }: StepProps) {
     panel = exhausted ? (
       <Panel title={`You have used all ${max} attempts`}>
         <p>
-          The digital checks did not pass. A trained person at {acsp} can check
-          your identity instead (Option 2).
+          The digital checks did not pass.{' '}
+          {option2IndividualLine(acsp ?? 'your ACSP')} (Option 2).
         </p>
         <Button
           className="mt-3 w-full"
@@ -894,9 +908,6 @@ export function OptionTwoStep({ vc, go }: StepProps) {
   const attemptsUsed =
     (vc.journey?.checkAttempts ?? 0) >=
     currentRuleSet(data).params.idvt_attempts
-  const reviewer = data.acsps
-    .find((a) => a.id === vc.acspId)
-    ?.reviewers.find((r) => r.attestation)
   const noSmartphone = vc.option2?.reason === 'no_smartphone'
   const reason = attemptsUsed ? 'attempts_used' : 'unsupported_document'
   return (
@@ -907,20 +918,25 @@ export function OptionTwoStep({ vc, go }: StepProps) {
             className="w-full"
             size="lg"
             onClick={() => {
-              apply((d) => requestOption2(d, vc.id, reason))
+              // The no-smartphone route has already made the request.
+              if (!vc.option2) apply((d) => requestOption2(d, vc.id, reason))
               go('status')
             }}
           >
             <UserRoundCheck aria-hidden="true" />
-            Ask for a person check
+            {vc.option2
+              ? 'See your case status'
+              : 'Ask for the document review'}
           </Button>
-          <Button
-            className="w-full"
-            variant="ghost"
-            onClick={() => go('document')}
-          >
-            Back to document choice
-          </Button>
+          {!vc.option2 && (
+            <Button
+              className="w-full"
+              variant="ghost"
+              onClick={() => go('document')}
+            >
+              Back to document choice
+            </Button>
+          )}
         </>
       }
     >
@@ -935,21 +951,20 @@ export function OptionTwoStep({ vc, go }: StepProps) {
         {noSmartphone
           ? 'The digital checks need a phone or tablet camera. '
           : 'The digital checks (Option 1) cannot support your case. '}
-        A trained person at {acsp} can check your identity instead. They will
-        contact you to arrange it.
+        {option2IndividualLine(acsp ?? 'your ACSP')}
       </Lead>
-      {noSmartphone && <PendingDecision className="mt-3" />}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <ProviderConfirmation />
+        {noSmartphone && <PendingDecision />}
+      </div>
       <ul className="mt-5 space-y-2.5 text-base text-graphite">
         <li className="rounded-2xl border border-line bg-white px-4 py-3">
-          You will need two documents: two from Group A, or one from Group A and
-          one from Group B.
+          You will need two documents: two from Option 2 Group A, or one from
+          Group A and one from Group B.
         </li>
         <li className="rounded-2xl border border-line bg-white px-4 py-3">
-          The person who checks them holds a current training attestation
-          {reviewer?.attestation
-            ? ` (${reviewer.attestation.reference}, valid to ${formatDate(reviewer.attestation.expiresOn)})`
-            : ''}
-          .
+          The certified identity provider’s trained reviewers check your
+          documents and send their findings to {acsp}.
         </li>
         <li className="rounded-2xl border border-line bg-white px-4 py-3">
           The decision is still made by {acsp}, and recorded in your case like

@@ -42,7 +42,13 @@ const partnerStatusByCase: Record<CaseStatus, PartnerStatus | null> = {
 }
 
 export function partnerStatusForCase(vc: VerificationCase | undefined) {
-  return vc ? partnerStatusByCase[vc.status] : null
+  if (!vc) return null
+  // Register correction (design interpretation, to confirm with the client):
+  // awaiting the client's approval is Further information required, and
+  // awaiting the register correction is In progress. No new status.
+  if (vc.registerCorrection?.stage === 'awaiting_client_approval')
+    return 'further_information'
+  return partnerStatusByCase[vc.status]
 }
 
 /** Invited, In progress, Further information required, Completed or Declined. Null when not invited. */

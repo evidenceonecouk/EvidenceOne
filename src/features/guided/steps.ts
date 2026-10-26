@@ -1,3 +1,4 @@
+import { acceptanceScenarios } from '@/data/acceptanceScenarios'
 import type { PersonaId } from '@/types/domain'
 
 export interface GuidedStep {
@@ -8,6 +9,8 @@ export interface GuidedStep {
   route: string
   /** One or two sentences. Plain, calm, no hype. */
   caption: string
+  /** The ACSP the ACSP persona acts as on this step. */
+  acspId?: string
   /** Shows the idle timeout notice for demonstration only. */
   idle?: 'professional' | 'individual'
 }
@@ -37,7 +40,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'reviewer',
     route: '/join/acsp',
     caption:
-      'The ACSP gives its regulatory status, the cases it accepts, its fee and its payment account. The application ends in Pending platform approval.',
+      'The ACSP gives its regulatory status, the cases it accepts and its fee. Connect payments hands off to the secure payment provider, which collects the business, representative and payout details. Evidence One holds no bank details. This step is subject to the payment provider’s confirmation. The application ends in Pending platform approval.',
   },
   {
     id: 'approvals',
@@ -45,7 +48,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'platformAdmin',
     route: '/admin/approvals',
     caption:
-      'The Platform Administrator approves ACSPs and Referral Partners. This role manages allocation and monitoring, and cannot read identity evidence.',
+      'The Platform Administrator approves ACSPs and Referral Partners. For an ACSP the two gates sit side by side: the payment provider’s eligibility and Evidence One’s approval. Payments are active only when both are met. This role manages allocation and monitoring, and cannot read identity evidence.',
   },
   {
     id: 'portfolio',
@@ -157,7 +160,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'individual',
     route: `${J}/checks`,
     caption:
-      'Document authenticity and security features, the chip where the document has one, liveness and face match, with up to three attempts. Option 2 is a fallback only when Option 1 cannot support the document, or the person has no smartphone or tablet.',
+      'Document authenticity and security features, the chip where the document has one, liveness and face match, with up to three attempts. Option 2 is a fallback only when Option 1 cannot support the document, or the person has no smartphone or tablet. It goes through the identity provider’s manual document review, subject to the provider confirming it can. The ACSP completes any further checks and decides.',
   },
   {
     id: 'address',
@@ -196,9 +199,28 @@ export const guidedSteps: GuidedStep[] = [
     id: 'case-difference',
     title: 'Flagged difference',
     persona: 'reviewer',
+    acspId: 'acsp-harcourt',
     route: '/acsp/cases/EO-2026-000127',
     caption:
-      'A name difference against the register is flagged, not halted. The reviewer records a decision and a reason, and the prompt to report it to Companies House is logged.',
+      'A name difference against the register is flagged, not halted, and the prompt to report it to Companies House is logged. Here the reviewer chose Correction needed, an outcome of the Mandatory decision, and raised a correction fee. The client approved the revised total, so the case waits for the register correction. Approve stays disabled until Register corrected is ticked.',
+  },
+  {
+    id: 'case-correction-paid',
+    title: 'Correction approved, payment taken',
+    persona: 'reviewer',
+    route: '/records/EO-2026-000124',
+    acspId: 'acsp-pellrowe',
+    caption:
+      'A case already past the correction branch. On Approve the payment was taken once: the verification fee and the correction add-on go to the ACSP, and the £69 plus VAT platform fee was deducted once. The invoice in the ACSP’s name itemises both lines. Declining, or an ACSP lapse, releases both authorisations.',
+  },
+  {
+    id: 'case-option2',
+    title: 'Option 2 through the identity provider',
+    persona: 'reviewer',
+    route: '/acsp/cases/EO-2026-000132',
+    acspId: 'acsp-harcourt',
+    caption:
+      'Three attempts at the digital checks did not pass, so Option 2 was offered. The provider’s trained reviewers return findings, and the ACSP ticks its additional checks and records why it is satisfied. The decision stays with the ACSP. Subject to provider confirmation.',
   },
   {
     id: 'case-chip',
@@ -217,12 +239,12 @@ export const guidedSteps: GuidedStep[] = [
       'A secure message thread with email notifications, and a proof of address dated outside six months. Referral Partners never see messages.',
   },
   {
-    id: 'code-message',
-    title: 'Code message',
+    id: 'message-warning',
+    title: 'Messages carry no codes',
     persona: 'reviewer',
     route: '/acsp/cases/EO-2026-000118',
     caption:
-      'The individual can send the Companies House personal code to their ACSP as a code message. Only the allocated reviewer can open it, opening it is audited without the code, and the text is deleted automatically 30 days after the ACSP marks it received. It never appears in exports, to Referral Partners, platform staff or the Copilot.',
+      'Case messages are for questions about the verification. A notice under the composer says not to send Companies House codes, passwords or other access credentials, and text that looks like a code is not sent until it is edited. Companies House emails the personal code to the person, and the next day the platform only asks whether it has arrived. There is no code sharing feature in Gate 2.',
   },
   {
     id: 'submit',
@@ -330,6 +352,14 @@ export const guidedSteps: GuidedStep[] = [
       'Language help is an option available after go-live. Choose Arabic in the language switch to see the journey mirrored right to left. English remains the version of record. The presenter menu can hide every held option.',
   },
   {
+    id: 'acceptance',
+    title: 'Gate 2 acceptance scenarios',
+    persona: 'superAdmin',
+    route: '/acceptance',
+    caption:
+      'The client expects eight end-to-end scenarios to form part of the formal Gate 2 acceptance testing. This presenter-only page opens each one, and the Guided demo menu has a walkthrough that steps through them.',
+  },
+  {
     id: 'points',
     title: 'Decisions and open points',
     persona: 'superAdmin',
@@ -338,3 +368,25 @@ export const guidedSteps: GuidedStep[] = [
       'What the client has decided, with dates, and what is still open. This page is for the presenter only.',
   },
 ]
+
+export type GuidedTrack = 'story' | 'acceptance'
+
+/** The Gate 2 acceptance walkthrough: every screen of the eight scenarios, in order. */
+export const acceptanceSteps: GuidedStep[] = acceptanceScenarios.flatMap((s) =>
+  s.screens.map((screen, i) => ({
+    id: `acceptance-${s.number}-${i + 1}`,
+    title: `Scenario ${s.number}: ${screen.label}`,
+    persona: screen.persona,
+    acspId: screen.acspId,
+    route: screen.route,
+    caption: screen.caption,
+  })),
+)
+
+export const stepsFor = (track: GuidedTrack | undefined): GuidedStep[] =>
+  track === 'acceptance' ? acceptanceSteps : guidedSteps
+
+export const TRACK_LABEL: Record<GuidedTrack, string> = {
+  story: 'Guided demo',
+  acceptance: 'Gate 2 acceptance walkthrough',
+}

@@ -1,6 +1,7 @@
 import { addTwelveMonths } from '@/lib/reconfirm'
 import type { AcspPlan, DemoData } from '@/types/domain'
 import { reviewerName, type ActionResult } from './actions'
+import { refuseOtherAcsp } from './guards'
 
 /*
   ACSP-side actions: reconfirmation, the platform-fee invoice mode, statement
@@ -114,6 +115,8 @@ export function handOffFiling(
 ): ActionResult {
   const task = data.corrections.find((t) => t.id === taskId)
   if (!task) return { data, audit: [] }
+  const refused = refuseOtherAcsp(data, task.caseId, reviewerId, 'the filing')
+  if (refused) return refused
   const now = new Date().toISOString()
   return {
     data: {

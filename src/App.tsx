@@ -194,6 +194,11 @@ const StoragePage = lazy(() =>
 const SuperHome = lazy(() =>
   import('@/features/super/SuperHome').then((m) => ({ default: m.SuperHome })),
 )
+const AcceptancePage = lazy(() =>
+  import('@/features/guided/AcceptancePage').then((m) => ({
+    default: m.AcceptancePage,
+  })),
+)
 const DecisionsPage = lazy(() =>
   import('@/features/guided/DecisionsPage').then((m) => ({
     default: m.DecisionsPage,
@@ -243,6 +248,7 @@ export default function App() {
 
                 {/* Presenter only */}
                 <Route path="decisions" element={<DecisionsPage />} />
+                <Route path="acceptance" element={<AcceptancePage />} />
                 <Route
                   path="points"
                   element={<Navigate to="/decisions" replace />}

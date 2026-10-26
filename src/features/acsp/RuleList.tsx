@@ -6,6 +6,7 @@ import { formatDateTime } from '@/lib/format'
 import type { RuleResult } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { recordRuleDecision } from '@/store/actions'
+import { CORRECTABLE_RULES, raiseCorrection } from '@/store/correctionActions'
 import { useDemoStore } from '@/store/DemoStore'
 import type { RuleDecision } from '@/types/domain'
 
@@ -139,6 +140,11 @@ function MandatoryDecision({
   const [editing, setEditing] = useState(false)
   const [choice, setChoice] = useState<RuleDecision['decision']>('satisfied')
   const [reason, setReason] = useState('')
+  const [amount, setAmount] = useState('')
+  const [what, setWhat] = useState('')
+  const correctable = CORRECTABLE_RULES.includes(ruleId)
+  const fee = Number(amount)
+  const needsFee = choice === 'correction_needed'
 
   if (decision && !editing) {
     return (
@@ -147,13 +153,19 @@ function MandatoryDecision({
           'mt-3 flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3',
           decision.decision === 'satisfied'
             ? 'border-approve/25 bg-approve-wash/60'
-            : 'border-decline/25 bg-decline-wash/60',
+            : decision.decision === 'correction_needed'
+              ? 'border-info/30 bg-info-wash/50'
+              : 'border-decline/25 bg-decline-wash/60',
         )}
       >
         <ClipboardCheck
           className={cn(
             'mt-0.5 size-4 shrink-0',
-            decision.decision === 'satisfied' ? 'text-approve' : 'text-decline',
+            decision.decision === 'satisfied'
+              ? 'text-approve'
+              : decision.decision === 'correction_needed'
+                ? 'text-info'
+                : 'text-decline',
           )}
           aria-hidden="true"
         />
@@ -161,15 +173,19 @@ function MandatoryDecision({
           <p className="font-medium text-ink">
             Your decision:{' '}
             {decision.decision === 'satisfied'
-              ? 'satisfied, continue'
-              : 'not satisfied'}
+              ? CORRECTABLE_RULES.includes(ruleId)
+                ? 'no correction needed, satisfied, continue'
+                : 'satisfied, continue'
+              : decision.decision === 'correction_needed'
+                ? 'correction needed'
+                : 'not satisfied'}
           </p>
           <p className="text-graphite">{decision.reason}</p>
           <p className="mt-0.5 text-[0.8125rem] text-slate">
             Recorded {formatDateTime(decision.at)}
           </p>
         </div>
-        {decidable && (
+        {decidable && decision.decision !== 'correction_needed' && (
           <Button size="xs" variant="ghost" onClick={() => setEditing(true)}>
             Change
           </Button>
@@ -203,8 +219,16 @@ function MandatoryDecision({
         <div className="mt-2 flex flex-wrap gap-2">
           {(
             [
-              ['satisfied', 'Satisfied, continue'],
+              [
+                'satisfied',
+                correctable
+                  ? 'No correction needed, I am satisfied'
+                  : 'Satisfied, continue',
+              ],
               ['not_satisfied', 'Not satisfied'],
+              ...(correctable
+                ? ([['correction_needed', 'Correction needed']] as const)
+                : []),
             ] as const
           ).map(([v, label]) => (
             <label
@@ -228,6 +252,46 @@ function MandatoryDecision({
           ))}
         </div>
       </fieldset>
+      {needsFee && (
+        <div className="mt-3 rounded-xl bg-mist/60 p-3">
+          <p className="text-[0.875rem] text-graphite">
+            You raise a correction fee on top of the verification fee. Each ACSP
+            sets its own. The client approves the revised total, and nothing is
+            taken until you approve. This is not a Halt.
+          </p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-[9rem_1fr]">
+            <div>
+              <label
+                htmlFor={`${id}-amount`}
+                className="block text-[0.9375rem] font-medium text-ink"
+              >
+                Correction fee (£)
+              </label>
+              <input
+                id={`${id}-amount`}
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor={`${id}-what`}
+                className="block text-[0.9375rem] font-medium text-ink"
+              >
+                What will be corrected
+              </label>
+              <input
+                id={`${id}-what`}
+                value={what}
+                onChange={(e) => setWhat(e.target.value)}
+                className="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+              />
+            </div>
+          </div>
+        </div>
+      )}
       <label
         htmlFor={`${id}-reason`}
         className="mt-3 block text-[0.9375rem] font-medium text-ink"
@@ -244,17 +308,27 @@ function MandatoryDecision({
       <div className="mt-3 flex gap-2">
         <Button
           size="sm"
-          disabled={!reason.trim()}
+          disabled={!reason.trim() || (needsFee && !(fee > 0 && what.trim()))}
           onClick={() => {
             apply((d) =>
-              recordRuleDecision(
-                d,
-                caseId,
-                ruleId,
-                choice,
-                reason.trim(),
-                reviewerId,
-              ),
+              needsFee
+                ? raiseCorrection(
+                    d,
+                    caseId,
+                    ruleId,
+                    fee,
+                    what,
+                    reason.trim(),
+                    reviewerId,
+                  )
+                : recordRuleDecision(
+                    d,
+                    caseId,
+                    ruleId,
+                    choice,
+                    reason.trim(),
+                    reviewerId,
+                  ),
             )
             setEditing(false)
           }}

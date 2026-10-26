@@ -18,6 +18,7 @@ import { formatDateTime, fullName } from '@/lib/format'
 import { handOffCorrection, startCorrection } from '@/store/actions'
 import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import { getAcsp, getCase, getPerson } from '@/store/selectors'
+import { AccessRefused } from './AccessRefused'
 import { CopyRow } from './CopyRow'
 import { CORRECT_SERVICE, HandoffInterstitial, openHandoff } from './Handoff'
 import { submissionPack } from './submissionPack'
@@ -26,7 +27,7 @@ import { submissionPack } from './submissionPack'
 export function Correction() {
   const { caseId = '' } = useParams()
   const { data, apply } = useDemoStore()
-  const { reviewer } = useActingAcsp()
+  const { acsp: actingAcsp, reviewer } = useActingAcsp()
   const vc = getCase(data, caseId)
   const person = vc && getPerson(data, vc.personId)
   const acsp = vc && getAcsp(data, vc.acspId)
@@ -37,6 +38,8 @@ export function Correction() {
   const [inline, setInline] = useState(false)
 
   if (!vc || !person || !acsp) return <Page>Case not found.</Page>
+  if (acsp.id !== actingAcsp.id)
+    return <AccessRefused caseId={vc.id} area="the correction workspace" />
   const reference = vc.submission?.verificationReference
   const back = (
     <Link

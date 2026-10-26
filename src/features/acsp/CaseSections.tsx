@@ -2,7 +2,6 @@ import {
   CircleCheck,
   CircleX,
   FileWarning,
-  GraduationCap,
   Home,
   Waypoints,
 } from 'lucide-react'
@@ -29,17 +28,23 @@ import {
   type RuleResult,
 } from '@/lib/rules'
 import { cn } from '@/lib/utils'
-import { recordOption2Check } from '@/store/actions'
+import {
+  returnProviderFindings,
+  setAdditionalCheck,
+  setAdditionalReason,
+} from '@/store/actions'
+import { OPTION2_ACSP_LINE } from '@/lib/option2'
+import { ProviderConfirmation } from '@/components/ProviderConfirmation'
 import { useDemoStore } from '@/store/DemoStore'
 import type {
   CaseStep,
   CheckResult,
   Person,
   RegisterEntry,
-  Reviewer,
   SupportingEvidenceType,
   VerificationCase,
 } from '@/types/domain'
+import { CorrectionBranch } from './CorrectionBranch'
 import { DiscrepancyPrompt } from './DiscrepancyPrompt'
 import { EvidenceThumb } from './EvidenceThumb'
 import { useRouteB } from './RouteBGate'
@@ -198,6 +203,11 @@ export function RegisterSection(p: SectionProps) {
         ) : undefined
       }
     >
+      <CorrectionBranch
+        vc={vc}
+        reviewerId={p.reviewerId}
+        decidable={p.decidable}
+      />
       {mismatches.length > 0 && (
         <DiscrepancyPrompt
           vc={vc}
@@ -685,87 +695,188 @@ export function EvidenceSection(p: SectionProps) {
   )
 }
 
-export function Option2Section(p: SectionProps & { reviewer?: Reviewer }) {
+export function Option2Section(p: SectionProps) {
   const { apply } = useDemoStore()
   const o = p.vc.option2
   if (p.vc.option !== 2 || !o) return null
-  const att = p.reviewer?.attestation
-  const met = p.results.some(
-    (r) => r.ruleId === 'OPT-04' && r.outcome === 'pass',
-  )
+  const findings = o.providerFindings
+  const checks = o.additionalChecks ?? []
+  const doneCount = checks.filter((c) => c.done).length
+  const outcomeLabel = {
+    passed: 'Passed',
+    flagged: 'Flagged',
+    not_passed: 'Not passed',
+  } as const
   return (
     <StepPanel
       id="sec-option"
       kicker="Fallback only"
-      title="Option 2 person check"
-      description="Offered because Option 1 could not support this person’s document"
+      title="Option 2 through the identity provider"
+      description="Offered because Option 1 could not support this person’s case"
       step="option"
       p={p}
     >
-      <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-        <div
-          className="rounded-2xl border border-line bg-white p-4"
-          data-cite="declared:option2"
-        >
-          <p className="text-[0.875rem] text-slate">Requirement</p>
-          <p className="mt-1 text-base text-ink">
-            Two documents: two from Group A, or one from Group A and one from
-            Group B. Checked in person by a trained reviewer.
-          </p>
-          {o.documents?.length ? (
-            <ul className="mt-3 space-y-1.5">
-              {o.documents.map((d, k) => (
-                <li
-                  key={k}
-                  data-cite={`evidence:option2-${k}`}
-                  className="flex items-center gap-2 text-[0.9375rem] text-ink"
-                >
-                  <CompletionTick className="size-4" label="Seen" />
-                  {d.label}{' '}
-                  <span className="text-slate">· Group {d.group}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            p.decidable && (
-              <Button
-                size="sm"
-                className="mt-3"
-                onClick={() =>
-                  apply((d) => recordOption2Check(d, p.vc.id, p.reviewerId))
-                }
-              >
-                Record the person check
-              </Button>
-            )
-          )}
-          {met && o.checkedAt && (
-            <p className="mt-2 text-[0.875rem] text-slate">
-              Checked {formatShortDate(o.checkedAt)}
+      <div className="space-y-4 p-5 sm:p-6">
+        <p className="flex flex-wrap items-center gap-2 text-base text-ink">
+          {OPTION2_ACSP_LINE}
+          <ProviderConfirmation />
+        </p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div
+            className="rounded-2xl border border-line bg-white p-4"
+            data-cite="declared:option2"
+          >
+            <h3 className="text-base font-medium text-ink">
+              Identity provider findings
+            </h3>
+            <p className="mt-1 text-[0.875rem] text-slate">
+              Simulated. Documents are two from Option 2 Group A, or one from
+              Group A and one from Group B.
             </p>
-          )}
-        </div>
-        <div
-          className="rounded-2xl border border-line bg-white p-4"
-          data-cite="declared:attestation"
-        >
-          <p className="flex items-center gap-2 text-[0.875rem] text-slate">
-            <GraduationCap className="size-4" aria-hidden="true" />
-            Reviewer training attestation
-          </p>
-          {att ? (
-            <>
-              <p className="mt-1 text-base text-ink">{p.reviewer!.name}</p>
-              <p className="text-[0.9375rem] text-graphite">{att.course}</p>
-              <p className="mt-1 font-mono text-[0.8125rem] text-slate">
-                {att.reference} · valid to {formatDate(att.expiresOn)}
+            {findings ? (
+              <>
+                <p className="mt-3 text-[0.875rem] text-slate">
+                  Documents checked
+                </p>
+                <ul className="mt-1 space-y-1.5">
+                  {(o.documents ?? []).map((d, k) => (
+                    <li
+                      key={k}
+                      data-cite={`evidence:option2-${k}`}
+                      className="flex items-center gap-2 text-[0.9375rem] text-ink"
+                    >
+                      <CompletionTick className="size-4" label="Checked" />
+                      {d.label}{' '}
+                      <span className="text-slate">· Group {d.group}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-[0.875rem] text-slate">
+                  Outcome of each supported check
+                </p>
+                <ul className="mt-1 space-y-2">
+                  {findings.checks.map((c) => (
+                    <li key={c.label} className="text-[0.9375rem] text-ink">
+                      <span className="font-medium">
+                        {outcomeLabel[c.outcome]}.
+                      </span>{' '}
+                      {c.label}
+                      {c.note && (
+                        <span className="block text-[0.875rem] text-graphite">
+                          {c.note}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-[0.875rem] text-slate">
+                  The provider could not check
+                </p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-[0.9375rem] text-ink">
+                  {findings.couldNotCheck.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-[0.8125rem] text-slate">
+                  Returned {formatShortDate(findings.returnedAt)}. The provider
+                  returns findings only. It does not approve or decline.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-base text-graphite">
+                  Waiting for the identity provider’s manual document review.
+                </p>
+                {p.decidable && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() =>
+                      apply((d) =>
+                        returnProviderFindings(d, p.vc.id, p.reviewerId),
+                      )
+                    }
+                  >
+                    Simulate: the provider returns its findings
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+          <div
+            className="rounded-2xl border border-line bg-white p-4"
+            data-cite="declared:option2-additional"
+          >
+            <h3 className="text-base font-medium text-ink">
+              Additional checks by you
+            </h3>
+            <p className="mt-1 text-[0.875rem] text-slate">
+              {doneCount} of {checks.length} complete. Approve stays disabled
+              until every check is ticked and your reason is recorded. The
+              decision is yours.
+            </p>
+            {checks.length === 0 ? (
+              <p className="mt-3 text-base text-graphite">
+                Opens when the provider returns its findings.
               </p>
-            </>
-          ) : (
-            <p className="mt-1 text-base text-decline">
-              No current attestation. Approval is blocked under OPT-03.
+            ) : (
+              <>
+                <ul className="mt-3 space-y-2">
+                  {checks.map((c) => (
+                    <li key={c.id}>
+                      <label className="flex cursor-pointer items-start gap-3 text-base text-ink">
+                        <input
+                          type="checkbox"
+                          className="mt-1 size-5 accent-ink"
+                          checked={c.done}
+                          disabled={!p.decidable}
+                          onChange={(e) =>
+                            apply((d) =>
+                              setAdditionalCheck(
+                                d,
+                                p.vc.id,
+                                c.id,
+                                e.target.checked,
+                                p.reviewerId,
+                              ),
+                            )
+                          }
+                        />
+                        {c.label}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <label
+                  htmlFor="o2-reason"
+                  className="mt-4 block text-[0.9375rem] font-medium text-ink"
+                >
+                  Why you are satisfied
+                </label>
+                <textarea
+                  id="o2-reason"
+                  rows={3}
+                  value={o.additionalReason ?? ''}
+                  disabled={!p.decidable}
+                  onChange={(e) =>
+                    apply((d) =>
+                      setAdditionalReason(
+                        d,
+                        p.vc.id,
+                        e.target.value,
+                        p.reviewerId,
+                      ),
+                    )
+                  }
+                  className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10"
+                />
+              </>
+            )}
+            <p className="mt-3 text-[0.8125rem] text-slate">
+              The report records that Option 2 was used, and why.
             </p>
-          )}
+          </div>
         </div>
       </div>
     </StepPanel>

@@ -9,27 +9,41 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { IdleNotice } from '@/components/app/IdleNotice'
 import { useDemoStore } from '@/store/DemoStore'
-import { guidedSteps } from './steps'
+import { stepsFor, TRACK_LABEL } from './steps'
 
 /*
-  Floating caption card for the guided demo. Mounted once in the presenter bar,
+  Floating caption card for the guided demo. Mounted once in the demo controls panel,
   so it is present on every screen while `state.guided.on` is true. It sits in
   the bottom corner, can be minimised, and never takes focus on its own.
 */
 export function GuidedDemo() {
-  const { state, setGuided, setPersona } = useDemoStore()
+  const { state, setGuided, setPersona, setAcsp } = useDemoStore()
   const navigate = useNavigate()
-  const { on, step } = state.guided
+  const { on, step, track } = state.guided
+  const guidedSteps = stepsFor(track)
   const last = guidedSteps.length - 1
   const index = Math.min(Math.max(step, 0), last)
   const current = guidedSteps[index]
   const [minimised, setMinimised] = useState(false)
   const [idleOpen, setIdleOpen] = useState(false)
 
-  // Apply a step only when it changes, not on first render, so a reload does not move the presenter.
-  const applied = useRef(`${on}:${index}`)
+  // A link such as /?guide=story&step=case-option2 opens the walker at that step.
   useEffect(() => {
-    const key = `${on}:${index}`
+    const q = new URLSearchParams(window.location.search)
+    const wanted = q.get('guide')
+    if (wanted !== 'story' && wanted !== 'acceptance') return
+    const list = stepsFor(wanted)
+    const ref = q.get('step') ?? ''
+    const byId = list.findIndex((x) => x.id === ref)
+    const n = byId >= 0 ? byId : Math.max(0, Number(ref) - 1 || 0)
+    setGuided({ on: true, step: Math.min(n, list.length - 1), track: wanted })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Apply a step only when it changes, not on first render, so a reload does not move the presenter.
+  const applied = useRef(`${on}:${track}:${index}`)
+  useEffect(() => {
+    const key = `${on}:${track}:${index}`
     if (applied.current === key) return
     applied.current = key
     if (!on) {
@@ -37,26 +51,28 @@ export function GuidedDemo() {
       return
     }
     setPersona(current.persona)
+    if (current.acspId) setAcsp(current.acspId)
     navigate(current.route)
     setIdleOpen(Boolean(current.idle))
-  }, [on, index, current, navigate, setPersona])
+  }, [on, track, index, current, navigate, setPersona, setAcsp])
 
   if (!on) return null
 
-  const go = (n: number) => setGuided({ on: true, step: n })
+  const go = (n: number) => setGuided({ on: true, step: n, track })
 
   return (
     <>
       <section
         aria-label="Guided demo"
         onKeyDown={(e) => {
-          if (e.key === 'Escape') setGuided({ on: false, step: index })
+          if (e.key === 'Escape') setGuided({ on: false, step: index, track })
         }}
         className="fixed right-3 bottom-3 left-3 z-[60] rounded-2xl border border-ink/20 bg-white text-ink shadow-[0_24px_60px_-20px_rgb(22_24_27/0.55)] sm:left-auto sm:w-[24rem] print:hidden"
       >
         <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
           <p className="flex-1 font-mono text-[0.875rem] tracking-[0.08em] text-graphite uppercase">
-            Guided demo · Step {index + 1} of {guidedSteps.length}
+            {TRACK_LABEL[track ?? 'story']} · Step {index + 1} of{' '}
+            {guidedSteps.length}
           </p>
           <button
             type="button"
@@ -75,7 +91,7 @@ export function GuidedDemo() {
           </button>
           <button
             type="button"
-            onClick={() => setGuided({ on: false, step: index })}
+            onClick={() => setGuided({ on: false, step: index, track })}
             className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg hover:bg-mist"
           >
             <X className="size-5" aria-hidden="true" />
@@ -107,7 +123,9 @@ export function GuidedDemo() {
           <button
             type="button"
             onClick={() =>
-              index === last ? setGuided({ on: false, step: 0 }) : go(index + 1)
+              index === last
+                ? setGuided({ on: false, step: 0, track })
+                : go(index + 1)
             }
             className="inline-flex h-10 cursor-pointer items-center gap-1 rounded-lg bg-ink px-4 text-base font-medium text-paper hover:bg-graphite"
           >

@@ -36,9 +36,11 @@ const reasons = [
 export function ExportControl({
   vc,
   actor,
+  reviewerId,
 }: {
   vc: VerificationCase
   actor: string
+  reviewerId: string
 }) {
   const { data, apply } = useDemoStore()
   const toast = useToast()
@@ -113,7 +115,7 @@ export function ExportControl({
             </Button>
             <Button
               onClick={() => {
-                apply((d) => requestExport(d, vc.id, actor, reason))
+                apply((d) => requestExport(d, vc.id, actor, reason, reviewerId))
                 setAsking(false)
                 toast({
                   title: 'Export requested',
@@ -136,8 +138,8 @@ export function ExportControl({
           setStepUp(false)
           apply((d) =>
             released && !direct
-              ? recordExportDownload(d, request!.id, actor, ref)
-              : recordExport(d, vc.id, ref, actor),
+              ? recordExportDownload(d, request!.id, actor, ref, reviewerId)
+              : recordExport(d, vc.id, ref, actor, reviewerId),
           )
           window.setTimeout(() => window.print(), 300)
         }}

@@ -81,12 +81,12 @@ const UNSUPPORTED_RX =
 
 const RULE_ID = /\b([A-Z]{2,4}(?:-EXP)?-\d{2})\b/i
 
-/** Questions about Companies House codes. The Copilot never reads code messages. */
+/** Questions about Companies House codes. Evidence One does not carry or keep them. */
 const CODES_RX =
-  /\b(personal|authentication|auth)\s+code|\bcode messages?\b|\bwhat (is|was) the code\b/i
+  /\b(personal|authentication|auth)\s+code|\bcodes?\b.*\b(send|share|message)|\bwhat (is|was) the code\b/i
 
 export const NO_CODES =
-  'I can’t read code messages. Only the allocated reviewer can open them in the case messages, and they are never shared with the Copilot or any AI feature.'
+  'Evidence One does not ask for, carry or keep Companies House codes, and messages must not contain them. Companies House sends the personal code directly to the person. If a code is needed for a later filing, the ACSP and the client agree how to pass it on outside Evidence One.'
 
 /** Classifies a free-text question into one of the supported intents, or a refusal. */
 export function classify(scope: CopilotScope, q: string): string {
@@ -381,7 +381,7 @@ function caseAnswer(
           {
             text:
               vc.option === 2
-                ? 'Option 2 person check in use, because Option 1 could not support the document.'
+                ? 'Option 2 is in use, because Option 1 could not support the document. The identity provider’s findings and the ACSP’s additional checks are on the case.'
                 : `Checks completed: ${checks.length ? checks.join(', ') : 'none yet'} passed, with PEP and sanctions screening ${vc.idvt.pepSanctions === 'pending' ? 'not yet run' : 'completed'}.`,
             cites: [
               ...checks.map(rule),

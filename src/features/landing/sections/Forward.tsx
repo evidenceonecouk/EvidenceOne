@@ -142,7 +142,6 @@ const footerNav: [string, string][] = [
   ['For partners', '#for-partners'],
   ['How it works', '#how-it-works'],
   ['Platform', '#platform-title'],
-  ['Standards', '#standards-title'],
 ]
 
 export function DarkFooter() {

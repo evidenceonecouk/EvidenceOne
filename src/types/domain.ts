@@ -250,6 +250,23 @@ export interface AcspMonitoring {
   notYetListedSince?: ISODate
 }
 
+/**
+  G2-02: where the ACSP is with the secure payment provider's own onboarding.
+  Evidence One never collects or stores the ACSP's bank credentials.
+*/
+export type PaymentProviderStatus =
+  'not_started' | 'in_progress' | 'more_information_needed' | 'eligible'
+
+export interface AcspPayments {
+  providerStatus: PaymentProviderStatus
+  /** Evidence One's own approval of the ACSP. The second gate. */
+  evidenceOneApproved: boolean
+  /** True only when the provider status is Eligible and Evidence One has approved. */
+  paymentsActive: boolean
+  /** Set when an administrator last changed a gate. */
+  updatedAt?: ISODate
+}
+
 export interface AcspFirm {
   id: string
   name: string
@@ -269,6 +286,8 @@ export interface AcspFirm {
   /** Set when this firm is also a Referral Partner (separate membership). */
   alsoPartnerId?: string
   approval: 'approved' | 'pending_approval'
+  /** Connect payments (G2-02). Payments are active only when both gates are met. */
+  payments: AcspPayments
   /** Share of B2C allocations, as a percentage. Allocation is confirmed by an administrator at launch. */
   b2cAllocationShare: number
   b2cAllocatedThisMonth: number
@@ -420,6 +439,17 @@ export type PaymentStatus = 'authorised' | 'taken' | 'released'
   payment as the ACSP's disclosed agent, by split payment, with the ACSP as
   merchant of record. The four fee types are never merged.
 */
+export interface PaymentAddOn {
+  /** The ACSP's correction fee, part of its Professional Fee, shown as its own line. VAT inclusive like the fee. */
+  amount: number
+  description: string
+  /** The second authorisation, for the revised total. Nothing is taken until the ACSP approves. */
+  authorisedAt: ISODate
+  reference: string
+  /** Who pays the add-on. The client, even where a Partner paid with an Agent Payment Code (Pending your decision). */
+  paidBy: 'client'
+}
+
 export interface Payment {
   method: PaymentMethod
   status: PaymentStatus
@@ -431,6 +461,8 @@ export interface Payment {
   disclosure?: { acknowledgedAt: ISODate; consentAt?: ISODate }
   /** The ACSP's professional fee, paid by the client or by the Partner on their behalf. */
   amount: number
+  /** Register correction add-on (G2-10, G2-13), authorised a second time when the client approves the revised total. */
+  addOn?: PaymentAddOn
   /** ACSP that received the payment (merchant of record). */
   payeeAcspId?: string
   code?: string
@@ -462,7 +494,8 @@ export interface Decision {
 
 /** A reviewer's recorded decision on a Mandatory decision rule result. */
 export interface RuleDecision {
-  decision: 'satisfied' | 'not_satisfied'
+  /** 'correction_needed' is an outcome of the Mandatory decision on a register difference (G2-10), not a fourth reviewer action. */
+  decision: 'satisfied' | 'not_satisfied' | 'correction_needed'
   reason: string
   at: ISODate
   reviewerId: string
@@ -499,13 +532,46 @@ export type Option2Reason =
   /** The person has no smartphone or tablet for the provider's journey (Pending your decision). */
   | 'no_smartphone'
 
+/**
+  Findings the identity provider's manual document review returns for an
+  Option 2 case (G2-14, subject to the provider confirming it can). The
+  provider does the supported checks and returns findings. It never decides.
+*/
+export interface ProviderFindings {
+  returnedAt: ISODate
+  /** Outcome of each supported check. */
+  checks: {
+    label: string
+    outcome: 'passed' | 'flagged' | 'not_passed'
+    note?: string
+  }[]
+  /** Anything the provider could not check, left for the ACSP. */
+  couldNotCheck: string[]
+}
+
+/** One additional check the ACSP completes itself before deciding. */
+export interface AdditionalCheck {
+  id: string
+  label: string
+  done: boolean
+  doneAt?: ISODate
+}
+
 export interface Option2State {
   reason: Option2Reason
   requestedAt: ISODate
   reviewerAgreedAt?: ISODate
+  /** Documents the provider's reviewers checked. */
   documents?: { group: 'A' | 'B'; label: string; expiresOn?: ISODate }[]
+  /** When the provider returned its findings. */
   checkedAt?: ISODate
-  checkedBy?: string
+  /** The provider's findings (simulated). */
+  providerFindings?: ProviderFindings
+  /** The ACSP's own additional checks. The ACSP keeps the final decision. */
+  additionalChecks?: AdditionalCheck[]
+  /** Why the ACSP is satisfied, recorded with the checklist. */
+  additionalReason?: string
+  additionalCompletedAt?: ISODate
 }
 
 export interface VerificationCase {
@@ -559,7 +625,43 @@ export interface VerificationCase {
   ruleSetVersion?: string
   ruleDecisions?: Record<string, RuleDecision>
   option2?: Option2State
+  /** Register correction branch, started by the Mandatory decision "Correction needed". */
+  registerCorrection?: RegisterCorrectionBranch
   escalatedTo?: { reviewerId: string; at: ISODate; note: string }
+}
+
+/**
+  Register correction with a fee (G2-10 and G2-13, client email of 23 October).
+  A register difference stays a flag. Where the ACSP decides it needs correcting
+  before approval, the Mandatory decision outcome "Correction needed" raises a
+  correction fee on top of the verification fee. Nothing here is a Halt, a
+  Block or a fourth reviewer action. Design interpretations are marked in the
+  rules and on the Decisions page.
+*/
+export type CorrectionStage =
+  | 'awaiting_client_approval'
+  | 'awaiting_register_correction'
+  | 'register_corrected'
+  | 'declined_by_client'
+
+export interface RegisterCorrectionBranch {
+  /** The Mandatory decision rule it came from, for example REG-11. */
+  ruleId: string
+  stage: CorrectionStage
+  raisedAt: ISODate
+  raisedBy: string
+  /** The add-on, set by the ACSP. There is no platform-wide value. */
+  amount: number
+  description: string
+  clientApprovedAt?: ISODate
+  clientDeclinedAt?: ISODate
+  /** The window in which the register is expected to be corrected, from correction_turnaround_hours_min and _max. */
+  expectedFrom?: ISODate
+  expectedBy?: ISODate
+  registerCorrectedAt?: ISODate
+  registerCorrectedBy?: string
+  /** Both authorisations released: the case was declined or the ACSP lapsed. */
+  releasedAt?: ISODate
 }
 
 export type CaseSource = 'referred' | 'b2c' | 'own_client'
@@ -584,24 +686,7 @@ export interface CaseMessage {
   body: string
   /** Email notification sent to the other party. Shown as a sent-notification row. */
   notifiedAt?: ISODate
-  /**
-    'code': a Companies House code the individual passes to the allocated ACSP
-    (P4). Only the allocated ACSP reviewer and the individual can open it. It is
-    never exported and never shown to Referral Partners, platform staff, the
-    Copilot or any AI feature. The audit trail never holds the value.
-  */
-  kind?: 'message' | 'code'
-  codeKind?: CodeKind
-  /** The ACSP marked "Code received". The text is deleted 30 days later. */
-  receivedAt?: ISODate
-  receivedBy?: string
-  /** receivedAt plus code_message_retention_days. */
-  deleteOn?: ISODate
-  /** The text was deleted automatically. The body is then empty. */
-  deletedAt?: ISODate
 }
-
-export type CodeKind = 'personal_code' | 'company_authentication_code'
 
 export interface DiscrepancyReport {
   /** What differs, for example "First name: AIDAN on the document, AIDEN on the register". */
@@ -754,8 +839,9 @@ export type ParamKey =
   | 'acsp_reconfirmation_months'
   /** M4, decided 19 October: a Not yet listed ACSP has 3 months to register. */
   | 'acsp_register_period_months'
-  /** P4, decided 19 and 20 October: a code message is deleted this many days after the ACSP marks it received. */
-  | 'code_message_retention_days'
+  /** G2-13: the register is expected to be corrected within this many hours of the client approving the revised total. */
+  | 'correction_turnaround_hours_min'
+  | 'correction_turnaround_hours_max'
 
 /**
   Decision settings. Most carry a "Pending your decision" badge on the Rules page
@@ -766,6 +852,12 @@ export interface RuleSettings {
   personal_code_prompt: 'day_after_confirmation'
   /** Open: whether a passing electronic address check for a UK resident removes the proof of address document. Off by default. */
   address_check_replaces_proof: boolean
+  /**
+    Whether an expired document is accepted within its expiryAllowanceMonths.
+    Off: expired passports are not accepted (H1, decided 19 October). Subject
+    to the identity provider's answer.
+  */
+  expired_document_allowance: boolean
   escalate_enabled: boolean
   /** Referral commissions are off at launch. Switching on needs a second approver. */
   referral_commissions: boolean
@@ -776,11 +868,33 @@ export type SettingKey = keyof RuleSettings
 export type RuleSetStatus =
   'current' | 'draft' | 'pending_approval' | 'superseded'
 
+export type DocumentListId = 'option1' | 'option2_a' | 'option2_b'
+
+/**
+  One document on an eligibility list (G2-07). The lists are part of the rule
+  set, changed only through a draft version and a second approver.
+*/
+export interface EligibleDocument {
+  id: string
+  label: string
+  list: DocumentListId
+  /** Whether the document carries a chip: yes, no, or on some. */
+  chip: 'yes' | 'no' | 'sometimes'
+  /** Months an expired document is still accepted. 0 throughout until the client decides. */
+  expiryAllowanceMonths: number
+  /** Switched on for its list. */
+  enabled: boolean
+  /** The tile on the individual's document step this Option 1 document sits behind. */
+  tile?: IdDocumentType | 'evisa'
+}
+
 export interface RuleSetVersion {
   version: string
   status: RuleSetStatus
   params: Record<ParamKey, number>
   settings: RuleSettings
+  /** Document eligibility lists for Option 1 and Option 2 (G2-07). */
+  documents: EligibleDocument[]
   createdAt: ISODate
   createdBy: string
   submittedAt?: ISODate
@@ -812,6 +926,8 @@ export interface ClientInvoice {
   gross: number
   /** Who paid: the client, or a Referral Partner on their behalf with an Agent Payment Code. */
   paidBy: string
+  /** The invoice itemises the verification fee and the correction add-on, each VAT inclusive. */
+  lines?: { description: string; gross: number }[]
 }
 
 /** Evidence One invoices the ACSP, documenting the platform fee already deducted. */

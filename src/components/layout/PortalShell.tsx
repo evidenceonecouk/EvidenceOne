@@ -495,15 +495,15 @@ export function PortalShell({
   useEffect(() => setOpen(false), [pathname])
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)]">
+    <div className="flex min-h-dvh">
       <div className="hidden w-[17.5rem] shrink-0 border-r border-line/80 bg-[#fbfbfa] lg:block print:hidden">
-        <aside className="sticky top-14 h-[calc(100dvh-3.5rem)]">
+        <aside className="sticky top-0 h-dvh">
           <Sidebar persona={persona} />
         </aside>
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="sticky top-14 z-30 flex h-16 items-center justify-between border-b border-line/80 bg-white/90 px-4 backdrop-blur-xl lg:hidden print:hidden">
+        <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line/80 bg-white/90 px-4 backdrop-blur-xl lg:hidden print:hidden">
           <Logo />
           <button
             type="button"

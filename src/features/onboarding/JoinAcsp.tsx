@@ -9,7 +9,12 @@ import { Button } from '@/components/ui/button'
 import { PACKAGES_PROVISIONAL_NOTE } from '@/data/packages'
 import { submitApplication } from '@/store/onboardingActions'
 import { useDemoStore } from '@/store/DemoStore'
-import type { OnboardingApplication } from '@/types/domain'
+import { PROVIDER_STATUS_LABEL } from '@/lib/payments'
+import type {
+  OnboardingApplication,
+  PaymentProviderStatus,
+} from '@/types/domain'
+import { ConnectPayments } from './ConnectPayments'
 import {
   CheckField,
   CheckGroup,
@@ -80,7 +85,8 @@ interface Form {
     perMonth: number
     turnaroundHours: number
     acceptingNew: boolean
-    payoutConnected: boolean
+    /** G2-02: status with the secure payment provider. No bank detail is ever held here. */
+    paymentStatus: PaymentProviderStatus
     vatRegistered: boolean
     vatNumber: string
     /** No platform default: each ACSP chooses (P6, decided 19 October). */
@@ -192,7 +198,7 @@ const SEED: Form = {
     perMonth: 110,
     turnaroundHours: 48,
     acceptingNew: true,
-    payoutConnected: false,
+    paymentStatus: 'not_started',
     vatRegistered: true,
     vatNumber: 'GB 288 4410 63',
     pepScreening: '',
@@ -269,7 +275,10 @@ function missing(step: number, f: Form): string[] {
   if (step === 3) {
     need(f.commercial.feeStandard > 0, 'A standard fee')
     need(f.commercial.perDay > 0, 'A daily maximum')
-    need(f.commercial.payoutConnected, 'A connected payout account')
+    need(
+      f.commercial.paymentStatus !== 'not_started',
+      'Connect payments started with the secure payment provider',
+    )
     need(!!f.commercial.pepScreening, 'A choice on PEP and sanctions screening')
     need(
       !!f.commercial.addressCheck,
@@ -337,7 +346,7 @@ function toAnswers(f: Form): OnboardingApplication['answers'] {
       maxPerMonth: f.commercial.perMonth,
       targetTurnaroundHours: f.commercial.turnaroundHours,
       acceptingNewCases: f.commercial.acceptingNew,
-      payoutAccountConnected: f.commercial.payoutConnected,
+      paymentProviderStatus: PROVIDER_STATUS_LABEL[f.commercial.paymentStatus],
       vatRegistered: f.commercial.vatRegistered,
       vatNumber: f.commercial.vatRegistered ? f.commercial.vatNumber : '',
       pepAndSanctionsScreening: f.commercial.pepScreening,
@@ -834,24 +843,11 @@ function CommercialStep({ form: f, setForm }: StepProps) {
           onChange={(v) => set({ acceptingNew: v })}
         />
       </Subsection>
-      <Subsection title="Payout account">
-        <p className="text-base text-graphite">
-          Clients pay you. Evidence One collects the payment as your disclosed
-          agent, and the secure payment provider pays out to your own account.
-        </p>
-        {f.commercial.payoutConnected ? (
-          <p className="text-base font-medium text-approve">
-            Payout account connected through the secure payment provider.
-          </p>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => set({ payoutConnected: true })}
-          >
-            Connect a payout account
-          </Button>
-        )}
+      <Subsection title="Connect payments">
+        <ConnectPayments
+          status={f.commercial.paymentStatus}
+          onChange={(v) => set({ paymentStatus: v })}
+        />
       </Subsection>
       <Subsection title="VAT">
         <CheckField

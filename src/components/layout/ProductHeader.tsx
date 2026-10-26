@@ -41,7 +41,6 @@ const publicLinks = [
   ['For partners', '#for-partners'],
   ['How it works', '#how-it-works'],
   ['Platform', '#platform-title'],
-  ['Standards', '#standards-title'],
 ] as const
 
 const suffixByPersona: Record<PersonaId, string | undefined> = {
@@ -105,7 +104,7 @@ export function ProductHeader({
   return (
     <header
       className={cn(
-        'sticky top-14 z-30 print:hidden border-b border-line/80 backdrop-blur-xl backdrop-saturate-150',
+        'sticky top-0 z-30 print:hidden border-b border-line/80 backdrop-blur-xl backdrop-saturate-150',
         publicNav ? 'bg-[#f4f4f3]/[0.92]' : 'bg-white/[0.92]',
         className,
       )}

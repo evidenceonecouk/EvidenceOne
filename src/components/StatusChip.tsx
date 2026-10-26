@@ -163,6 +163,44 @@ export function PartnerCheckChip({
   )
 }
 
+const toneText: Record<Tone, string> = {
+  neutral: 'text-slate',
+  progress: 'text-ink',
+  complete: 'text-approve',
+  attention: 'text-info',
+  negative: 'text-decline',
+}
+
+/* Compact table line: icon and check name, the result word shown whenever it is not a pass. */
+export function PartnerCheckLine({
+  label,
+  result,
+}: {
+  label: string
+  result: PartnerCheckResult
+}) {
+  const spec = checkSpecs[result]
+  const Icon = spec.icon
+  return (
+    <span className="flex min-w-0 items-center gap-2 text-[0.875rem] leading-6">
+      <Icon
+        className={cn('size-4 shrink-0', toneText[spec.tone])}
+        aria-hidden="true"
+      />
+      <span className="truncate text-graphite">{label}</span>
+      {result === 'passed' ? (
+        <span className="sr-only">: {spec.label}</span>
+      ) : (
+        <span
+          className={cn('font-medium whitespace-nowrap', toneText[spec.tone])}
+        >
+          {spec.label}
+        </span>
+      )}
+    </span>
+  )
+}
+
 /* One ACSP status set everywhere. */
 const acspSpecs: Record<AcspStatus, ChipSpec> = {
   pending_approval: {

@@ -94,6 +94,7 @@ export function CopilotPanel({
         answer: answerText(answer),
         sources: answerSources(answer),
         reviewer: asker,
+        reviewerId: reviewer.id,
       }),
     )
   }
@@ -110,7 +111,7 @@ export function CopilotPanel({
       aria-hidden={!open}
       inert={!open}
       className={cn(
-        'fixed top-14 right-0 bottom-0 z-40 flex w-full flex-col border-l border-line bg-paper transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] sm:w-[26rem] print:hidden',
+        'fixed top-0 right-0 bottom-0 z-40 flex w-full flex-col border-l border-line bg-paper transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] sm:w-[26rem] print:hidden',
         open
           ? 'translate-x-0 shadow-[-24px_0_60px_-40px_rgb(22_24_27/0.5)]'
           : 'pointer-events-none invisible translate-x-full',

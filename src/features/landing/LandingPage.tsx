@@ -1,6 +1,4 @@
 import { Alongside } from './sections/Alongside'
-import { Audiences } from './sections/Audiences'
-import { Standards } from './sections/Closing'
 import { Hub, Steps, TrustStrip } from './sections/Connect'
 import { DarkFooter, Forward } from './sections/Forward'
 import { Hero } from './sections/Hero'
@@ -19,8 +17,6 @@ export function LandingPage() {
       <TrustStrip />
       <SeeItWorking />
       <Platform />
-      <Audiences />
-      <Standards />
       <Forward />
       <DarkFooter />
     </div>

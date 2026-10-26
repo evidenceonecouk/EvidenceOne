@@ -8,6 +8,7 @@ import type {
   VerificationCase,
 } from '@/types/domain'
 import { reviewerName, type ActionResult } from './actions'
+import { refuseOtherAcsp } from './guards'
 
 /*
   Reviewer-side actions for register differences (G2-10). A difference in name,
@@ -68,6 +69,13 @@ export function recordDiscrepancyChoice(
   note: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the discrepancy choice',
+  )
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   if (!vc) return { data, audit: [] }
   const now = new Date().toISOString()
@@ -115,6 +123,13 @@ export function raiseRegisterCorrection(
   field: string,
   reviewerId: string,
 ): ActionResult {
+  const refused = refuseOtherAcsp(
+    data,
+    caseId,
+    reviewerId,
+    'the register correction task',
+  )
+  if (refused) return refused
   const vc = data.cases.find((c) => c.id === caseId)
   const person = vc && data.people.find((p) => p.id === vc.personId)
   const entry =

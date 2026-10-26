@@ -16,6 +16,16 @@ export const PROVIDER_FEE_FIXED = 0.2
 
 export const round2 = (n: number) => Math.round(n * 100) / 100
 
+/**
+  What is taken on approval: the ACSP's verification fee plus any register
+  correction add-on. The add-on is part of the ACSP Professional Fee, shown as
+  its own line, never a fifth fee type.
+*/
+export const paymentTotal = (p: {
+  amount: number
+  addOn?: { amount: number }
+}) => round2(p.amount + (p.addOn?.amount ?? 0))
+
 export interface PaymentSplit {
   /** What the client pays the ACSP (the ACSP's professional fee, VAT inclusive). */
   gross: number

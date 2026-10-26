@@ -1,5 +1,5 @@
 import type { AuditInput } from '@/lib/audit'
-import { splitPayment } from '@/lib/fees'
+import { paymentTotal, splitPayment } from '@/lib/fees'
 import { addDays, formatDate, formatMoney } from '@/lib/format'
 import {
   buildClientInvoice,
@@ -128,7 +128,9 @@ export function takePayment(
   )
   if (!acsp) return { data, audit: [] }
   const name = nameOf(data, vc.personId)
-  const split = splitPayment(payment.amount, vc.source, data.billing.settings)
+  const total = paymentTotal(payment)
+  // The £69 plus VAT platform fee is deducted once, on referred and B2C cases only, never per correction.
+  const split = splitPayment(total, vc.source, data.billing.settings)
   const paidBy =
     payment.method === 'agent_payment_code'
       ? (payment.payerName ?? 'Referral Partner')
@@ -138,7 +140,16 @@ export function takePayment(
     acsp,
     caseId,
     clientName: name,
-    gross: payment.amount,
+    gross: total,
+    lines: payment.addOn
+      ? [
+          { description: 'Verification fee', gross: payment.amount },
+          {
+            description: `Register correction: ${payment.addOn.description}`,
+            gross: payment.addOn.amount,
+          },
+        ]
+      : undefined,
     vatRate: data.billing.settings.vatRate,
     paidBy,
     issuedAt: at,
@@ -190,8 +201,8 @@ export function takePayment(
       caseId,
       detail:
         (payment.method === 'agent_payment_code'
-          ? `Approved, so ${formatMoney(payment.amount)} was taken from ${payment.payerName}, paid on the client’s behalf with Agent Payment Code ${payment.code}.`
-          : `Approved, so ${formatMoney(payment.amount)} was taken from ${name}’s card. Reference ${payment.reference}.`) +
+          ? `Approved, so ${formatMoney(payment.amount)} was taken from ${payment.payerName}, paid on the client’s behalf with Agent Payment Code ${payment.code}.${payment.addOn ? ` The register correction add-on of ${formatMoney(payment.addOn.amount)} was taken from ${name}’s card, reference ${payment.addOn.reference}.` : ''}`
+          : `Approved, so ${formatMoney(total)} was taken from ${name}’s card${payment.addOn ? `: the verification fee of ${formatMoney(payment.amount)} and the register correction add-on of ${formatMoney(payment.addOn.amount)}` : ''}. Reference ${payment.reference}.`) +
         ` Evidence One collected it as ${acsp.name}’s disclosed agent, with ${acsp.name} as merchant of record.${platformLine} Net ${formatMoney(split.net)} to ${acsp.name}’s own payment account.`,
     },
     {
@@ -245,8 +256,24 @@ export function releasePayment(
     releasedAt: at,
     releaseReason: reason,
   }
+  const released = withPayment(data, caseId, full)
   return {
-    data: withPayment(data, caseId, full),
+    data: vc.registerCorrection
+      ? {
+          ...released,
+          cases: released.cases.map((c) =>
+            c.id === caseId && c.registerCorrection
+              ? {
+                  ...c,
+                  registerCorrection: {
+                    ...c.registerCorrection,
+                    releasedAt: at,
+                  },
+                }
+              : c,
+          ),
+        }
+      : released,
     audit: [
       {
         at,
@@ -254,7 +281,9 @@ export function releasePayment(
         actorType: 'system',
         action: 'payment.released',
         caseId,
-        detail: `${reason}. The authorisation of ${formatMoney(payment.amount)} was released. Nothing was taken and no invoice was issued.`,
+        detail: payment.addOn
+          ? `${reason}. Both authorisations were released: ${formatMoney(payment.amount)} for the verification and ${formatMoney(payment.addOn.amount)} for the register correction. Nothing was taken and no invoice was issued.`
+          : `${reason}. The authorisation of ${formatMoney(payment.amount)} was released. Nothing was taken and no invoice was issued.`,
       },
     ],
   }

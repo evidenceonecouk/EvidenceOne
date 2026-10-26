@@ -1,7 +1,7 @@
 import type { OnboardingApplication } from '@/types/domain'
 
 /*
-  Two applications waiting for a Platform Administrator. Answers are typed and
+  Three applications waiting (two ACSPs and a Referral Partner) for a Platform Administrator. Answers are typed and
   grouped by section, never free-text blobs. Synthetic organisations only.
 */
 export function seedApplications(now: number): OnboardingApplication[] {
@@ -51,7 +51,65 @@ export function seedApplications(now: number): OnboardingApplication[] {
           currency: 'GBP',
           pepAndSanctionsScreening: 'on',
           electronicAddressCheck: 'off',
-          paymentAccountConnected: true,
+          paymentProviderStatus: 'Eligible',
+          plan: 'Per-case fee on referred cases',
+        },
+        evidenceAndRetention: {
+          retention: 'platform',
+          retentionYears: 7,
+        },
+        declarations: {
+          accurate: true,
+          acceptsAgencyModel: true,
+          acceptsMonitoring: true,
+        },
+      },
+    },
+    {
+      id: 'APP-ACSP-2026-0103',
+      kind: 'acsp',
+      name: 'Harrowgate & Imrie Solicitors',
+      submittedAt: at(18),
+      status: 'pending_approval',
+      answers: {
+        organisation: {
+          legalName: 'Harrowgate & Imrie Solicitors Ltd',
+          kind: 'Law firm',
+          address: '41 Castle Street, Cardiff CF10 1BS',
+          vatNumber: 'GB 301 5527 18',
+        },
+        regulatoryStatus: {
+          acspNumber: 'ACSP-0466-9021',
+          supervisor: 'Solicitors Regulation Authority',
+          supervisorNumber: 'SRA-662031',
+          onCompaniesHouseList: true,
+        },
+        people: {
+          administrator: 'Rhian Imrie',
+          administratorMobile: '07700 900447',
+          administratorMobileConfirmed: true,
+          reviewers: ['Rhian Imrie', 'Owen Harrowgate'],
+          reviewerMobilesConfirmed: true,
+          trainedForOption2: false,
+        },
+        casesAccepted: {
+          residenceCountries: ['United Kingdom'],
+          documentTypes: ['passport', 'driving_licence'],
+          languages: ['English', 'Welsh'],
+          roles: ['director', 'psc'],
+          higherRisk: false,
+          perDay: 4,
+          perWeek: 16,
+          perMonth: 60,
+          targetTurnaroundHours: 36,
+        },
+        commercial: {
+          standardFee: 95,
+          enhancedFee: 150,
+          currency: 'GBP',
+          pepAndSanctionsScreening: 'off',
+          electronicAddressCheck: 'off',
+          paymentProviderStatus: 'More information needed',
           plan: 'Per-case fee on referred cases',
         },
         evidenceAndRetention: {

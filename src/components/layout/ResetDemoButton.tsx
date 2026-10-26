@@ -11,19 +11,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { cn } from '@/lib/utils'
 import { personaById } from '@/store/personas'
 import { useDemoStore } from '@/store/DemoStore'
 
-export function ResetDemoButton() {
+export function ResetDemoButton({ className }: { className?: string }) {
   const { state, reset } = useDemoStore()
   const navigate = useNavigate()
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[0.9375rem] font-medium text-paper/85 hover:bg-white/10 hover:text-paper">
+      <AlertDialogTrigger
+        className={cn(
+          'inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[0.9375rem] font-medium text-paper/85 hover:bg-white/10 hover:text-paper',
+          className,
+        )}
+      >
         <RotateCcw className="size-4" aria-hidden="true" />
-        <span className="hidden sm:inline">Reset demo</span>
-        <span className="sr-only sm:hidden">Reset demo</span>
+        Reset demo
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

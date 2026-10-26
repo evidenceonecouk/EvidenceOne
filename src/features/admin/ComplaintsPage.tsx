@@ -1,3 +1,4 @@
+import { paymentTotal } from '@/lib/fees'
 import { useState } from 'react'
 import { CircleSlash, MessageSquareWarning, Undo2 } from 'lucide-react'
 import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
@@ -118,7 +119,7 @@ export function ComplaintsPage() {
                 </p>
                 {vc?.payment && (
                   <p className="mt-2 text-[0.9375rem] text-graphite">
-                    Payment of {formatMoney(vc.payment.amount)}:{' '}
+                    Payment of {formatMoney(paymentTotal(vc.payment))}:{' '}
                     {paymentStateLine(vc.payment)}
                   </p>
                 )}

@@ -43,7 +43,7 @@ export const fr: LanguageStrings = {
     status:
       'Cette page indique où en est votre dossier. C’est votre ACSP qui décide. Companies House vous enverra le code personnel directement par e-mail.',
     'option-2':
-      'Si les contrôles dans le navigateur ne peuvent pas prendre en charge votre document, votre ACSP peut organiser un contrôle avec une personne formée.',
+      'Si les contrôles dans le navigateur ne peuvent pas prendre en charge votre document, les examinateurs formés du fournisseur d’identité certifié peuvent vérifier vos documents. Votre ACSP effectue les contrôles complémentaires et prend la décision.',
   },
   helper: {
     title: 'Quel document puis-je utiliser ?',

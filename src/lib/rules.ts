@@ -1,7 +1,8 @@
-import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
+import { option1Offers } from '@/data/documentRules'
+import { additionalChecksComplete } from '@/lib/option2'
 import { ruleById } from '@/data/rules'
 import { chipResultFor } from '@/lib/chip'
-import { formatDate, fullName } from '@/lib/format'
+import { formatDate, formatMoney, fullName } from '@/lib/format'
 import {
   historyCovers,
   monthYear,
@@ -316,7 +317,27 @@ export function expiryStatus(
   at: number,
 ): 'in_date' | 'within_exception' | 'beyond_exception' {
   if (new Date(doc.expiresOn).getTime() >= at) return 'in_date'
-  if (doc.type === 'passport') return 'beyond_exception'
+  // Document lists (G2-07). The allowance applies only when the setting is on,
+  // and every allowance is 0 until the client decides, so an expired passport
+  // is beyond its exception (H1).
+  const allowance = rs.settings.expired_document_allowance
+    ? Math.max(
+        0,
+        ...rs.documents
+          .filter(
+            (x) =>
+              x.enabled &&
+              x.list === 'option1' &&
+              (x.tile === doc.type ||
+                (doc.type === 'passport' && x.tile === 'passport')),
+          )
+          .map((x) => x.expiryAllowanceMonths),
+      )
+    : 0
+  if (doc.type === 'passport')
+    return allowance > 0 && addMonths(doc.expiresOn, allowance) >= at
+      ? 'within_exception'
+      : 'beyond_exception'
   if (doc.type === 'biometric_residence_permit')
     return addMonths(doc.expiresOn, rs.params.brp_expiry) < at
       ? 'beyond_exception'
@@ -361,12 +382,6 @@ export function evidenceTriggers(
     })
   return out
 }
-
-/** The reviewer who would decide: the recorded one, or the signed-in reviewer for open cases. */
-const reviewerFor = (data: DemoData, vc: VerificationCase) =>
-  data.acsps
-    .flatMap((a) => a.reviewers)
-    .find((r) => r.id === (vc.reviewerId ?? PRIMARY_REVIEWER_ID))
 
 const isNameEvidence = (e: { label: string }) =>
   /name|marriage|deed poll|certificate/i.test(e.label)
@@ -583,6 +598,73 @@ export function evaluateCase(
         : 'Prompted. No choice is recorded yet. The choice is logged on the case; nothing is filed through an API.',
     )
   }
+  // Register correction with a fee (G2-10 and G2-13). Not a Halt, and not a fourth reviewer action.
+  const corr = vc.registerCorrection
+  if (corr) {
+    const total = (vc.payment?.amount ?? 0) + corr.amount
+    const money = formatMoney
+    const window = `${P.correction_turnaround_hours_min} to ${P.correction_turnaround_hours_max} hours`
+    const cite: Citation = {
+      kind: 'declared',
+      ref: 'correction',
+      label: 'Register correction',
+    }
+    if (corr.stage === 'awaiting_client_approval')
+      add(
+        'REG-21',
+        'register',
+        'request',
+        `Waiting for the client to approve the revised total of ${money(total)}: the verification fee of ${money(vc.payment?.amount ?? 0)} plus a correction add-on of ${money(corr.amount)} (${corr.description}). Approving is a second authorisation. Nothing is taken`,
+        [cite],
+      )
+    else if (corr.stage === 'declined_by_client')
+      add(
+        'REG-21',
+        'register',
+        'flag',
+        `The client declined the revised total of ${money(total)}. The Mandatory decision is open again: proceed without a correction, request information, or decline`,
+        [cite],
+      )
+    else
+      add(
+        'REG-21',
+        'register',
+        'pass',
+        `The client approved the revised total of ${money(total)} on ${formatDate(corr.clientApprovedAt!)}. A second authorisation of ${money(corr.amount)} was placed. Nothing is taken until you approve`,
+        [cite],
+      )
+    if (corr.stage === 'awaiting_register_correction')
+      add(
+        'REG-20',
+        'register',
+        'block',
+        `Awaiting register correction, expected ${window} after the client approved (${formatDate(corr.expectedFrom!)} to ${formatDate(corr.expectedBy!)}). Tick Register corrected once you have corrected it at Companies House. Approve stays disabled`,
+        [
+          cite,
+          {
+            kind: 'param',
+            ref: 'correction_turnaround_hours_max',
+            label: window,
+          },
+        ],
+      )
+    else if (corr.stage === 'register_corrected')
+      add(
+        'REG-20',
+        'register',
+        'pass',
+        `Register corrected on ${formatDate(corr.registerCorrectedAt!)}${corr.registerCorrectedBy ? ` by ${corr.registerCorrectedBy}` : ''}`,
+        [cite],
+      )
+    if (vc.payment?.status === 'taken' && vc.payment.addOn)
+      add(
+        'REG-22',
+        'register',
+        'pass',
+        `Payment taken once on approval: ${money(vc.payment.amount)} verification fee and ${money(vc.payment.addOn.amount)} correction add-on to the ACSP.${vc.source === 'own_client' ? ' No platform fee: the ACSP’s own client' : ' The £69 plus VAT platform fee was deducted once, not per correction'}`,
+        [cite],
+      )
+  }
   if (
     checkMs - new Date(entry.appointedOn).getTime() <
     P.recent_appointment_days * DAY
@@ -619,11 +701,17 @@ export function evaluateCase(
 
   // 3 Identity document
   if (doc) {
+    // The accepted list is data (G2-07): Option 1 reads the Option 1 list in
+    // this rule set version. Option 2 documents are classified in OPT-04.
+    const tile = vc.journey?.eVisa ? 'evisa' : doc.type
+    const accepted = vc.option === 2 || option1Offers(rs.documents, tile)
     add(
       'DOC-01',
       'document',
-      'pass',
-      `${documentName(doc)} is on the accepted list for Option ${vc.option}`,
+      accepted ? 'pass' : 'request',
+      accepted
+        ? `${vc.journey?.eVisa ? 'eVisa' : documentName(doc)} is on the accepted list for Option ${vc.option}`
+        : `${documentName(doc)} is not on the Option 1 list in this rule set. Another document is asked for`,
       [docCite],
     )
     const status = expiryStatus(doc, rs, checkMs)
@@ -633,10 +721,12 @@ export function evaluateCase(
       add(
         'DOC-EXP-01',
         'document',
-        status === 'in_date' ? 'pass' : 'request',
+        status === 'beyond_exception' ? 'request' : 'pass',
         status === 'in_date'
           ? `Passport in date at the check, expires ${formatDate(doc.expiresOn)}`
-          : `Passport expired ${formatDate(doc.expiresOn)}. An expired passport is not accepted, so another document is asked for.`,
+          : status === 'within_exception'
+            ? `Passport expired ${formatDate(doc.expiresOn)}, within the allowance in the document lists`
+            : `Passport expired ${formatDate(doc.expiresOn)}. An expired passport is not accepted, so another document is asked for.`,
         [docCite],
       )
     } else if (doc.type === 'biometric_residence_permit') {
@@ -976,17 +1066,21 @@ export function evaluateCase(
     add('OPT-02', 'option', 'flag', `Option 2 offered because ${reason}`, [
       { kind: 'declared', ref: 'option2', label: 'Option 2 request' },
     ])
-    const reviewer = reviewerFor(data, vc)
-    const att = reviewer?.attestation
-    const current = att && new Date(att.expiresOn).getTime() > now
+    const additionalDone = additionalChecksComplete(o)
     add(
       'OPT-03',
       'option',
-      current ? 'pass' : 'block',
-      current
-        ? `${reviewer!.name} holds a current training attestation (${att!.reference}, valid to ${formatDate(att!.expiresOn)})`
-        : 'The reviewer has no current training attestation for person checks',
-      [{ kind: 'declared', ref: 'attestation', label: 'Training attestation' }],
+      additionalDone ? 'pass' : 'block',
+      additionalDone
+        ? 'The ACSP completed its additional checks and recorded why it is satisfied. The decision stays with the ACSP'
+        : 'The ACSP’s additional checks are not complete, or no reason is recorded. Approve stays disabled',
+      [
+        {
+          kind: 'declared',
+          ref: 'option2-additional',
+          label: 'Additional checks by the ACSP',
+        },
+      ],
     )
     const docs = o.documents ?? []
     const a = docs.filter((d) => d.group === 'A').length
@@ -997,8 +1091,8 @@ export function evaluateCase(
       'option',
       met ? 'pass' : 'request',
       met
-        ? `Documents checked: ${docs.map((d) => `${d.label} (Group ${d.group})`).join(' and ')}`
-        : 'Two documents are needed: two from Group A, or one from Group A and one from Group B',
+        ? `Documents checked by the identity provider: ${docs.map((d) => `${d.label} (Group ${d.group})`).join(' and ')}`
+        : 'Two documents are needed: two from Option 2 Group A, or one from Group A and one from Group B',
       docs.map((d, k) => ({
         kind: 'evidence' as const,
         ref: `option2-${k}`,
@@ -1177,7 +1271,7 @@ export function casesAffectedBy(data: DemoData, ruleId: string) {
 }
 
 export interface VersionChange {
-  kind: 'param' | 'setting'
+  kind: 'param' | 'setting' | 'document'
   key: string
   label: string
   from: string
@@ -1226,6 +1320,26 @@ export function diffVersions(
         to: name(to.settings[key]),
       })
     }
+  }
+  for (const doc of to.documents ?? []) {
+    const before = (from.documents ?? []).find((x) => x.id === doc.id)
+    const onOff = (v: boolean) => (v ? 'On' : 'Off')
+    if (!before || before.enabled !== doc.enabled)
+      out.push({
+        kind: 'document',
+        key: doc.id,
+        label: `Document list: ${doc.label}`,
+        from: before ? onOff(before.enabled) : 'Not on the list',
+        to: onOff(doc.enabled),
+      })
+    if (before && before.expiryAllowanceMonths !== doc.expiryAllowanceMonths)
+      out.push({
+        kind: 'document',
+        key: `${doc.id}.expiry`,
+        label: `Expiry allowance: ${doc.label}`,
+        from: `${before.expiryAllowanceMonths} months`,
+        to: `${doc.expiryAllowanceMonths} months`,
+      })
   }
   return out
 }

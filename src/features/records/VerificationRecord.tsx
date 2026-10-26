@@ -8,13 +8,14 @@ import { Wordmark } from '@/components/brand/Wordmark'
 import { reasonCodes } from '@/data/reasonCodes'
 import { recordAttribution, sourceDetail } from '@/lib/attribution'
 import { chipResultFor, chipResultLabel, securityFeaturesFor } from '@/lib/chip'
-import { isCodeMessage, ordinaryMessages } from '@/lib/codeWarning'
 import { formatDate, formatDateTime, fullName, shortHash } from '@/lib/format'
 import { documentName, ruleSetFor } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { reviewerName } from '@/store/actions'
 import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import { chainIntact } from './chain'
+import { AccessRefused } from '@/features/acsp/AccessRefused'
+import { AuditExport } from './AuditExport'
 import { ExportControl } from './ExportControl'
 import { CasePayment } from '@/features/acsp/CasePayment'
 import {
@@ -43,15 +44,7 @@ export function VerificationRecord() {
   if (!vc || !person || !company || !entry)
     return <Page>Record not found.</Page>
   if (vc.acspId !== actingAcsp.id)
-    return (
-      <Page width="narrow">
-        <p className="text-lg text-ink">
-          This record is held by{' '}
-          {reviewerOrgName(data, vc.acspId) ?? 'another ACSP'}. Each ACSP's
-          records are kept separate.
-        </p>
-      </Page>
-    )
+    return <AccessRefused caseId={vc.id} area="the verification record" />
 
   const acspName = reviewerOrgName(data, vc.acspId)
   const reviewer = data.acsps
@@ -103,7 +96,7 @@ export function VerificationRecord() {
     [
       'Checks',
       vc.option === 2
-        ? `Option 2: person check by a trained reviewer, register comparison${pep ? ', PEP and sanctions screening' : ''}`
+        ? `Option 2: identity provider’s manual document review with the ACSP’s additional checks, register comparison${pep ? ', PEP and sanctions screening' : ''}`
         : `Option 1, certified identity provider: document authenticity, liveness, face match${vc.idvt.faceMatchScore ? ` ${vc.idvt.faceMatchScore}%` : ''}, register comparison${pep ? ', PEP and sanctions screening' : ''}`,
     ],
     ...(vc.option === 1
@@ -147,18 +140,7 @@ export function VerificationRecord() {
           ],
         ] as [string, string][])
       : []),
-    [
-      'Secure messages',
-      `${ordinaryMessages(vc.messages).length} kept with the record`,
-    ],
-    ...(vc.messages?.some(isCodeMessage)
-      ? ([
-          [
-            'Code messages',
-            'Not part of the record or its export. Deleted 30 days after the ACSP marks the code received',
-          ],
-        ] as [string, string][])
-      : []),
+    ['Secure messages', `${(vc.messages ?? []).length} kept with the record`],
     ['Rule set applied', `Route A rule set ${rs.version}`],
     [
       'Companies House verification reference',
@@ -187,7 +169,17 @@ export function VerificationRecord() {
           <ArrowLeft className="size-4" aria-hidden="true" />
           All records
         </Link>
-        <ExportControl vc={vc} actor={reviewerName(data, actingReviewer.id)} />
+        <AuditExport
+          acspId={vc.acspId}
+          caseId={vc.id}
+          actor={reviewerName(data, actingReviewer.id)}
+          reviewerId={actingReviewer.id}
+        />
+        <ExportControl
+          vc={vc}
+          actor={reviewerName(data, actingReviewer.id)}
+          reviewerId={actingReviewer.id}
+        />
       </div>
 
       {/* The statement, laid out like a document */}

@@ -1,3 +1,4 @@
+import { paymentTotal } from '@/lib/fees'
 import type { AuditInput } from '@/lib/audit'
 import type { Complaint, Person, VerificationCase } from '@/types/domain'
 
@@ -23,8 +24,10 @@ export function seedComplaints(
     const p = people.find((x) => x.id === vc?.personId)
     return p ? `${p.givenNames} ${p.familyName}` : 'The client'
   }
-  const taken = (caseId: string) =>
-    cases.find((c) => c.id === caseId)?.payment?.amount ?? 0
+  const taken = (caseId: string) => {
+    const p = cases.find((c) => c.id === caseId)?.payment
+    return p ? paymentTotal(p) : 0
+  }
   const complaints: Complaint[] = [
     {
       id: 'CMP-2026-0012',

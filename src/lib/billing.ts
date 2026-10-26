@@ -1,4 +1,9 @@
-import { invoiceBreakdown, round2, splitPayment } from '@/lib/fees'
+import {
+  invoiceBreakdown,
+  paymentTotal,
+  round2,
+  splitPayment,
+} from '@/lib/fees'
 import { fullName } from '@/lib/format'
 import type {
   AcspFirm,
@@ -34,6 +39,8 @@ export interface StatementRow {
   source: CaseSource
   paidAt: ISODate
   gross: number
+  /** Of the gross, the register correction add-on, if any. Part of the ACSP Professional Fee. */
+  correctionAddOn: number
   providerFee: number
   /** Platform fee ex VAT, VAT on it, and the total deducted. All zero for an own client. */
   platformFee: number
@@ -59,7 +66,8 @@ export function statementRows(data: DemoData, acspId: string): StatementRow[] {
     .map((vc) => {
       const p = vc.payment!
       const person = data.people.find((x) => x.id === vc.personId)
-      const split = splitPayment(p.amount, vc.source, settings)
+      const total = paymentTotal(p)
+      const split = splitPayment(total, vc.source, settings)
       const platformFee = p.platformFee ?? split.platformFee
       const platformFeeVat =
         p.platformFeeVat ?? round2(platformFee * settings.vatRate)
@@ -70,12 +78,13 @@ export function statementRows(data: DemoData, acspId: string): StatementRow[] {
         clientName: person ? fullName(person) : 'Client',
         source: vc.source,
         paidAt: p.paidAt!,
-        gross: p.amount,
+        gross: total,
+        correctionAddOn: p.addOn?.amount ?? 0,
         providerFee,
         platformFee,
         platformFeeVat,
         platformFeeGross,
-        net: p.netPayout ?? round2(p.amount - providerFee - platformFeeGross),
+        net: p.netPayout ?? round2(total - providerFee - platformFeeGross),
         payoutAt: p.payoutAt,
       }
     })
@@ -98,6 +107,7 @@ export function totals(rows: StatementRow[]) {
     round2(rows.reduce((a, r) => a + f(r), 0))
   return {
     gross: sum((r) => r.gross),
+    correctionAddOn: sum((r) => r.correctionAddOn),
     providerFee: sum((r) => r.providerFee),
     platformFee: sum((r) => r.platformFee),
     platformFeeVat: sum((r) => r.platformFeeVat),
@@ -139,7 +149,7 @@ export function clientInvoices(data: DemoData, acspId: string): InvoiceView[] {
     .filter((c) => !known.has(c.id))
     .map((c) => {
       const person = data.people.find((x) => x.id === c.personId)
-      const b = invoiceBreakdown(c.payment!.amount, settings.vatRate)
+      const b = invoiceBreakdown(paymentTotal(c.payment!), settings.vatRate)
       return {
         id: c.payment!.clientInvoiceId ?? `INV-${c.id.slice(-6)}`,
         acspId,

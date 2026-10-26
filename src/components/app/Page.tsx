@@ -40,7 +40,9 @@ export function PageHeader({
   meta?: ReactNode
 }) {
   return (
-    <header className="flex flex-col gap-6 pb-8 lg:flex-row lg:items-end lg:justify-between">
+    // relative z-20: .stagger children are each a stacking context, so menus in
+    // the actions (language switch) must sit above the content that follows.
+    <header className="relative z-20 flex flex-col gap-6 pb-8 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
         {kicker && (
           <div className="mb-3 font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">

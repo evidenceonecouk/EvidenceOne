@@ -1,4 +1,9 @@
-import { DEFAULT_BILLING_SETTINGS, invoiceBreakdown, round2 } from '@/lib/fees'
+import {
+  DEFAULT_BILLING_SETTINGS,
+  invoiceBreakdown,
+  paymentTotal,
+  round2,
+} from '@/lib/fees'
 import type {
   AcspFirm,
   BillingData,
@@ -78,7 +83,7 @@ export function seedBilling(
     .map((c) => {
       const pay = c.payment!
       const acsp = acsps.find((a) => a.id === (pay.payeeAcspId ?? c.acspId))
-      const b = invoiceBreakdown(pay.amount, settings.vatRate)
+      const b = invoiceBreakdown(paymentTotal(pay), settings.vatRate)
       return {
         id: pay.clientInvoiceId!,
         acspId: acsp?.id ?? c.acspId,
@@ -89,6 +94,15 @@ export function seedBilling(
         net: b.net,
         vat: b.vat,
         gross: b.gross,
+        lines: pay.addOn
+          ? [
+              { description: 'Verification fee', gross: pay.amount },
+              {
+                description: `Register correction: ${pay.addOn.description}`,
+                gross: pay.addOn.amount,
+              },
+            ]
+          : undefined,
         paidBy:
           pay.method === 'agent_payment_code'
             ? (pay.payerName ?? 'Referral Partner')

@@ -97,7 +97,7 @@ export function submissionPack(
       label: 'Verification method',
       value:
         vc.option === 2
-          ? 'Person check by a trained reviewer (Option 2)'
+          ? 'Identity provider’s manual document review, with the ACSP’s additional checks (Option 2)'
           : 'Identity verification technology (IDVT), Option 1',
     },
     {
