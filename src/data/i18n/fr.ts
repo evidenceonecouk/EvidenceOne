@@ -26,7 +26,7 @@ export const fr: LanguageStrings = {
     instruct:
       'Voici le cabinet qui vérifiera votre identité. Il est responsable de la vérification et fixe lui-même ses honoraires. Evidence One est son prestataire technologique.',
     payment:
-      'Vous payez l’ACSP désigné. Evidence One encaisse le paiement en son nom, en tant qu’agent. Les données de carte sont saisies chez un prestataire de paiement sécurisé.',
+      'Vous payez l’ACSP désigné. Evidence One encaisse le paiement en son nom, en tant qu’agent. Les données de carte sont saisies chez un prestataire de paiement sécurisé. Votre carte est autorisée maintenant et vous n’êtes débité que lorsque l’ACSP approuve votre vérification.',
     document:
       'Choisissez un document d’identité. Un seul suffit en général. Tout se fait dans votre navigateur, sans rien installer.',
     scan: 'Photographiez votre document ou téléversez une photo nette. Les quatre coins et tout le texte doivent être visibles.',

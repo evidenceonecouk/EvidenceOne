@@ -258,6 +258,13 @@ export function matchAcsps(
   })
 }
 
+/** Ranking order: lower fee, then shorter turnaround, then more capacity left today, then name. */
+export const compareForRanking = (a: AcspFirm, b: AcspFirm) =>
+  a.profile.fee.standard - b.profile.fee.standard ||
+  a.profile.targetTurnaroundHours - b.profile.targetTurnaroundHours ||
+  capacityLeftToday(b) - capacityLeftToday(a) ||
+  a.name.localeCompare(b.name)
+
 /** Eligible ACSPs ranked on clear criteria. "Ranked by clear criteria. Not AI." */
 export function suggestAcsps(
   data: DemoData,
@@ -266,14 +273,7 @@ export function suggestAcsps(
 ): AcspSuggestion[] {
   return matchAcsps(data, criteria, now)
     .filter((m) => m.eligible)
-    .sort(
-      (a, b) =>
-        a.acsp.profile.fee.standard - b.acsp.profile.fee.standard ||
-        a.acsp.profile.targetTurnaroundHours -
-          b.acsp.profile.targetTurnaroundHours ||
-        capacityLeftToday(b.acsp) - capacityLeftToday(a.acsp) ||
-        a.acsp.name.localeCompare(b.acsp.name),
-    )
+    .sort((a, b) => compareForRanking(a.acsp, b.acsp))
     .map((m, i) => {
       const p = m.acsp.profile
       const shared = criteria.languages.filter((l) =>

@@ -5,32 +5,19 @@ import {
   UserRoundCheck,
   type LucideIcon,
 } from 'lucide-react'
+import { HeldOptionBadge } from '@/components/HeldOption'
+import { modelCopy as copy } from '@/data/copy'
 import { languages } from '@/data/i18n'
 import { container } from '../parts'
 import { RuleKicker } from './Hero'
 
-const model: { icon: LucideIcon; title: string; body: string }[] = [
-  {
-    icon: UserRoundCheck,
-    title: 'You instruct a named ACSP',
-    body: 'Before you pay, you see who will verify you, their fee and their turnaround. You pay the ACSP. Evidence One collects the payment as the ACSP’s agent.',
-  },
-  {
-    icon: Landmark,
-    title: 'The ACSP is the service provider',
-    body: 'The ACSP carries out the verification, makes the statement to Companies House and stays responsible for it. Evidence One is its technology provider.',
-  },
-  {
-    icon: ClipboardList,
-    title: 'The platform prepares, evidences and records',
-    body: 'Evidence One does not verify anyone. It prepares the case, records every check and keeps an audit trail for seven years.',
-  },
-  {
-    icon: BadgeCheck,
-    title: 'AI is advisory. People decide.',
-    body: 'AI observations are labelled and advisory only, and AI is never applied to your identity document. Only the ACSP reviewer can approve, request information or decline. Matching and rules are the same every time.',
-  },
+const icons: LucideIcon[] = [
+  UserRoundCheck,
+  Landmark,
+  ClipboardList,
+  BadgeCheck,
 ]
+const model = copy.cards.map((card, i) => ({ icon: icons[i], ...card }))
 
 /** How the model works in plain words, then the six languages. */
 export function Model() {
@@ -43,12 +30,12 @@ export function Model() {
     >
       <div className={container}>
         <div className="border-t border-line pt-10">
-          <RuleKicker>Who does what</RuleKicker>
+          <RuleKicker>{copy.kicker}</RuleKicker>
           <h2
             id="model-title"
             className="mt-6 max-w-3xl text-[2rem] leading-[1.08] font-normal tracking-[-0.035em] text-ink sm:text-[2.75rem]"
           >
-            A named ACSP verifies you. The platform keeps the evidence.
+            {copy.title}
           </h2>
         </div>
 
@@ -86,12 +73,11 @@ export function Model() {
           className="mt-8 rounded-[20px] border border-line bg-white/70 p-6 sm:p-8"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-            <h3 className="text-[1.375rem] tracking-[-0.02em] text-ink">
-              Help in your language
+            <h3 className="flex flex-wrap items-center gap-3 text-[1.375rem] tracking-[-0.02em] text-ink">
+              {copy.languages.title}
+              <HeldOptionBadge code="O1" />
             </h3>
-            <p className="text-base text-graphite">
-              Available on every screen of your journey, at any time.
-            </p>
+            <p className="text-base text-graphite">{copy.languages.lead}</p>
           </div>
           <ul className="mt-5 flex flex-wrap gap-2.5">
             {help.map((l) => (
@@ -111,7 +97,7 @@ export function Model() {
             ))}
           </ul>
           <p className="mt-4 text-[0.9375rem] text-graphite">
-            AI translation. Advisory only. English is the version of record.
+            {copy.languages.note}
           </p>
         </div>
       </div>

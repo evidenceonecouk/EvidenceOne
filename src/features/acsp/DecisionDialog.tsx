@@ -55,12 +55,15 @@ export function DecisionDialog({
   outcome,
   personName,
   defaultNote = '',
+  paymentNote,
   onClose,
   onConfirm,
 }: {
   outcome: DecisionOutcome | null
   personName: string
   defaultNote?: string
+  /** What the decision does to the authorised payment (P10). */
+  paymentNote?: string
   onClose: () => void
   onConfirm: (reasonCode: string, note: string) => void
 }) {
@@ -183,6 +186,11 @@ export function DecisionDialog({
                     </span>
                   </span>
                 </label>
+              )}
+              {paymentNote && outcome !== 'request_info' && (
+                <p className="rounded-xl bg-mist px-4 py-3 text-[0.9375rem] leading-relaxed text-ink">
+                  {paymentNote}
+                </p>
               )}
             </div>
             <DialogFooter className="border-t border-line/80 px-6 py-4">

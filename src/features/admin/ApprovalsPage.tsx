@@ -3,7 +3,6 @@ import { CircleCheck, CircleX, Lock } from 'lucide-react'
 import { Link } from 'react-router'
 import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
 import { useToast } from '@/components/app/Toaster'
-import { PendingDecision } from '@/components/PendingDecision'
 import { AcspStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { formatDateTime } from '@/lib/format'
@@ -194,9 +193,8 @@ export function ApprovalsPage() {
                   {outcome === 'not_yet_listed' && (
                     <>
                       because its name is not on the Companies House published
-                      list. Time to register: to be set{' '}
-                      <PendingDecision code="M4" />. It can still be allocated
-                      and becomes Active when the listing arrives.
+                      list. Time to register: 3 months. It can still be
+                      allocated and becomes Active when the listing arrives.
                     </>
                   )}
                 </p>

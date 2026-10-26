@@ -4,6 +4,7 @@ import type {
   AcspProfile,
   ReferralPartner,
 } from '@/types/domain'
+import { seedPlan } from './packages'
 
 /*
   Fictional organisations. ACSPs perform the verification; Referral Partners
@@ -46,6 +47,7 @@ const profile = (
   fee: { standard: 49, enhanced: 95, currency: 'GBP' },
   evidenceRetention: 'platform',
   pepScreening: true,
+  addressCheck: false,
   ...p,
 })
 
@@ -97,6 +99,7 @@ export const acsps: AcspFirm[] = [
       address: '14 Harcourt Lane, London EC4A 2QR',
       connectedAccount: 'acct_HL_synthetic_4471',
       vatNumber: 'GB 301 4471 82',
+      addressCheck: true,
       residenceCountries: [
         'United Kingdom',
         'United Arab Emirates',
@@ -122,7 +125,7 @@ export const acsps: AcspFirm[] = [
       fee: { standard: 150, enhanced: 220, currency: 'GBP' },
     }),
     monitoring: monitoring(),
-    plan: { invoiceMode: 'monthly', subscription: 'monthly_only' },
+    plan: seedPlan(PRIMARY_ACSP_ID, 'monthly'),
     b2cAllocationShare: 50,
     b2cAllocatedThisMonth: 9,
   },
@@ -157,7 +160,7 @@ export const acsps: AcspFirm[] = [
       fee: { standard: 120, enhanced: 180, currency: 'GBP' },
     }),
     monitoring: monitoring(),
-    plan: { invoiceMode: 'per_case', subscription: 'monthly_only' },
+    plan: seedPlan('acsp-pellrowe', 'per_case'),
     b2cAllocationShare: 20,
     b2cAllocatedThisMonth: 5,
   },
@@ -201,7 +204,7 @@ export const acsps: AcspFirm[] = [
       lastReconfirmedAt: '2025-08-20T10:00:00.000Z',
       nextReconfirmationDue: '2026-08-20T10:00:00.000Z',
     }),
-    plan: { invoiceMode: 'per_case', subscription: 'monthly_only' },
+    plan: seedPlan('acsp-northbank', 'per_case'),
     b2cAllocationShare: 0,
     b2cAllocatedThisMonth: 7,
   },
@@ -216,7 +219,7 @@ export const acsps: AcspFirm[] = [
     acspNumber: 'ACSP-0318-4096',
     status: 'not_yet_listed',
     statusNote:
-      'Not found on the Companies House published list of ACSPs. Time to register: to be set (Pending your decision, M4). Can become Active when the listing arrives.',
+      'Not found on the Companies House published list of ACSPs. Time to register: 3 months. Can become Active when the listing arrives.',
     approval: 'approved',
     reviewers: [
       {
@@ -244,11 +247,7 @@ export const acsps: AcspFirm[] = [
       nameMatchConfirmedBy: undefined,
       notYetListedSince: '2026-09-18T10:00:00.000Z',
     }),
-    plan: {
-      invoiceMode: 'monthly',
-      subscription: 'monthly_with_cases',
-      casesIncluded: 20,
-    },
+    plan: seedPlan('acsp-ashdown', 'monthly'),
     b2cAllocationShare: 0,
     b2cAllocatedThisMonth: 0,
   },
@@ -278,6 +277,7 @@ export const acsps: AcspFirm[] = [
       address: '22 Castle Gate, Nottingham NG1 7AW',
       connectedAccount: 'acct_FS_synthetic_5063',
       vatNumber: 'GB 412 5063 90',
+      addressCheck: true,
       capacity: { perDay: 5, perWeek: 20, perMonth: 70 },
       usedToday: 2,
       // Own clients only: not open to referred or B2C cases, so the £69 platform fee never applies to its fee.
@@ -285,14 +285,14 @@ export const acsps: AcspFirm[] = [
       fee: { standard: 49, enhanced: 90, currency: 'GBP' },
     }),
     monitoring: monitoring(),
-    plan: { invoiceMode: 'per_case', subscription: 'monthly_only' },
+    plan: seedPlan('acsp-fenwick', 'per_case'),
     b2cAllocationShare: 0,
     b2cAllocatedThisMonth: 0,
   },
 ]
 
 export const PRIMARY_PARTNER_ID = 'partner-fenwick'
-/** Overseas corporate service provider in Dubai. Sees status only (P11, Pending your decision). */
+/** Overseas corporate service provider in Dubai. Sees status only (P11, decided 19 October). */
 export const DUBAI_PARTNER_ID = 'partner-meridian'
 
 export const partners: ReferralPartner[] = [

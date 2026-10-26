@@ -279,7 +279,8 @@ export function Submission() {
               address and the reference is read for you. This is the
               verification reference, never the personal code. Companies House
               will email the personal code directly to {name}. Evidence One does
-              not receive or keep it.
+              not receive it from Companies House. There is no field for it
+              here.
             </p>
             <p className="mt-4 rounded-xl bg-mist px-4 py-3 font-mono text-[0.875rem] text-graphite">
               Case address: {vc.id.toLowerCase()}@cases.evidenceone.example

@@ -405,7 +405,7 @@ export function buildPeople(now: number): Person[] {
         issuingCountry: 'United Kingdom',
         numberLastTwo: '12',
         number: '541806912',
-        // Expired two months before the demo was seeded: DOC-EXP-01 and ADDL-01.
+        // Expired two months before the demo was seeded: DOC-EXP-01, another document asked for.
         expiresOn: isoDate(now - 61 * DAY),
         nameOnDocument: 'HANNAH LOUISE PRYCE',
         dobOnDocument: '1988-10-17',
@@ -523,7 +523,8 @@ export function buildPeople(now: number): Person[] {
         expiresOn: '2030-02-14',
         nameOnDocument: 'OWEN DAVID TREGEAR',
         dobOnDocument: '1977-06-03',
-        hasChip: true,
+        // Non-biometric passport: security features validated, no chip step.
+        hasChip: false,
       },
     },
     {

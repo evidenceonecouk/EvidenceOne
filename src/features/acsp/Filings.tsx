@@ -16,6 +16,7 @@ import {
 } from '@/components/app/Page'
 import { Stepper } from '@/components/app/Stepper'
 import { useToast } from '@/components/app/Toaster'
+import { HeldOptionBadge } from '@/components/HeldOption'
 import { PendingDecision } from '@/components/PendingDecision'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -28,6 +29,7 @@ import { getCompany, getPerson } from '@/store/selectors'
 import type { CorrectionTask } from '@/types/domain'
 import { CopyRow } from './CopyRow'
 import { filingPack } from './filingPack'
+import { RouteBGate } from './RouteBGate'
 import { openFilingHandoff, WebFilingInterstitial } from './WebFilingHandoff'
 
 const STEPS = ['Prepared and checked', 'Filed by the ACSP', 'Register updated']
@@ -39,6 +41,14 @@ const stepIndex: Record<CorrectionTask['status'], number> = {
 
 /** Route B: Companies House filings, prepared and checked here, filed by the ACSP from its own WebFiling account. */
 export function Filings() {
+  return (
+    <RouteBGate>
+      <FilingsList />
+    </RouteBGate>
+  )
+}
+
+function FilingsList() {
   const { data } = useDemoStore()
   const { acsp } = useActingAcsp()
   const tasks = data.corrections
@@ -55,10 +65,10 @@ export function Filings() {
         description="Evidence One prepares and checks the filing. You file it from your own Companies House WebFiling account. A register correction does not pause a verification: Route A carries on."
         meta={
           <>
-            <PendingDecision code="P2" />
+            <HeldOptionBadge code="O2" />
             <span className="text-base text-slate">
-              How Route B is sold is open: the platform prepares and checks, the
-              ACSP files.
+              Available on subscription plans. The platform prepares and checks,
+              the ACSP files.
             </span>
           </>
         }
@@ -154,6 +164,7 @@ function TaskCard({ task }: { task: CorrectionTask }) {
                   key={f.key}
                   label={f.label}
                   value={f.value}
+                  copyable={!f.filerEntered}
                   done={done.includes(f.key)}
                   onToggle={() => toggle(f.key)}
                 />

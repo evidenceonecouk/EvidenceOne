@@ -4,8 +4,11 @@ import type { DemoData } from '@/types/domain'
 import { seedApplications } from './applications'
 import { seedApprovals } from './approvals'
 import { seedBilling } from './billing'
+import { seedBulkRequests } from './bulkRequests'
 import { buildCases } from './cases'
+import { seedExportRequests } from './exportRequests'
 import { companies, register } from './companies'
+import { seedComplaints } from './complaints'
 import { seedMonitoring } from './monitoring'
 import { acsps, partners } from './organisations'
 import { buildPeople } from './people'
@@ -19,6 +22,9 @@ export function createSeed(now = Date.now()): DemoData {
   const applications = seedApplications(now)
   const approvals = seedApprovals(now)
   const monitoring = seedMonitoring()
+  const bulkRequests = seedBulkRequests(now)
+  const complaints = seedComplaints(cases, people, now)
+  const exports = seedExportRequests(cases, now)
 
   // Platform events: they belong to the 'platform' chain, never to an ACSP chain.
   const platform = (e: Omit<AuditInput, 'acspId'>): AuditInput => ({
@@ -108,6 +114,37 @@ export function createSeed(now = Date.now()): DemoData {
     }),
   ]
 
+  // Bulk / Bespoke Requests are platform events: submitted, messages, conversion.
+  const bulkEvents: AuditInput[] = bulkRequests.flatMap((b) => [
+    platform({
+      at: b.submittedAt,
+      actor: b.submittedBy,
+      actorType: 'person',
+      action: 'bulk_request.submitted',
+      detail: `Bulk / Bespoke Request ${b.id} submitted. It goes to the Platform Administrator first.`,
+    }),
+    ...b.messages.map((m) =>
+      platform({
+        at: m.at,
+        actor: m.authorName,
+        actorType: 'person',
+        action: 'bulk_request.message',
+        detail: `Message on Bulk / Bespoke Request ${b.id}.`,
+      }),
+    ),
+    ...(b.convertedAt
+      ? [
+          platform({
+            at: b.convertedAt,
+            actor: b.convertedBy ?? 'Platform Administrator',
+            actorType: 'person',
+            action: 'bulk_request.converted',
+            detail: `Bulk / Bespoke Request ${b.id} converted into linked cases: ${b.caseIds.join(', ')}${b.additionalServices.length ? `, plus ${b.additionalServices.length} additional Companies House service placeholder` : ''}${b.corporateRequested ? ', and a corporate verification to be added later' : ''}.`,
+          }),
+        ]
+      : []),
+  ])
+
   const data: DemoData = {
     acsps,
     partners,
@@ -123,6 +160,9 @@ export function createSeed(now = Date.now()): DemoData {
     referralRecords: [],
     applications,
     monitoring,
+    bulkRequests,
+    complaints: complaints.complaints,
+    exportRequests: exports.requests,
     audit: buildChain(
       [
         ...publications,
@@ -130,7 +170,10 @@ export function createSeed(now = Date.now()): DemoData {
         ...onboarding,
         ...approvalEvents,
         ...monitoringEvents,
+        ...bulkEvents,
         ...audit,
+        ...complaints.audit,
+        ...exports.audit,
       ],
       cases,
     ),

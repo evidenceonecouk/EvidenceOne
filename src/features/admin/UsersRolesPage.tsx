@@ -10,7 +10,6 @@ import {
 import { Page, Panel, PanelHeader } from '@/components/app/Page'
 import { Avatar } from '@/components/visual/Avatar'
 import { buildUsers, capabilities, roles, signIn } from '@/data/adminPages'
-import { PendingDecision } from '@/components/PendingDecision'
 import { formatDateTime, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
@@ -63,11 +62,7 @@ export function UsersRolesPage() {
       </Panel>
 
       <Panel aria-labelledby="signin-title" className="mb-6 overflow-hidden">
-        <PanelHeader
-          id="signin-title"
-          title="Sign-in and step-up"
-          actions={<PendingDecision code="H2" />}
-        />
+        <PanelHeader id="signin-title" title="Sign-in and step-up" />
         <dl className="grid divide-line/70 sm:grid-cols-2 sm:divide-x xl:grid-cols-4">
           <Figure
             label="Individuals"

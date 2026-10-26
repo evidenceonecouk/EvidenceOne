@@ -1,6 +1,8 @@
 import { MonoLabel, Panel } from '@/components/app/Page'
 import { carriesPlatformFee, splitPayment } from '@/lib/fees'
+import { CircleCheck, CircleSlash, Clock } from 'lucide-react'
 import { formatDateTime } from '@/lib/format'
+import { PAYMENT_STATUS_LABEL } from '@/lib/paymentStatus'
 import { useDemoStore } from '@/store/DemoStore'
 import type { VerificationCase } from '@/types/domain'
 
@@ -74,39 +76,69 @@ export function CasePayment({
   return (
     <Panel className={className ?? 'p-5 sm:p-6'} aria-label="Payment">
       <MonoLabel>Payment to {acspName}</MonoLabel>
+      <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-0.5 text-[0.875rem] font-medium text-ink">
+        {p.status === 'taken' ? (
+          <CircleCheck className="size-4 text-approve" aria-hidden="true" />
+        ) : p.status === 'released' ? (
+          <CircleSlash className="size-4 text-slate" aria-hidden="true" />
+        ) : (
+          <Clock className="size-4 text-info" aria-hidden="true" />
+        )}
+        {PAYMENT_STATUS_LABEL[p.status]}
+      </p>
       <p className="mt-2 text-[0.9375rem] text-slate">
         {p.method === 'agent_payment_code'
-          ? `Paid by ${p.payerName ?? 'the Referral Partner'} on the client's behalf with single-use Agent Payment Code ${p.code ?? ''}.`
-          : 'Paid by the client by card.'}
-        {p.paidAt && ` ${formatDateTime(p.paidAt)}.`}
+          ? `Paid by ${p.payerName ?? 'the Referral Partner'} on the client's behalf with single-use Agent Payment Code ${p.code ?? ''}, taken on approval.`
+          : 'Paid by the client by card, taken on approval.'}{' '}
+        Authorised {formatDateTime(p.authorisedAt)}.
+        {p.status === 'taken' &&
+          p.paidAt &&
+          ` Taken when you approved, ${formatDateTime(p.paidAt)}.`}
+        {p.status === 'authorised' &&
+          ' Nothing is taken unless you approve. A decline or a lapse releases the authorisation.'}
       </p>
-      <dl className="mt-3 divide-y divide-line/70">
-        {line('ACSP Professional Fee', gbp(rows.gross), true)}
-        {line(
-          'Payment provider fee (borne by the ACSP)',
-          `-${gbp(rows.providerFee)}`,
-        )}
-        {rows.referred ? (
-          <>
-            {line(
-              'Platform Fee, deducted automatically',
-              `-${gbp(rows.platformFeeGross)}`,
-            )}
-            <p className="py-1.5 text-[0.8125rem] text-slate">
-              {gbp(rows.platformFee)} plus VAT {gbp(rows.platformFeeVat)}.
-              Referred and B2C cases only.
-            </p>
-          </>
-        ) : (
-          <div className="py-1.5">
-            <dt className="text-[0.9375rem] text-graphite">Platform Fee</dt>
-            <dd className="text-[0.9375rem] font-medium text-ink">
-              None. Included in your subscription.
-            </dd>
-          </div>
-        )}
-        {line('Paid out to your payment account', gbp(rows.net), true)}
-      </dl>
+      {p.status === 'released' ? (
+        <p className="mt-3 rounded-xl bg-mist px-4 py-3 text-[0.9375rem] text-ink">
+          Nothing was taken.{' '}
+          {p.releaseReason ?? 'The authorisation was released'}
+          {p.releasedAt && `, ${formatDateTime(p.releasedAt)}`}. No invoice was
+          issued.
+        </p>
+      ) : (
+        <dl className="mt-3 divide-y divide-line/70">
+          {line('ACSP Professional Fee', gbp(rows.gross), true)}
+          {line(
+            'Payment provider fee (borne by the ACSP)',
+            `-${gbp(rows.providerFee)}`,
+          )}
+          {rows.referred ? (
+            <>
+              {line(
+                'Platform Fee, deducted automatically',
+                `-${gbp(rows.platformFeeGross)}`,
+              )}
+              <p className="py-1.5 text-[0.8125rem] text-slate">
+                {gbp(rows.platformFee)} plus VAT {gbp(rows.platformFeeVat)}.
+                Referred and B2C cases only.
+              </p>
+            </>
+          ) : (
+            <div className="py-1.5">
+              <dt className="text-[0.9375rem] text-graphite">Platform Fee</dt>
+              <dd className="text-[0.9375rem] font-medium text-ink">
+                None. Your own client carries no platform fee.
+              </dd>
+            </div>
+          )}
+          {line(
+            p.status === 'taken'
+              ? 'Paid out to your payment account'
+              : 'Paid out on approval',
+            gbp(rows.net),
+            true,
+          )}
+        </dl>
+      )}
       <p className="mt-3 text-[0.8125rem] leading-snug text-slate">
         {p.reference}
         {p.clientInvoiceId &&

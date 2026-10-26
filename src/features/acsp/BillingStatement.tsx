@@ -9,6 +9,7 @@ import {
   gbp,
   monthKey,
   monthLabel,
+  planUsage,
   SOURCE_LABEL,
   statementRows,
   totals,
@@ -21,9 +22,14 @@ import { useDemoStore } from '@/store/DemoStore'
 import type { AcspFirm } from '@/types/domain'
 import { Note, Table, Td, Th } from './BillingParts'
 
-const INCLUDED = 'Included in your subscription'
+const INCLUDED = 'No platform fee: own client'
 
-function pdfLines(acsp: AcspFirm, label: string, rows: StatementRow[]) {
+function pdfLines(
+  acsp: AcspFirm,
+  label: string,
+  rows: StatementRow[],
+  plan: PlanCharge | undefined,
+) {
   const t = totals(rows)
   const pad = (s: string, n: number) => s.slice(0, n).padEnd(n)
   const num = (s: string, n: number) => s.padStart(n)
@@ -36,16 +42,31 @@ function pdfLines(acsp: AcspFirm, label: string, rows: StatementRow[]) {
   ]
   for (const r of rows)
     lines.push(
-      `${pad(r.caseId, 16)}${pad(r.clientName, 22)}${pad(SOURCE_LABEL[r.source], 12)}${num(gbp(r.gross), 10)}${num(gbp(r.providerFee), 14)}${num(r.source === 'own_client' ? 'Subscription' : gbp(r.platformFeeGross), 14)}${num(gbp(r.net), 14)}  ${r.payoutAt ? formatShortDate(r.payoutAt) : 'Pending'}`,
+      `${pad(r.caseId, 16)}${pad(r.clientName, 22)}${pad(SOURCE_LABEL[r.source], 12)}${num(gbp(r.gross), 10)}${num(gbp(r.providerFee), 14)}${num(r.source === 'own_client' ? 'None' : gbp(r.platformFeeGross), 14)}${num(gbp(r.net), 14)}  ${r.payoutAt ? formatShortDate(r.payoutAt) : 'Pending'}`,
     )
   lines.push(
     '',
     `${pad('Totals', 50)}${num(gbp(t.gross), 10)}${num(gbp(t.providerFee), 14)}${num(gbp(t.platformFeeGross), 14)}${num(gbp(t.net), 14)}`,
     '',
     'Platform fee: GBP 69 plus VAT per referred or B2C case, deducted automatically. Own clients carry no platform fee.',
+    ...(plan
+      ? [
+          '',
+          `Plan charge, separate from the payments above: ${plan.name} package ${gbp(plan.monthly)} a month${plan.extraCases ? `, plus ${plan.extraCases} additional own-client cases at ${gbp(plan.extraFee)} (${gbp(plan.extraCharge)})` : ''}. Provisional.`,
+        ]
+      : []),
     'Refunds and complaints: who decides, and what happens to the platform fee on a refunded case, is not yet decided.',
   )
   return lines
+}
+
+/** The month's subscription charge. A plan line, not one of the four fee types. */
+interface PlanCharge {
+  name: string
+  monthly: number
+  extraCases: number
+  extraFee: number
+  extraCharge: number
 }
 
 /** Case by case: gross received, payment provider fee, platform fee (referred and B2C only), net paid out. */
@@ -63,10 +84,19 @@ export function BillingStatement({ acsp }: { acsp: AcspFirm }) {
   const rows = all.filter((r) => monthKey(r.paidAt) === month)
   const t = totals(rows)
   const [stepUp, setStepUp] = useState(false)
+  const usage = planUsage(data, acsp)
+  const thisMonth = month === monthKey(new Date().toISOString())
+  const plan: PlanCharge | undefined = usage.pkg && {
+    name: usage.pkg.name,
+    monthly: usage.pkg.monthlyPrice,
+    extraCases: thisMonth ? usage.extraCases : 0,
+    extraFee: usage.pkg.extraCaseFee,
+    extraCharge: thisMonth ? usage.extraCasesCharge : 0,
+  }
 
   const download = (ref: string) => {
     const label = monthLabel(month)
-    const blob = buildPdf(pdfLines(acsp, label, rows))
+    const blob = buildPdf(pdfLines(acsp, label, rows, plan))
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -204,19 +234,54 @@ export function BillingStatement({ acsp }: { acsp: AcspFirm }) {
         )}
       </Panel>
 
+      {plan && month && (
+        <Panel className="p-5 sm:p-6" aria-labelledby={`${selectId}-plan`}>
+          <h3 id={`${selectId}-plan`} className="text-lg font-medium text-ink">
+            Plan charge for {monthLabel(month)}
+          </h3>
+          <p className="mt-1 text-base text-slate">
+            Your subscription for your own clients. A separate plan line, not
+            one of the four fee types, and never deducted from a client’s
+            payment. Provisional.
+          </p>
+          <dl className="mt-4 divide-y divide-line/70 border-y border-line/70 text-base">
+            <div className="flex flex-wrap justify-between gap-2 py-3">
+              <dt className="text-graphite">
+                {plan.name} package, monthly subscription
+              </dt>
+              <dd className="text-ink tabular">{gbp(plan.monthly)}</dd>
+            </div>
+            {plan.extraCases > 0 && (
+              <div className="flex flex-wrap justify-between gap-2 py-3">
+                <dt className="text-graphite">
+                  {plan.extraCases} additional own-client case
+                  {plan.extraCases === 1 ? '' : 's'} at {gbp(plan.extraFee)}
+                </dt>
+                <dd className="text-ink tabular">{gbp(plan.extraCharge)}</dd>
+              </div>
+            )}
+            <div className="flex flex-wrap justify-between gap-2 py-3">
+              <dt className="font-medium text-ink">Plan charge</dt>
+              <dd className="font-medium text-ink tabular">
+                {gbp(plan.monthly + plan.extraCharge)}
+              </dd>
+            </div>
+          </dl>
+        </Panel>
+      )}
+
       <Note title="Where the money goes">
-        Each payment is split when it is taken. The payment provider fee and, on
-        referred and B2C cases only, the platform fee are deducted, and the rest
-        is paid out to your connected payment account (
+        The client’s card is authorised when they instruct you and the payment
+        is taken only when you approve. Nothing is taken on a decline or if your
+        ACSP status lapses. Each payment is split when it is taken. The payment
+        provider fee and, on referred and B2C cases only, the platform fee are
+        deducted, and the rest is paid out to your connected payment account (
         {acsp.profile.connectedAccount}). The payment is taken by the secure
         payment provider.
       </Note>
-      <Note
-        title="Refunds and complaints"
-        badge={<PendingDecision code="P10" />}
-      >
-        Who decides a refund, and what happens to the platform fee on a refunded
-        case, is not yet decided. The demo shows no refund flow.
+      <Note title="Refunds and complaints" badge={<PendingDecision />}>
+        Complaints and refunds are handled by a Platform Administrator. What
+        happens to the platform fee on a refunded case is not yet decided.
       </Note>
 
       <StepUpDialog

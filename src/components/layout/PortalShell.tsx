@@ -8,10 +8,12 @@ import {
   Handshake,
   Hourglass,
   Inbox,
+  Layers,
   LayoutDashboard,
   Link2,
   ListChecks,
   Menu,
+  MessageSquareWarning,
   Palette,
   Radar,
   Receipt,
@@ -52,6 +54,7 @@ interface NavItem {
 
 function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
   const { data, state } = useDemoStore()
+  const showHeldOptions = state.showHeldOptions !== false
   if (persona === 'partner') {
     const sent = data.invites.filter(
       (i) =>
@@ -68,6 +71,11 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
           icon: Search,
         },
         { to: '/partner/invites', label: 'Invites', icon: Send, count: sent },
+        {
+          to: '/partner/requests',
+          label: 'Bulk / Bespoke Requests',
+          icon: Layers,
+        },
       ],
     }
   }
@@ -89,12 +97,17 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
           icon: Inbox,
           count: awaiting,
         },
-        {
-          to: '/acsp/filings',
-          label: 'Filings',
-          icon: Waypoints,
-          count: tasks,
-        },
+        // Route B filings are a held option (O2): hidden with the held options.
+        ...(showHeldOptions
+          ? [
+              {
+                to: '/acsp/filings',
+                label: 'Filings',
+                icon: Waypoints,
+                count: tasks,
+              },
+            ]
+          : []),
         { to: '/records', label: 'Records', icon: Archive },
         { to: '/acsp/billing', label: 'Billing', icon: Receipt },
         ...(lapsed
@@ -157,12 +170,26 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
         label: 'Matching and allocation',
         icon: GitMerge,
       },
+      {
+        to: '/admin/requests',
+        label: 'Bulk / Bespoke Requests',
+        icon: Layers,
+        count: (data.bulkRequests ?? []).filter((b) => b.status === 'open')
+          .length,
+      },
       { to: '/admin/monitoring', label: 'ACSP monitoring', icon: Radar },
       { to: '/admin/fees', label: 'Fees and plans', icon: Coins },
       {
         to: '/admin/commissions',
         label: 'Referral commissions',
         icon: Handshake,
+      },
+      {
+        to: '/admin/complaints',
+        label: 'Complaints and refunds',
+        icon: MessageSquareWarning,
+        count: (data.complaints ?? []).filter((c) => c.status === 'open')
+          .length,
       },
       { to: '/admin/compliance', label: 'Compliance', icon: ShieldCheck },
       { to: '/rules', label: 'Rules', icon: ListChecks },

@@ -75,7 +75,7 @@ export function HandoffInterstitial({
         Evidence One is {acspName ?? 'the ACSP'}'s technology provider. It never
         sees or keeps your GOV.UK One Login details.
         {kind === 'submission' &&
-          ' Companies House emails the personal code directly to the individual. Evidence One does not receive or keep it.'}
+          ' Companies House emails the personal code directly to the individual. Evidence One does not receive it from Companies House.'}
       </p>
       <div className="mt-6 rounded-2xl border border-line bg-mist/60 px-5 py-4 text-[0.9375rem] leading-relaxed text-graphite">
         <p className="flex items-center gap-2 font-medium text-ink">

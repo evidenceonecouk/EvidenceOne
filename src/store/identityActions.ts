@@ -1,22 +1,22 @@
-import { DOCUMENT_LABEL, GROUP_B_DOCUMENTS } from '@/lib/identityChecks'
-import { fullName } from '@/lib/format'
+import { hasChipStep } from '@/lib/chip'
+import { DOCUMENT_LABEL } from '@/lib/identityChecks'
 import { currentRuleSet } from '@/lib/rules'
-import type { DemoData, IdDocumentType } from '@/types/domain'
+import type { ChipResult, DemoData, IdDocumentType } from '@/types/domain'
 import { updateJourney, type ActionResult } from './actions'
 
 /*
   Actions for the identity step of the individual's journey. Every capture and
   every change of document is written to the audit trail. The checks run in the
-  browser through the certified identity provider; Evidence One does not read
-  a passport chip.
+  browser through the certified identity provider. Where the document has a
+  chip, the provider's own chip reader on the person's phone reads it, inside
+  the same provider journey. Evidence One has no app and does not read chips.
 */
 
 type CaptureRoute = 'upload' | 'phone' | 'camera'
-type LivenessRoute = 'phone' | 'computer'
 
 const routeText: Record<CaptureRoute, string> = {
   upload: 'uploaded from the computer',
-  phone: 'captured in the phone’s browser and returned to this case',
+  phone: 'captured on the person’s phone or tablet and returned to this case',
   camera: 'captured with the phone’s camera in the browser',
 }
 
@@ -38,33 +38,82 @@ export function recordDocumentCapture(
   )
 }
 
-/** The selfie video for liveness and face match was captured. */
+/** The selfie video for liveness and face match was captured on a phone or tablet. There is no webcam-only route. */
 export function recordLivenessCapture(
   data: DemoData,
   caseId: string,
-  route: LivenessRoute,
 ): ActionResult {
   return updateJourney(
     data,
     caseId,
-    { selfieDone: true, livenessRoute: route },
+    { selfieDone: true, livenessRoute: 'phone' },
     {
       action: 'liveness.captured',
       detail:
-        route === 'phone'
-          ? 'Selfie video captured in the phone’s browser and returned to this case, for liveness and face match.'
-          : 'Selfie video captured with this computer’s camera, for liveness and face match.',
+        'Selfie video captured on the person’s phone, for liveness and face match.',
     },
   )
 }
 
-/** The choice of document, including an eVisa holder's second document. */
+const chipText: Record<Exclude<ChipResult, 'not_applicable'>, string> = {
+  read: 'Chip read in the identity provider’s chip reader on the person’s phone. Chip signature validated by the certified identity provider.',
+  not_read:
+    'Chip not read: the person could not complete the chip step. The case continues and records that no chip was read. IDVT-01 gives the reviewer a Mandatory decision.',
+}
+
+/** The chip step inside the provider journey. Only the result is recorded, never chip data. */
+export function recordChipResult(
+  data: DemoData,
+  caseId: string,
+  result: Exclude<ChipResult, 'not_applicable'>,
+): ActionResult {
+  return updateJourney(
+    data,
+    caseId,
+    { chipResult: result },
+    {
+      action: result === 'read' ? 'chip.read' : 'chip.not_read',
+      actorType: 'system',
+      detail: chipText[result],
+    },
+  )
+}
+
+/**
+  Desktop: the whole provider journey (document, chip where it applies,
+  selfie video) is finished on the person's phone or tablet, then the desktop
+  screen shows the result. The return is simulated in the demo.
+*/
+export function recordPhoneJourney(
+  data: DemoData,
+  caseId: string,
+  chip: Exclude<ChipResult, 'not_applicable'> = 'read',
+): ActionResult {
+  const vc = data.cases.find((c) => c.id === caseId)
+  const person = vc && data.people.find((p) => p.id === vc.personId)
+  const type = vc?.journey?.documentType ?? person?.document?.type ?? 'passport'
+  const steps: ((d: DemoData) => ActionResult)[] = [
+    (d) => recordDocumentCapture(d, caseId, type, 'phone'),
+    ...(hasChipStep(person?.document, type)
+      ? [(d: DemoData) => recordChipResult(d, caseId, chip)]
+      : []),
+    (d) => recordLivenessCapture(d, caseId),
+  ]
+  return steps.reduce<ActionResult>(
+    (acc, step) => {
+      const r = step(acc.data)
+      return { data: r.data, audit: [...acc.audit, ...r.audit] }
+    },
+    { data, audit: [] },
+  )
+}
+
+/** The choice of document. An eVisa is an accepted Option 1 document, checked by the provider with the Home Office. */
 export function chooseDocument(
   data: DemoData,
   caseId: string,
   type: IdDocumentType,
   eVisa: boolean,
-  secondDocument?: string,
 ): ActionResult {
   const vc = data.cases.find((c) => c.id === caseId)
   const changed = vc?.journey?.documentType !== type
@@ -74,16 +123,20 @@ export function chooseDocument(
     {
       documentType: type,
       eVisa,
-      eVisaSecondDocument: eVisa ? secondDocument : undefined,
       ...(changed
-        ? { photoPageDone: false, captureRoute: undefined, checksDone: false }
+        ? {
+            photoPageDone: false,
+            captureRoute: undefined,
+            chipResult: undefined,
+            checksDone: false,
+          }
         : {}),
     },
     {
       action: 'document.chosen',
       detail: eVisa
-        ? `eVisa holder: ${DOCUMENT_LABEL[type].toLowerCase()} plus one Group B document (${secondDocument ?? GROUP_B_DOCUMENTS[0].toLowerCase()}), until the certified identity provider confirms an eVisa check in the browser.`
-        : `${DOCUMENT_LABEL[type]} chosen as the one identity document, checked in the browser.`,
+        ? `eVisa holder: the certified identity provider checks the eVisa directly with the Home Office, with the ${DOCUMENT_LABEL[type].toLowerCase()} linked to it. Option 1.`
+        : `${DOCUMENT_LABEL[type]} chosen as the one identity document, checked through the certified identity provider.`,
     },
   )
 }
@@ -115,7 +168,11 @@ export function recordCheckFailure(
       checkAttempts: attempts,
       checksDone: false,
       ...(what === 'document'
-        ? { photoPageDone: false, captureRoute: undefined }
+        ? {
+            photoPageDone: false,
+            captureRoute: undefined,
+            chipResult: undefined,
+          }
         : { selfieDone: false, livenessRoute: undefined }),
     },
     {
@@ -129,47 +186,29 @@ export function recordCheckFailure(
   return { ...result, exhausted }
 }
 
-/** DOC-EXP-01 or IDVT-01 under the current setting: the person moves to another Option 1 document. */
+/** DOC-EXP-01 to DOC-EXP-03: the document has expired, so the person moves to another Option 1 document. */
 export function switchDocument(
   data: DemoData,
   caseId: string,
   type: IdDocumentType,
-  why: 'expired' | 'other_document',
 ): ActionResult {
   return updateJourney(
     data,
     caseId,
     {
       documentType: type,
-      expiredChoice: why === 'expired' ? 'other_document' : undefined,
+      expiredChoice: 'other_document',
+      eVisa: false,
       photoPageDone: false,
       captureRoute: undefined,
+      chipResult: undefined,
+      selfieDone: false,
+      livenessRoute: undefined,
       checksDone: false,
     },
     {
       action: 'document.replaced',
-      detail:
-        why === 'expired'
-          ? `DOC-EXP-01: the document has expired, so another document was asked for. ${DOCUMENT_LABEL[type]} chosen, checked in the browser.`
-          : `IDVT-01 (chip_not_read_fallback): another Option 1 document was asked for. ${DOCUMENT_LABEL[type]} chosen, checked in the browser.`,
-    },
-  )
-}
-
-/** ADDL-01: continue with the expired document and send one supporting document. A Request, never a Halt. */
-export function continueWithSupportingDocument(
-  data: DemoData,
-  caseId: string,
-): ActionResult {
-  const vc = data.cases.find((c) => c.id === caseId)
-  const person = vc && data.people.find((p) => p.id === vc.personId)
-  return updateJourney(
-    data,
-    caseId,
-    { expiredChoice: 'supporting_document' },
-    {
-      action: 'document.expired_continue',
-      detail: `${person ? fullName(person) : 'The individual'} continues with the expired document. ADDL-01: one supporting document will be requested. The reviewer decides.`,
+      detail: `DOC-EXP-01: an expired passport is not accepted, so another document was asked for (a Request, never a Halt). ${DOCUMENT_LABEL[type]} chosen, checked through the certified identity provider.`,
     },
   )
 }

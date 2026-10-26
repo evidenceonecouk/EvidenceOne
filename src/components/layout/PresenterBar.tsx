@@ -2,19 +2,23 @@ import { ClipboardList, Compass, Play, Square } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { GuidedDemo } from '@/features/guided/GuidedDemo'
+import { guidedSteps } from '@/features/guided/steps'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import { PersonaSwitcher } from './PersonaSwitcher'
 import { ResetDemoButton } from './ResetDemoButton'
 
-/** Guided demo menu: start or stop, and the presenter-only Points for the call page. */
+/** Guided demo menu: start or stop, and the presenter-only Decisions and open points page. */
 function GuidedMenu() {
-  const { state, setGuided } = useDemoStore()
+  const { state, setGuided, setShowHeldOptions } = useDemoStore()
+  const showHeld = state.showHeldOptions !== false
   const navigate = useNavigate()
   const on = state.guided.on
   return (
@@ -26,15 +30,17 @@ function GuidedMenu() {
             ? 'bg-paper text-ink'
             : 'text-paper/85 hover:bg-white/10 hover:text-paper',
         )}
-        aria-label={`Guided demo, currently ${on ? 'on' : 'off'}`}
+        aria-label={`Guided demo, ${guidedSteps.length} steps, currently ${on ? 'on' : 'off'}`}
       >
         <Compass className="size-4" aria-hidden="true" />
-        <span className="hidden sm:inline">Guided demo</span>
+        <span className="hidden sm:inline">
+          Guided demo, {guidedSteps.length} steps
+        </span>
         <span className="hidden text-[0.8125rem] sm:inline">
           {on ? 'On' : 'Off'}
         </span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-80">
         {on ? (
           <DropdownMenuItem
             onSelect={() => setGuided({ on: false, step: state.guided.step })}
@@ -53,13 +59,27 @@ function GuidedMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
-          onSelect={() => navigate('/points')}
+          onSelect={() => navigate('/decisions')}
           className="gap-2 py-2.5 text-base"
         >
           <ClipboardList className="size-4" aria-hidden="true" />
-          Points for the call
+          Decisions and open points
           <span className="ml-auto text-sm text-slate">Presenter only</span>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={showHeld}
+          onCheckedChange={(v) => setShowHeldOptions(v === true)}
+          onSelect={(e) => e.preventDefault()}
+          className="py-2.5 text-base"
+        >
+          <span>
+            Show options held until after go-live
+            <span className="block text-sm text-slate">
+              Language help, Route B filings, bank statement redaction
+            </span>
+          </span>
+        </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

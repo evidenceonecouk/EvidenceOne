@@ -13,17 +13,23 @@ import {
   SuperOnlyNotice,
   useSuperSeat,
 } from '@/features/super/ApprovalFlow'
+import { PACKAGES_PROVISIONAL_NOTE } from '@/data/packages'
+import { planUsage } from '@/lib/billing'
 import { PROVIDER_FEE_FIXED, PROVIDER_FEE_RATE, splitPayment } from '@/lib/fees'
-import { formatDate, formatMoney } from '@/lib/format'
+import { formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import {
   feeText,
+  packageText,
   pendingOfKind,
   proposeChange,
-  subscriptionText,
 } from '@/store/superActions'
-import type { BillingSettings } from '@/types/domain'
+import type {
+  BillingSettings,
+  PackageId,
+  SubscriptionPackage,
+} from '@/types/domain'
 
 const inputCls =
   'h-12 w-full rounded-xl border border-line bg-white px-3.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-ink/10 disabled:bg-mist disabled:text-slate'
@@ -56,7 +62,7 @@ export function FeesPage() {
       {isSuper ? (
         <SeatNotice />
       ) : (
-        <SuperOnlyNotice what="the fees, the plans and each ACSP's plan" />
+        <SuperOnlyNotice what="the platform fee, the subscription packages and each ACSP's plan" />
       )}
 
       {pending.length > 0 && (
@@ -194,7 +200,6 @@ function PlatformFeePanel({
         id={`${id}-title`}
         title="Platform fee"
         description="Per referred or B2C case, charged to the ACSP"
-        actions={<PendingDecision code="P10" />}
       />
       <div className="space-y-5 px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
@@ -211,19 +216,20 @@ function PlatformFeePanel({
         <ul className="list-disc space-y-1.5 pl-5 text-base text-graphite">
           <li>
             Applies to referred cases and B2C cases only. It is never charged on
-            an ACSP’s own client, who is covered by the subscription.
+            an ACSP’s own client, who is covered by the ACSP’s package.
           </li>
           <li>
-            Deducted automatically from each payment, by default, for every
-            ACSP.
+            Deducted automatically from each payment, for every ACSP, when the
+            payment is taken on the ACSP’s approval. Nothing is deducted on a
+            declined case, because nothing is taken.
           </li>
           <li>
             Evidence One’s per-case or consolidated monthly invoice documents
             the fee already deducted. It is not a request for payment.
           </li>
           <li>
-            What happens to the fee on a refunded case is open (refunds and
-            complaints).
+            What happens to the fee on a refunded case is open.{' '}
+            <PendingDecision className="align-middle" />
           </li>
         </ul>
 
@@ -301,7 +307,7 @@ function PlatformFeePanel({
           </div>
           <p className="mt-2 text-[0.875rem] text-slate">
             An ACSP’s own client carries no platform fee. The case shows
-            “Included in your subscription”.
+            “Included in your package”.
           </p>
         </div>
 
@@ -387,24 +393,42 @@ function PlatformFeePanel({
   )
 }
 
-/* Subscription plans */
+/* Subscription packages, provisional */
 
-const structures: {
-  value: BillingSettings['subscription']['structure']
-  title: string
-  body: string
+type PackageField =
+  | 'monthlyPrice'
+  | 'casesIncluded'
+  | 'filesPerCase'
+  | 'storageGb'
+  | 'extraCaseFee'
+
+const packageFields: {
+  key: PackageField
+  label: string
+  money?: boolean
+  unit?: string
 }[] = [
-  {
-    value: 'monthly_only',
-    title: 'Monthly fee alone',
-    body: 'One monthly fee covers all of the ACSP’s own clients.',
-  },
-  {
-    value: 'monthly_with_cases',
-    title: 'Monthly fee with cases included',
-    body: 'One monthly fee covers a number of the ACSP’s own cases each month.',
-  },
+  { key: 'monthlyPrice', label: 'Monthly price', money: true },
+  { key: 'casesIncluded', label: 'Own-client cases a month', unit: 'cases' },
+  { key: 'filesPerCase', label: 'Files per request', unit: 'files' },
+  { key: 'storageGb', label: 'Storage, account total', unit: 'GB' },
+  { key: 'extraCaseFee', label: 'Each additional case', money: true },
 ]
+
+const fieldText = (
+  p: SubscriptionPackage,
+  f: (typeof packageFields)[number],
+) => (f.money ? formatMoney(p[f.key]) : `${p[f.key]} ${f.unit}`)
+
+function toValues(p: SubscriptionPackage): Record<PackageField, string> {
+  return {
+    monthlyPrice: String(p.monthlyPrice),
+    casesIncluded: String(p.casesIncluded),
+    filesPerCase: String(p.filesPerCase),
+    storageGb: String(p.storageGb),
+    extraCaseFee: String(p.extraCaseFee),
+  }
+}
 
 function SubscriptionPanel({
   settings,
@@ -417,84 +441,76 @@ function SubscriptionPanel({
   const toast = useToast()
   const { actor } = useSuperSeat()
   const id = useId()
-  const sub = settings.subscription
-  const [structure, setStructure] = useState(sub.structure)
-  const [cases, setCases] = useState(String(sub.casesIncluded ?? ''))
-  const [price, setPrice] = useState(
-    sub.price === null ? '' : String(sub.price),
+  const packages = settings.packages
+  const [packageId, setPackageId] = useState<PackageId>(packages[0].id)
+  const current = packages.find((p) => p.id === packageId) ?? packages[0]
+  const [values, setValues] = useState<Record<PackageField, string>>(() =>
+    toValues(current),
   )
   const [stepUp, setStepUp] = useState(false)
 
-  const casesNum = cases === '' ? null : Number(cases)
-  const priceNum = price === '' ? null : Number(price)
-  const proposed = {
-    structure,
-    casesIncluded: structure === 'monthly_with_cases' ? casesNum : null,
-    price: priceNum,
+  const proposed: SubscriptionPackage = {
+    ...current,
+    monthlyPrice: Number(values.monthlyPrice),
+    casesIncluded: Number(values.casesIncluded),
+    filesPerCase: Number(values.filesPerCase),
+    storageGb: Number(values.storageGb),
+    extraCaseFee: Number(values.extraCaseFee),
   }
   const valid =
-    (structure === 'monthly_only' ||
-      (casesNum !== null && Number.isInteger(casesNum) && casesNum > 0)) &&
-    (priceNum === null || priceNum >= 0) &&
-    (proposed.structure !== sub.structure ||
-      proposed.casesIncluded !== sub.casesIncluded ||
-      proposed.price !== sub.price)
+    packageFields.every(
+      (f) => values[f.key] !== '' && Number(values[f.key]) >= 0,
+    ) && packageFields.some((f) => proposed[f.key] !== current[f.key])
   const waiting = !!pendingOfKind(data, 'subscription_plan')
-  const current = subscriptionText(sub.structure, sub.casesIncluded, sub.price)
 
   return (
     <Panel aria-labelledby={`${id}-title`}>
       <PanelHeader
         id={`${id}-title`}
-        title="Subscription plans"
-        description="For an ACSP’s own clients, instead of the platform fee"
-        actions={<PendingDecision />}
+        title="Subscription packages"
+        description="For an ACSP’s own clients. Referred cases sit outside the allowance."
+        actions={<StateBadge tone="info">Provisional</StateBadge>}
       />
       <div className="space-y-5 px-5 py-5 sm:px-6">
         <p className="text-base text-graphite">
-          Two plan shapes are supported. Neither has a price yet.{' '}
-          <span className="font-medium text-ink">
-            Terms to be set by the client by {formatDate(sub.termsDueBy)}.
-          </span>
+          {PACKAGES_PROVISIONAL_NOTE} Each package includes the workflow,
+          compliance infrastructure, audit trail, storage, case management and
+          Companies House-related functionality.
         </p>
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {structures.map((s) => (
+        <ul className="grid gap-3 sm:grid-cols-3">
+          {packages.map((p) => (
             <li
-              key={s.value}
-              className={cn(
-                'rounded-xl border px-4 py-4',
-                sub.structure === s.value
-                  ? 'border-ink bg-white'
-                  : 'border-line bg-mist/50',
-              )}
+              key={p.id}
+              className="rounded-xl border border-line bg-white px-4 py-4"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-base font-medium text-ink">{s.title}</h3>
-                {sub.structure === s.value && (
-                  <StateBadge tone="ok">Selected</StateBadge>
-                )}
-              </div>
-              <p className="mt-1.5 text-[0.9375rem] text-graphite">{s.body}</p>
-              <p className="mt-3 text-lg font-medium text-ink">
-                {sub.structure === s.value && sub.price !== null
-                  ? `${money2(sub.price)} a month`
-                  : 'Price not set'}
+              <h3 className="text-base font-medium text-ink">{p.name}</h3>
+              <p className="mt-1 text-[1.5rem] leading-tight font-medium text-ink tabular">
+                {formatMoney(p.monthlyPrice)}
+                <span className="ml-1 text-base font-normal text-slate">
+                  a month
+                </span>
               </p>
-              {s.value === 'monthly_with_cases' && (
-                <p className="text-[0.875rem] text-slate">
-                  Cases included:{' '}
-                  {sub.structure === s.value && sub.casesIncluded
-                    ? sub.casesIncluded
-                    : 'not set'}
-                </p>
-              )}
+              <dl className="mt-3 space-y-1 text-[0.9375rem] text-graphite">
+                {packageFields.slice(1).map((f) => (
+                  <div key={f.key} className="flex justify-between gap-3">
+                    <dt className="text-slate">{f.label}</dt>
+                    <dd className="text-right tabular">{fieldText(p, f)}</dd>
+                  </div>
+                ))}
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate">File size</dt>
+                  <dd className="text-right tabular">up to {p.maxFileMb} MB</dd>
+                </div>
+              </dl>
             </li>
           ))}
         </ul>
         <p className="text-[0.9375rem] text-slate">
-          Current plan: <span className="text-ink">{current}</span>. The price
-          is configurable here and is shown as “Price not set” until the client
-          sets it.
+          Referred and B2C cases carry the platform fee and never count towards
+          a package. Storage is a fair-use guide, never a reason to delete a
+          retained record: near the limit the ACSP is invited to upgrade or add
+          storage. Route B filings and ongoing PEP and sanctions monitoring are
+          available only on a package.
         </p>
 
         {canEdit && (
@@ -507,63 +523,52 @@ function SubscriptionPanel({
           >
             <fieldset>
               <legend className="text-base font-medium text-ink">
-                Propose a plan change
+                Propose a change to a package
               </legend>
-              <div className="mt-3 grid gap-2">
-                {structures.map((s) => (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {packages.map((p) => (
                   <label
-                    key={s.value}
+                    key={p.id}
                     className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-4 py-3 text-base text-ink has-[:checked]:border-ink has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-ink/10"
                   >
                     <input
                       type="radio"
-                      name={`${id}-structure`}
+                      name={`${id}-package`}
                       className="size-4 accent-ink"
-                      checked={structure === s.value}
-                      onChange={() => setStructure(s.value)}
+                      checked={packageId === p.id}
+                      onChange={() => {
+                        setPackageId(p.id)
+                        setValues(toValues(p))
+                      }}
                     />
-                    {s.title}
+                    {p.name}
                   </label>
                 ))}
               </div>
             </fieldset>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor={`${id}-cases`}
-                  className="text-base font-medium text-ink"
-                >
-                  Cases included each month
-                </label>
-                <input
-                  id={`${id}-cases`}
-                  type="number"
-                  min={1}
-                  step={1}
-                  disabled={structure !== 'monthly_with_cases'}
-                  value={structure === 'monthly_with_cases' ? cases : ''}
-                  onChange={(e) => setCases(e.target.value)}
-                  className={cn(inputCls, 'mt-2')}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`${id}-price`}
-                  className="text-base font-medium text-ink"
-                >
-                  Monthly price (optional)
-                </label>
-                <input
-                  id={`${id}-price`}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Price not set"
-                  className={cn(inputCls, 'mt-2')}
-                />
-              </div>
+              {packageFields.map((f) => (
+                <div key={f.key}>
+                  <label
+                    htmlFor={`${id}-${f.key}`}
+                    className="text-base font-medium text-ink"
+                  >
+                    {f.label}
+                    {f.unit === 'GB' ? ' (GB)' : f.money ? ' (£)' : ''}
+                  </label>
+                  <input
+                    id={`${id}-${f.key}`}
+                    type="number"
+                    min={0}
+                    step={f.money ? '0.01' : 1}
+                    value={values[f.key]}
+                    onChange={(e) =>
+                      setValues((v) => ({ ...v, [f.key]: e.target.value }))
+                    }
+                    className={cn(inputCls, 'mt-2')}
+                  />
+                </div>
+              ))}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <Button size="lg" type="submit" disabled={!valid || waiting}>
@@ -571,8 +576,8 @@ function SubscriptionPanel({
               </Button>
               <p className="text-[0.9375rem] text-slate">
                 {waiting
-                  ? 'A plan change is already waiting for a second approver.'
-                  : 'Leave the price empty to keep “Price not set”.'}
+                  ? 'A package change is already waiting for a second approver.'
+                  : 'You confirm with step-up. A different Super Administrator then approves it.'}
               </p>
             </div>
           </form>
@@ -580,7 +585,7 @@ function SubscriptionPanel({
       </div>
       <StepUpDialog
         open={stepUp}
-        action="propose a change to the subscription plan"
+        action={`propose a change to the ${current.name} package`}
         onClose={() => setStepUp(false)}
         onConfirmed={(ref) => {
           setStepUp(false)
@@ -589,21 +594,17 @@ function SubscriptionPanel({
               d,
               {
                 kind: 'subscription_plan',
-                payload: { kind: 'subscription_plan', ...proposed },
-                summary: 'Change the subscription plan for ACSPs’ own clients',
-                from: current,
-                to: subscriptionText(
-                  proposed.structure,
-                  proposed.casesIncluded,
-                  proposed.price,
-                ),
+                payload: { kind: 'subscription_plan', package: proposed },
+                summary: `Change the ${current.name} package (provisional)`,
+                from: packageText(current),
+                to: packageText(proposed),
               },
               actor,
               ref,
             ),
           )
           toast({
-            title: 'Plan change proposed',
+            title: 'Package change proposed',
             description: `Waiting for a second approver. Step-up ${ref} recorded.`,
           })
         }}
@@ -621,13 +622,10 @@ const invoiceModeLabel = {
 
 function AcspPlansTable() {
   const { data } = useDemoStore()
-  const sub = data.billing.settings.subscription
   const rows = useMemo(
     () =>
       data.acsps.map((a) => {
-        const own = data.cases.filter(
-          (c) => c.acspId === a.id && c.source === 'own_client',
-        ).length
+        const usage = planUsage(data, a)
         const referred = data.cases.filter(
           (c) => c.acspId === a.id && c.source !== 'own_client' && c.payment,
         )
@@ -638,21 +636,21 @@ function AcspPlansTable() {
             (c.payment?.platformFeeVat ?? 0),
           0,
         )
-        return { a, own, referred: referred.length, deducted }
+        return { a, usage, deducted }
       }),
-    [data.acsps, data.cases],
+    [data],
   )
   return (
     <Panel className="mt-8" aria-labelledby="acsp-plans">
       <PanelHeader
         id="acsp-plans"
         title="Each ACSP’s plan"
-        description="Platform fee invoicing for referred and B2C cases, and the subscription for the ACSP’s own clients"
+        description="Platform fee invoicing for referred and B2C cases, and the package for the ACSP’s own clients, this month"
       />
       <div className="overflow-x-auto">
         <table className="w-full min-w-4xl text-left text-[0.9375rem]">
           <caption className="sr-only">
-            Plan and invoice mode for each ACSP
+            Plan, package usage and invoice mode for each ACSP
           </caption>
           <thead>
             <tr className="border-b border-line text-slate">
@@ -660,10 +658,11 @@ function AcspPlansTable() {
                 'ACSP',
                 'Status',
                 'Platform fee invoice',
-                'Own-client plan',
-                'Referred and B2C cases',
-                'Fee deducted, with VAT',
+                'Package',
                 'Own-client cases',
+                'Referred cases, not counted',
+                'Storage',
+                'Fee deducted, with VAT',
               ].map((h, i) => (
                 <th
                   key={h}
@@ -679,7 +678,7 @@ function AcspPlansTable() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ a, own, referred, deducted }) => (
+            {rows.map(({ a, usage, deducted }) => (
               <tr key={a.id} className="border-b border-line/60 last:border-0">
                 <th
                   scope="row"
@@ -694,18 +693,35 @@ function AcspPlansTable() {
                   {invoiceModeLabel[a.plan.invoiceMode]}
                 </td>
                 <td className="px-5 py-3.5 text-graphite">
-                  {a.plan.subscription === 'monthly_with_cases'
-                    ? `Monthly fee with ${a.plan.casesIncluded ?? 'a number of'} cases included`
-                    : 'Monthly fee alone'}
+                  {usage.pkg ? usage.pkg.name : 'No subscription'}
                   <span className="block text-[0.875rem] text-slate">
-                    {sub.price === null ? 'Price not set' : money2(sub.price)}
+                    {usage.pkg
+                      ? `${formatMoney(usage.pkg.monthlyPrice)} a month`
+                      : 'Referred cases only'}
                   </span>
                 </td>
-                <td className="px-5 py-3.5 text-right tabular">{referred}</td>
+                <td className="px-5 py-3.5 text-right tabular">
+                  {usage.pkg
+                    ? `${usage.ownClientCases} of ${usage.pkg.casesIncluded}`
+                    : usage.ownClientCases}
+                  {usage.extraCases > 0 && (
+                    <span className="block text-[0.875rem] text-slate">
+                      {usage.extraCases} extra,{' '}
+                      {formatMoney(usage.extraCasesCharge)}
+                    </span>
+                  )}
+                </td>
+                <td className="px-5 py-3.5 text-right tabular">
+                  {usage.referredCases}
+                </td>
+                <td className="px-5 py-3.5 text-right tabular">
+                  {usage.pkg
+                    ? `${usage.storageUsedGb} of ${usage.pkg.storageGb} GB`
+                    : `${usage.storageUsedGb} GB, archive`}
+                </td>
                 <td className="px-5 py-3.5 text-right tabular">
                   {money2(deducted)}
                 </td>
-                <td className="px-5 py-3.5 text-right tabular">{own}</td>
               </tr>
             ))}
           </tbody>

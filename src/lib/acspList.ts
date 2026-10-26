@@ -93,3 +93,39 @@ export function sampleAcspCsv(acsps: AcspFirm[]): string {
   ]
   return ['ACSP name,ACSP number,Status', ...rows].join('\n')
 }
+
+/** An ACSP not on the published list has 3 months to register (M4, decided 19 October). */
+export const REGISTER_PERIOD_MONTHS = 3
+
+/** The date by which a Not yet listed ACSP should appear on the published list. */
+export function registerDeadline(acsp: AcspFirm): Date | undefined {
+  const since = acsp.monitoring.notYetListedSince
+  if (acsp.status !== 'not_yet_listed' || !since) return undefined
+  const d = new Date(since)
+  d.setMonth(d.getMonth() + REGISTER_PERIOD_MONTHS)
+  return d
+}
+
+/** Whole days left to register, never below zero. */
+export function registerDaysLeft(
+  acsp: AcspFirm,
+  now = Date.now(),
+): number | undefined {
+  const due = registerDeadline(acsp)
+  if (!due) return undefined
+  return Math.max(0, Math.ceil((due.getTime() - now) / 86_400_000))
+}
+
+/** "Time to register: 3 months. 56 days left, by 18 December 2026." */
+export function registerCountdownText(acsp: AcspFirm, now = Date.now()) {
+  const due = registerDeadline(acsp)
+  const left = registerDaysLeft(acsp, now)
+  if (!due || left === undefined)
+    return `Time to register: ${REGISTER_PERIOD_MONTHS} months.`
+  const date = due.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  return `Time to register: ${REGISTER_PERIOD_MONTHS} months. ${left} day${left === 1 ? '' : 's'} left, by ${date}.`
+}

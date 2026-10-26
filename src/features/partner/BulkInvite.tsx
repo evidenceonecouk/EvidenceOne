@@ -4,6 +4,8 @@ import {
   Building2,
   Check,
   CreditCard,
+  Layers,
+  ListOrdered,
   Mail,
   Send,
   Ticket,
@@ -27,7 +29,12 @@ import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/visual/Avatar'
 import { attributionText } from '@/lib/attribution'
 import { formatMoney, formatShortDate } from '@/lib/format'
-import { capacityLeftToday, matchAcsps, type AcspMatch } from '@/lib/matching'
+import {
+  capacityLeftToday,
+  compareForRanking,
+  matchAcsps,
+  type AcspMatch,
+} from '@/lib/matching'
 import { cn } from '@/lib/utils'
 import { sendInvites } from '@/store/actions'
 import { useActingPartner, useDemoStore } from '@/store/DemoStore'
@@ -36,18 +43,21 @@ import { getCompany, peopleForCompany, roleLabel } from '@/store/selectors'
 import type { AcspFirm } from '@/types/domain'
 import { useActingPartnerUser } from './usePartnerUser'
 
+/*
+  Single referral from a Referral Partner. Client details, then the 2 or 3
+  matched ACSPs with fee and turnaround, ranked by clear criteria and not AI.
+  The Partner selects one, chooses who pays and sends. Several clients or a mix
+  of services go through a Bulk / Bespoke Request instead.
+*/
 const STEPS = [
-  'Choose people',
-  'Instructing ACSP',
+  'Client details',
+  'Choose an ACSP',
   'Who pays',
   'Preview and send',
 ]
 const LANGUAGES = ['English', 'Russian', 'Ukrainian', 'Arabic']
-const TURNAROUND: { label: string; hours?: number }[] = [
-  { label: 'Any' },
-  { label: 'Within 24 hours', hours: 24 },
-  { label: 'Within 48 hours', hours: 48 },
-]
+/** A referral shows the best 2 or 3 matched ACSPs, never the whole list. */
+const SHOWN = 3
 
 interface CardMatch {
   acsp: AcspFirm
@@ -79,11 +89,8 @@ export function BulkInvite() {
   const [payer, setPayer] = useState<'client' | 'partner'>('client')
   const [acspChoice, setAcspChoice] = useState('')
   const [languages, setLanguages] = useState<string[]>(['English'])
-  const [turnaround, setTurnaround] = useState(0)
-  const [capacityToday, setCapacityToday] = useState(true)
 
   const chosen = eligible.filter((r) => selected.includes(r.personId))
-  const maxTurnaroundHours = TURNAROUND[turnaround].hours
   const chosenKey = chosen.map((r) => r.personId).join(',')
 
   // Criteria come from each person's register entry and details. An ACSP must suit everyone in the batch.
@@ -97,8 +104,7 @@ export function BulkInvite() {
               data,
               criteriaForPerson(data, personId, number, {
                 languages,
-                maxTurnaroundHours,
-                needsCapacityToday: capacityToday,
+                needsCapacityToday: true,
               }),
             ),
           }
@@ -127,20 +133,18 @@ export function BulkInvite() {
         caveat: passing.find((r) => r.caveat)?.caveat,
       }
     })
-  }, [data, number, chosenKey, languages, maxTurnaroundHours, capacityToday])
+  }, [data, number, chosenKey, languages])
 
-  const eligibleAcsps = matches.filter((m) => m.eligible)
-  const choice =
-    acspChoice &&
-    (acspChoice === 'platform_suggest' ||
-      eligibleAcsps.some((m) => m.acsp.id === acspChoice))
-      ? acspChoice
-      : (eligibleAcsps[0]?.acsp.id ?? 'platform_suggest')
-  const suggest = choice === 'platform_suggest'
-  const instructing = suggest
-    ? undefined
-    : data.acsps.find((a) => a.id === choice)
-  const partnerPays = payer === 'partner' && !suggest
+  // Only ACSPs that suit everyone selected, best first, at most three.
+  const shown = matches
+    .filter((m) => m.eligible)
+    .sort((a, b) => compareForRanking(a.acsp, b.acsp))
+    .slice(0, SHOWN)
+  const choice = shown.some((m) => m.acsp.id === acspChoice)
+    ? acspChoice
+    : (shown[0]?.acsp.id ?? '')
+  const instructing = data.acsps.find((a) => a.id === choice)
+  const partnerPays = payer === 'partner'
 
   if (!company || company.lodgedByPartnerId !== partner.id) {
     return (
@@ -178,22 +182,21 @@ export function BulkInvite() {
         partnerId: partner.id,
         actor: `${partner.contactName}, ${partner.name}`,
         instructingAcspId: choice,
+        shownAcspIds: shown.map((m) => m.acsp.id),
         payer: partnerPays ? 'partner' : 'client',
-        languages,
-        maxTurnaroundHours,
       }),
     )
     const verified = chosen.filter((r) => r.registerVerified)
     toast({
-      title: `${chosen.length} invite${chosen.length === 1 ? '' : 's'} sent`,
+      title: `Referral sent to ${instructing?.name ?? 'the ACSP'}`,
       description: verified.length
         ? `${verified.map((r) => r.name).join(', ')}: the register already shows an identity as verified (REG-04). They are told before payment and may continue or stop.`
-        : 'Each one is pre-filled from the register and written to the audit trail.',
+        : `${chosen.length} invite${chosen.length === 1 ? '' : 's'} sent, pre-filled from the register and written to the audit trail.`,
     })
     navigate(`/partner/invites?new=${chosen.length}`)
   }
 
-  const acspName = instructing?.name ?? 'the ACSP the platform suggests'
+  const acspName = instructing?.name ?? 'the ACSP'
   const fee = instructing?.profile.fee.standard
 
   return (
@@ -206,9 +209,17 @@ export function BulkInvite() {
         {company.name}
       </Link>
       <PageHeader
-        kicker="Bulk invite"
-        title="Invite directors and PSCs to verify"
-        description="You introduce the people. The ACSP they instruct makes the verification and the decision."
+        kicker="Referral"
+        title="Refer a client to an ACSP"
+        description="You introduce the client and select the ACSP. The ACSP makes the verification and the decision."
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/partner/requests">
+              <Layers aria-hidden="true" />
+              Several clients or services? Bulk / Bespoke Request
+            </Link>
+          </Button>
+        }
       />
       <div className="mb-8">
         <Stepper steps={STEPS} current={step} />
@@ -314,122 +325,93 @@ export function BulkInvite() {
           <Panel aria-labelledby="criteria-step">
             <PanelHeader
               id="criteria-step"
-              title="Instructing ACSP"
-              description="The person instructs this ACSP, who verifies them and takes the payment. Evidence One is the ACSP's technology provider."
+              title="Choose an ACSP"
+              description="The client instructs the ACSP you select. That ACSP verifies them and takes the payment. Evidence One is the ACSP's technology provider."
+              actions={
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[0.875rem] text-graphite">
+                  <ListOrdered className="size-4" aria-hidden="true" />
+                  Ranked by clear criteria. Not AI.
+                </span>
+              }
             />
-            <div className="grid gap-5 p-5 sm:grid-cols-3 sm:p-6">
-              <fieldset>
-                <legend className="mb-2 text-[0.9375rem] text-slate">
-                  Languages the people can use
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {LANGUAGES.map((l) => {
-                    const on = languages.includes(l)
-                    return (
-                      <label
-                        key={l}
-                        className={cn(
-                          'inline-flex h-10 cursor-pointer items-center rounded-full border px-3.5 text-[0.9375rem] has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink',
-                          on
-                            ? 'border-ink bg-ink text-paper'
-                            : 'border-line bg-white text-ink',
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={on}
-                          onChange={() =>
-                            setLanguages((ls) =>
-                              on ? ls.filter((x) => x !== l) : [...ls, l],
-                            )
-                          }
-                        />
-                        {l}
-                      </label>
-                    )
-                  })}
-                </div>
-              </fieldset>
-              <div>
-                <label
-                  htmlFor="turnaround"
-                  className="mb-2 block text-[0.9375rem] text-slate"
-                >
-                  Turnaround
-                </label>
-                <select
-                  id="turnaround"
-                  value={turnaround}
-                  onChange={(e) => setTurnaround(Number(e.target.value))}
-                  className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base text-ink focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:outline-none"
-                >
-                  {TURNAROUND.map((t, i) => (
-                    <option key={t.label} value={i}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+            <fieldset className="p-5 sm:p-6">
+              <legend className="mb-2 text-[0.9375rem] text-slate">
+                Languages the client can use
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map((l) => {
+                  const on = languages.includes(l)
+                  return (
+                    <label
+                      key={l}
+                      className={cn(
+                        'inline-flex h-10 cursor-pointer items-center rounded-full border px-3.5 text-[0.9375rem] has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink',
+                        on
+                          ? 'border-ink bg-ink text-paper'
+                          : 'border-line bg-white text-ink',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={on}
+                        onChange={() =>
+                          setLanguages((ls) =>
+                            on ? ls.filter((x) => x !== l) : [...ls, l],
+                          )
+                        }
+                      />
+                      {l}
+                    </label>
+                  )
+                })}
               </div>
-              <label className="flex items-center gap-3 self-end text-base text-ink">
-                <Checkbox
-                  checked={capacityToday}
-                  onChange={() => setCapacityToday((v) => !v)}
-                />
-                Capacity left today
-              </label>
-            </div>
+            </fieldset>
             <p className="border-t border-line/70 px-5 py-3.5 text-[0.875rem] text-slate sm:px-6">
               Residence country, document type, issuing country and role come
-              from each person’s register entry and details. Matching is
-              evaluated by rules, never by AI.
+              from the client’s register entry and details. Only ACSPs that are
+              active, accepting cases and have capacity today are shown, lowest
+              fee first, then shortest turnaround.
             </p>
           </Panel>
 
-          <fieldset className="space-y-3">
-            <legend className="sr-only">Choose the instructing ACSP</legend>
-            {matches.map((m) => (
-              <AcspCard
-                key={m.acsp.id}
-                m={m}
-                checked={choice === m.acsp.id}
-                onChange={() => setAcspChoice(m.acsp.id)}
-              />
-            ))}
-            <label
-              className={cn(
-                'flex cursor-pointer items-start gap-4 rounded-2xl border bg-white p-5 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink has-[:focus-visible]:ring-offset-2',
-                suggest
-                  ? 'border-ink shadow-[0_0_0_1px_var(--ink)]'
-                  : 'border-line hover:border-silver',
-              )}
-            >
-              <input
-                type="radio"
-                name="acsp"
-                className="mt-1.5 size-4 accent-[var(--ink)]"
-                checked={suggest}
-                onChange={() => setAcspChoice('platform_suggest')}
-              />
-              <span>
-                <span className="block text-base font-medium text-ink">
-                  Let Evidence One suggest an ACSP
-                </span>
-                <span className="mt-1 block text-[0.9375rem] text-graphite">
-                  The platform ranks matching ACSPs on clear criteria, not AI.
-                  Each person sees every suggestion with its own fee and
-                  turnaround before they instruct one.
-                </span>
-              </span>
-            </label>
-          </fieldset>
+          {shown.length === 0 ? (
+            <Panel className="p-5 sm:p-6">
+              <p className="text-base text-ink">
+                No ACSP matches{' '}
+                {chosen.length === 1 ? 'this client' : 'everyone selected'}.
+              </p>
+              <p className="mt-1 text-[0.9375rem] text-graphite">
+                Try another language, refer fewer people at once, or send a Bulk
+                / Bespoke Request and the Platform Administrator will arrange it
+                with you.
+              </p>
+            </Panel>
+          ) : (
+            <fieldset className="space-y-3">
+              <legend className="mb-1 text-[0.9375rem] text-slate">
+                {shown.length === 1
+                  ? 'One ACSP matches'
+                  : `The ${shown.length} best matched ACSPs`}
+              </legend>
+              {shown.map((m, i) => (
+                <AcspCard
+                  key={m.acsp.id}
+                  m={m}
+                  rank={i + 1}
+                  checked={choice === m.acsp.id}
+                  onChange={() => setAcspChoice(m.acsp.id)}
+                />
+              ))}
+            </fieldset>
+          )}
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(0)}>
               <ArrowLeft aria-hidden="true" />
               Back
             </Button>
-            <Button onClick={() => setStep(2)}>
+            <Button disabled={!instructing} onClick={() => setStep(2)}>
               Continue
               <ArrowRight aria-hidden="true" />
             </Button>
@@ -457,27 +439,26 @@ export function BulkInvite() {
                 onChange={() => setPayer('client')}
                 icon={<CreditCard className="size-5" aria-hidden="true" />}
                 title="The client pays"
-                body={`Each person pays ${acspName} by card after they instruct the ACSP.`}
+                body={`Each person authorises a card payment to ${acspName} when they instruct the ACSP. It is taken only when ${acspName} approves.`}
               />
               <RadioCard
                 name="payer"
                 checked={partnerPays}
-                disabled={!partner.paymentCode || suggest}
+                disabled={!partner.paymentCode}
                 onChange={() => setPayer('partner')}
                 icon={<Ticket className="size-5" aria-hidden="true" />}
                 title="Referral Partner pays, with an Agent Payment Code"
                 body={
                   !partner.paymentCode
                     ? 'No payment code on this account.'
-                    : suggest
-                      ? 'Name an ACSP in the previous step so the fee is known before you pay.'
-                      : `${partner.name} pays. A single-use Agent Payment Code is generated for each invite and works for that invite only.`
+                    : `${partner.name} pays on the client’s behalf, taken on approval. A single-use Agent Payment Code is generated for each invite and works for that invite only.`
                 }
               />
             </fieldset>
             <p className="border-t border-line/70 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
               Evidence One collects the payment as the ACSP’s disclosed agent
-              and pays it to the ACSP’s own payment account. The platform fee of{' '}
+              and pays it to the ACSP’s own payment account when the ACSP
+              approves. Nothing is taken on a decline. The platform fee of{' '}
               {formatMoney(data.billing.settings.platformFee)} plus VAT applies
               to referred cases and is deducted from that payment. It is never
               added on top, so neither you nor the client pays more than the
@@ -503,7 +484,7 @@ export function BulkInvite() {
                       ? partnerPays
                         ? `${formatMoney(fee * chosen.length)} to ${acspName}, paid by you`
                         : `${formatMoney(fee)} each, paid by the client`
-                      : 'Shown once an ACSP is suggested'}
+                      : 'Set by the ACSP'}
                   </span>
                 }
               />
@@ -564,23 +545,19 @@ export function BulkInvite() {
                     {roleLabel[chosen[0].role]}
                   </div>
                   <p className="mt-4 text-base leading-relaxed text-graphite">
-                    {instructing
-                      ? `Your identity verification is being conducted by ${instructing.name} using the Evidence One platform. `
-                      : 'You will see ACSPs that suit you, each with its own fee, and choose one. '}
+                    {`Your identity verification is being conducted by ${acspName} using the Evidence One platform. `}
                     {partnerPays
                       ? `There is nothing to pay. ${partner.name} has covered the ACSP's fee.`
-                      : instructing
-                        ? `The ACSP's fee is ${formatMoney(instructing.profile.fee.standard)}, paid to ${instructing.name}.`
-                        : 'You pay the ACSP you choose.'}
+                      : fee !== undefined
+                        ? `The ACSP's fee is ${formatMoney(fee)}, paid to ${acspName}.`
+                        : ''}
                   </p>
                   <span className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-ink px-5 text-base font-medium text-paper">
                     <Mail className="size-4" aria-hidden="true" />
                     Open my invite
                   </span>
                   <p className="mt-7 border-t border-line pt-4 text-[0.9375rem] leading-relaxed text-slate">
-                    {instructing
-                      ? attributionText(instructing.name)
-                      : 'Evidence One is the technology provider of the ACSP you instruct.'}
+                    {attributionText(acspName)}
                   </p>
                 </div>
               </div>
@@ -600,8 +577,8 @@ export function BulkInvite() {
               ))}
             </ul>
             <p className="mt-4 text-[0.875rem] text-slate">
-              Recorded in the audit trail as “Instructing ACSP:{' '}
-              {instructing?.name ?? 'to be suggested by the platform'}”.
+              Recorded in the audit trail as “Instructing ACSP: {acspName},
+              selected by the Referral Partner”.
             </p>
           </Panel>
 
@@ -612,7 +589,7 @@ export function BulkInvite() {
             </Button>
             <Button size="lg" onClick={send}>
               <Send aria-hidden="true" />
-              Send {chosen.length} invite{chosen.length === 1 ? '' : 's'}
+              Send referral
             </Button>
           </div>
         </div>
@@ -623,10 +600,12 @@ export function BulkInvite() {
 
 function AcspCard({
   m,
+  rank,
   checked,
   onChange,
 }: {
   m: CardMatch
+  rank: number
   checked: boolean
   onChange: () => void
 }) {
@@ -652,6 +631,7 @@ function AcspCard({
       />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-mono text-[0.8125rem] text-slate">{rank}</span>
           <span className="text-base font-medium text-ink">{acsp.name}</span>
           <AcspStatusChip status={acsp.status} />
           <span className="inline-flex items-center gap-1 text-[0.875rem] text-graphite">
@@ -663,10 +643,12 @@ function AcspCard({
             {m.eligible ? 'Matches' : 'Does not match'}
           </span>
         </span>
-        <span className="mt-1 block text-[0.9375rem] text-graphite">
+        <span className="mt-1 block text-base text-ink">
           Fee {formatMoney(p.fee.standard)} · Turnaround{' '}
-          {p.targetTurnaroundHours} hours · {capacityLeftToday(acsp)} places
-          left today · {p.languages.join(', ')}
+          {p.targetTurnaroundHours} hours
+        </span>
+        <span className="mt-0.5 block text-[0.9375rem] text-graphite">
+          {capacityLeftToday(acsp)} places left today · {p.languages.join(', ')}
         </span>
         {m.eligible && m.caveat && (
           <span className="mt-1 block text-[0.875rem] text-slate">

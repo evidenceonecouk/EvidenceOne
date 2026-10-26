@@ -38,15 +38,16 @@ import {
   type SuggestionAnswers,
 } from '@/lib/matchCriteria'
 import { suggestAcsps, type AcspSuggestion } from '@/lib/matching'
+import { paymentStateLine, type PaymentRequest } from '@/lib/paymentStatus'
 import { currentRuleSet } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import {
-  recordPayment,
   requestAmendment,
   stopAlreadyVerified,
   updateJourney,
 } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
+import { authorisePayment } from '@/store/paymentActions'
 import {
   instructAcsp,
   noteAlreadyVerified,
@@ -54,7 +55,7 @@ import {
   requestDifferentAcsp,
 } from '@/store/journeyActions'
 import { getAcsp, getPartner, roleLabel } from '@/store/selectors'
-import type { AcspFirm, IdDocumentType, Payment } from '@/types/domain'
+import type { AcspFirm, IdDocumentType } from '@/types/domain'
 import { needsSuggestion } from '../journey'
 import { Lead, Screen, ScreenTitle } from '../JourneyShell'
 import type { StepProps } from './types'
@@ -167,10 +168,9 @@ export function InviteStep({
   const { data, apply } = useDemoStore()
   const invite = data.invites.find((i) => i.caseId === vc.id)
   const partner = getPartner(data, invite?.partnerId ?? vc.partnerId ?? '')
-  const chosenAcsp =
-    invite?.instructingAcspId && invite.instructingAcspId !== 'platform_suggest'
-      ? getAcsp(data, invite.instructingAcspId)
-      : getAcsp(data, vc.acspId)
+  const chosenAcsp = invite?.instructingAcspId
+    ? getAcsp(data, invite.instructingAcspId)
+    : getAcsp(data, vc.acspId)
   const suggested = needsSuggestion(data, vc)
   const alreadyVerified =
     entry.identityVerified && !vc.journey?.alreadyVerifiedAcknowledged
@@ -1099,7 +1099,7 @@ export function InstructStep({ vc, next }: StepProps) {
       footer={
         instructed ? (
           <Button className="w-full" size="lg" onClick={next}>
-            Continue to payment
+            Continue to authorise payment
             <ChevronRight aria-hidden="true" className="rtl:rotate-180" />
           </Button>
         ) : (
@@ -1126,7 +1126,8 @@ export function InstructStep({ vc, next }: StepProps) {
       <p className="mt-2 text-base leading-relaxed text-graphite">
         Evidence One is {acsp.name}’s technology provider. {acsp.name} takes
         your payment, reviews your evidence, makes the decision and submits it
-        to Companies House.
+        to Companies House. You are only charged when {acsp.name} approves your
+        verification.
       </p>
       <AcspCard acsp={acsp} />
       {vc.source !== 'own_client' && (
@@ -1144,14 +1145,15 @@ export function InstructStep({ vc, next }: StepProps) {
         </p>
       ) : (
         <p className="mt-4 text-[0.9375rem] text-slate">
-          Payment comes next, and only after you have instructed this ACSP.
+          Next you authorise payment. Nothing is taken until {acsp.name}{' '}
+          approves your verification.
         </p>
       )}
     </Screen>
   )
 }
 
-/* Payment to the named ACSP */
+/* Payment to the named ACSP: authorised now, taken only on approval (P10) */
 
 export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
   const { data, apply } = useDemoStore()
@@ -1232,12 +1234,12 @@ export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
     )
 
   const fee = acsp.profile.fee.standard
-  const doPay = (payment: Payment) => {
+  const doPay = (payment: PaymentRequest) => {
     setProcessing(true)
     window.setTimeout(() => {
       const now = new Date().toISOString()
       apply((d) =>
-        recordPayment(d, vc.id, payment, {
+        authorisePayment(d, vc.id, payment, {
           disclosure: disclosure
             ? {
                 acknowledgedAt: now,
@@ -1249,13 +1251,12 @@ export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
       setProcessing(false)
     }, 1200)
   }
-  const payment = (m: 'card' | 'code'): Payment =>
+  const payment = (m: 'card' | 'code'): PaymentRequest =>
     m === 'card'
       ? {
           method: 'pay_myself',
           amount: fee,
           payeeAcspId: acsp.id,
-          paidAt: new Date().toISOString(),
           reference: ref,
         }
       : {
@@ -1264,11 +1265,10 @@ export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
           payeeAcspId: acsp.id,
           code: prepaid ?? typed,
           payerName: prepaid ? partner?.name : codeOwner?.name,
-          paidAt: new Date().toISOString(),
           reference: ref,
         }
 
-  const done = paid ? vc.journey?.payment : undefined
+  const done = paid ? (vc.payment ?? vc.journey?.payment) : undefined
   if (done) {
     const invoice = data.billing.clientInvoices.find(
       (i) => i.id === done.clientInvoiceId,
@@ -1282,14 +1282,25 @@ export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
           </Button>
         }
       >
-        <ScreenTitle kicker="Payment">Payment complete</ScreenTitle>
+        <ScreenTitle kicker="Payment">
+          {done.status === 'taken'
+            ? 'Payment taken'
+            : done.status === 'released'
+              ? 'Nothing was taken'
+              : 'Payment authorised'}
+        </ScreenTitle>
         <div className="mt-5 flex items-start gap-3 rounded-2xl border border-line bg-white p-4">
-          <CompletionTick label="Paid" />
+          <CompletionTick
+            label={done.status === 'taken' ? 'Taken' : 'Authorised'}
+          />
           <div>
             <p className="text-base font-medium text-ink">
               {done.method === 'pay_myself'
-                ? `${money2(done.amount)} paid to ${acsp.name}`
-                : `Paid by ${done.payerName} on your behalf`}
+                ? `${money2(done.amount)} to ${acsp.name}`
+                : `Paid by ${done.payerName} on your behalf, taken on approval`}
+            </p>
+            <p className="mt-0.5 text-[0.9375rem] text-slate">
+              {paymentStateLine(done)}
             </p>
             <p className="mt-0.5 text-[0.9375rem] text-slate">
               {done.method === 'pay_myself'
@@ -1298,6 +1309,14 @@ export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
             </p>
           </div>
         </div>
+        {done.status === 'authorised' && (
+          <Lead>
+            You are only charged when {acsp.name} approves your verification. If
+            it is not approved, the authorisation is released and nothing is
+            taken. Your invoice is issued in {acsp.name}’s name when the payment
+            is taken.
+          </Lead>
+        )}
         {invoice && (
           <article
             aria-label={`Invoice ${invoice.id}`}
@@ -1369,7 +1388,7 @@ export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
           ) : method === 'card' ? (
             <>
               <Lock aria-hidden="true" />
-              Pay {formatMoney(fee)} to {acsp.name}
+              Authorise {formatMoney(fee)} to {acsp.name}
             </>
           ) : (
             'Apply code'
@@ -1382,19 +1401,21 @@ export function PaymentStep({ vc, person, entry, next, go }: StepProps) {
       </ScreenTitle>
       <p className="mt-4 text-base leading-relaxed text-ink">
         You are paying {acsp.name}. Evidence One collects this payment on{' '}
-        {acsp.name}’s behalf as its agent.
+        {acsp.name}’s behalf as its agent. Your card is authorised now and you
+        are only charged when {acsp.name} approves your verification.
       </p>
       {prepaid ? (
         <p className="mt-3 flex items-start gap-2.5 rounded-2xl bg-mist px-4 py-3 text-base text-graphite">
           <Ticket className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          Paid by {partner?.name} on your behalf, with a single-use Agent
-          Payment Code tied to this invite.
+          Paid by {partner?.name} on your behalf, taken on approval, with a
+          single-use Agent Payment Code tied to this invite.
         </p>
       ) : (
         <Lead>
           The fee is {acsp.name}’s own: {formatMoney(fee)}. Card details are
           entered with the secure payment provider and never reach Evidence One.
-          You will receive an invoice in {acsp.name}’s name.
+          Nothing is taken if your verification is declined. You receive an
+          invoice in {acsp.name}’s name when the payment is taken.
         </Lead>
       )}
 

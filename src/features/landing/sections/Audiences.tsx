@@ -7,6 +7,7 @@ import {
 import { PersonStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { audiencesCopy as copy } from '@/data/copy'
 import { useNow } from '@/hooks/useNow'
 import { fullName, timeRemaining } from '@/lib/format'
 import { useDemoStore } from '@/store/DemoStore'
@@ -15,7 +16,7 @@ import type { PersonaId } from '@/types/domain'
 import { SectionTitle, container } from '../parts'
 
 const audiences: {
-  id: string
+  id: keyof typeof copy.tabs
   tab: string
   title: string
   body: string
@@ -25,28 +26,19 @@ const audiences: {
 }[] = [
   {
     id: 'individuals',
-    tab: 'Directors and PSCs',
-    title: 'In your browser, on a laptop or a phone',
-    body: 'Open your invite, check the details held on the register, choose to pay your named ACSP, then capture one identity document and a short liveness check. Follow every step until your ACSP submits to Companies House, which emails the personal code directly to you.',
-    cta: 'Try the individual journey',
+    ...copy.tabs.individuals,
     to: '/journey/EO-2026-000135/invite',
     persona: 'individual',
   },
   {
     id: 'partners',
-    tab: 'Referral Partners',
-    title: 'Every client company in one view',
-    body: 'Connect companies from the register, see who still needs to verify, and invite several directors at once, with an Agent Payment Code if you pay for them. You see status and check results only, never documents.',
-    cta: 'Open the Referral Partner portal',
+    ...copy.tabs.partners,
     to: '/partner',
     persona: 'partner',
   },
   {
     id: 'acsps',
-    tab: 'ACSPs',
-    title: 'Decide with the evidence in front of you',
-    body: 'A review queue with a 36-hour review target, every rule result with its ID, Mandatory decisions you record, an ACSP Copilot that cites its sources, then a submission workspace ready for GOV.UK One Login.',
-    cta: 'Open the review queue',
+    ...copy.tabs.acsps,
     to: '/acsp/queue',
     persona: 'reviewer',
   },
@@ -64,7 +56,7 @@ export function Audiences() {
           id="audiences-title"
           className="mx-auto max-w-3xl text-center text-ink"
         >
-          Made for everyone in the chain
+          {copy.title}
         </SectionTitle>
 
         <Tabs

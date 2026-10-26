@@ -30,6 +30,7 @@ import type {
   VerificationCase,
 } from '@/types/domain'
 import { ReconfirmBanner } from './ReconfirmBanner'
+import { useRouteB } from './RouteBGate'
 
 const filters: { id: string; label: string; statuses: CaseStatus[] }[] = [
   {
@@ -112,6 +113,7 @@ export function ReviewQueue() {
       data.cases.find((c) => c.id === t.caseId)?.acspId === acsp.id,
   ).length
   const target = currentRuleSet(data).params.review_target_hours
+  const routeB = useRouteB()
 
   return (
     <Page>
@@ -132,7 +134,8 @@ export function ReviewQueue() {
           </>
         }
         actions={
-          openTasks > 0 && (
+          openTasks > 0 &&
+          routeB.shown && (
             <Button asChild variant="outline">
               <Link to="/acsp/filings">
                 <Waypoints aria-hidden="true" />

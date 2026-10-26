@@ -1,8 +1,16 @@
 import { Archive, Database, FileText, HardDrive, Receipt } from 'lucide-react'
-import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
+import { Page, Panel, PanelHeader } from '@/components/app/Page'
+import { useToast } from '@/components/app/Toaster'
+import { UsageBar } from '@/components/app/UsageBar'
 import { PendingDecision } from '@/components/PendingDecision'
+import { Button } from '@/components/ui/button'
+import { planUsage } from '@/lib/billing'
+import { formatDateTime } from '@/lib/format'
 import { currentRuleSet } from '@/lib/rules'
 import { useDemoStore } from '@/store/DemoStore'
+import { releaseExport } from '@/store/exportActions'
+import { PLATFORM_ADMIN } from '@/store/platformActions'
+import type { ParamKey } from '@/types/domain'
 import { AdminHeader, StateBadge } from './kit'
 
 const MB_PER_CASE = 10
@@ -36,34 +44,6 @@ const stores = [
 ]
 
 const volumes = [100, 1000, 10000]
-
-const decisions = [
-  {
-    code: 'S1',
-    title: 'Archive evidence after 12 months',
-    body: 'Move evidence to cheaper, slower storage after a year. It stays retrievable for the full seven years.',
-  },
-  {
-    code: 'S2',
-    title: 'Liveness media: full recording or stills',
-    body: 'Keep the full liveness media, or stills plus the provider result. Biometric samples are deleted within 30 days either way.',
-  },
-  {
-    code: 'S3',
-    title: 'Upload limit',
-    body: 'Suggested: 10 MB a file and five files per request.',
-  },
-  {
-    code: 'S4',
-    title: 'An ACSP that keeps its own retention',
-    body: 'Export the records to the ACSP, then remove them from the platform. Each ACSP controls its own verification records.',
-  },
-  {
-    code: 'S5',
-    title: 'Storage in subscriptions',
-    body: 'Whether storage is included in every subscription, or capped.',
-  },
-]
 
 const gb = (mb: number) =>
   mb >= 1000
@@ -175,26 +155,189 @@ export function StoragePage() {
         </p>
       </Panel>
 
-      <section aria-labelledby="dec-title">
-        <div className="mb-3 flex items-center gap-3">
-          <h2 id="dec-title" className="text-[1.0625rem] font-medium text-ink">
-            Open storage decisions
-          </h2>
-          <MonoLabel>{decisions.length} open</MonoLabel>
-        </div>
-        <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {decisions.map((d) => (
-            <li
-              key={d.code}
-              className="rounded-2xl border border-line/80 bg-white p-5"
-            >
-              <PendingDecision />
+      <Panel aria-labelledby="rules-title" className="mb-6 overflow-hidden">
+        <PanelHeader
+          id="rules-title"
+          title="Storage and retention rules"
+          description="Decided by the client on 19 and 20 October"
+        />
+        <ul className="grid gap-4 p-5 sm:p-6 md:grid-cols-2 xl:grid-cols-3">
+          {decided(years, rs.params).map((d) => (
+            <li key={d.title} className="rounded-2xl border border-line/80 p-5">
+              <StateBadge tone="ok">Decided, {d.date}</StateBadge>
               <p className="mt-3 text-base font-medium text-ink">{d.title}</p>
               <p className="mt-1 text-[0.9375rem] text-slate">{d.body}</p>
             </li>
           ))}
         </ul>
+      </Panel>
+
+      <AcspStorage />
+
+      <ExportReleases />
+
+      <section aria-labelledby="open-title">
+        <h2
+          id="open-title"
+          className="mb-3 text-[1.0625rem] font-medium text-ink"
+        >
+          Still open
+        </h2>
+        <div className="rounded-2xl border border-line/80 bg-white p-5">
+          <PendingDecision />
+          <p className="mt-3 text-base font-medium text-ink">
+            Liveness media kept for seven years
+          </p>
+          <p className="mt-1 text-[0.9375rem] text-slate">
+            Whether keeping liveness media for seven years needs the client’s
+            data framework updated.
+          </p>
+        </div>
       </section>
     </Page>
+  )
+}
+
+function decided(years: number, params: Record<ParamKey, number>) {
+  return [
+    {
+      title: `Kept ${years} years from the decision`,
+      body: 'From the reviewer decision (decided_at), approvals, declines, failed and abandoned cases alike.',
+      date: '19 Oct',
+    },
+    {
+      title: `Liveness media kept ${params.liveness_media_retention_years} years`,
+      body: 'Kept with the case for the same period. The certified identity provider holds its own copy for 7 days.',
+      date: '20 Oct',
+    },
+    {
+      title: 'Live storage with a paid subscription',
+      body: 'An ACSP with no paid subscription has its records moved to cheaper archive storage. They are still kept for seven years.',
+      date: '19 Oct',
+    },
+    {
+      title: 'Upload limit',
+      body: `${params.max_file_mb} MB a file and ${params.max_files_per_request} files per request.`,
+      date: '19 Oct',
+    },
+    {
+      title: 'ACSP export',
+      body: 'Immediately after the ACSP presses Approve, or at any time within the seven years on a request to an administrator, who releases the download and never opens the evidence.',
+      date: '19 Oct',
+    },
+    {
+      title: 'Storage included in the packages',
+      body: 'Easy 2 GB, Pro 10 GB and Scale 25 GB, each an account total kept for seven years. A fair-use guide, never a reason to delete a retained record.',
+      date: '19 Oct',
+    },
+  ]
+}
+
+function AcspStorage() {
+  const { data } = useDemoStore()
+  return (
+    <Panel aria-labelledby="acsp-storage" className="mb-6 overflow-hidden">
+      <PanelHeader
+        id="acsp-storage"
+        title="Storage by ACSP"
+        description="Account totals against each package. Each ACSP’s records are kept separate."
+        actions={<StateBadge tone="info">Provisional packages</StateBadge>}
+      />
+      <ul className="divide-y divide-line/70">
+        {data.acsps.map((a) => {
+          const u = planUsage(data, a)
+          return (
+            <li
+              key={a.id}
+              className="grid gap-3 px-5 py-4 sm:px-6 md:grid-cols-[16rem_1fr] md:items-center"
+            >
+              <div>
+                <p className="text-base font-medium text-ink">{a.name}</p>
+                <p className="text-[0.875rem] text-slate">
+                  {u.pkg
+                    ? `${u.pkg.name} package · live storage`
+                    : 'No subscription · archive storage'}
+                </p>
+              </div>
+              {u.pkg ? (
+                <UsageBar
+                  label="Storage"
+                  used={u.storageUsedGb}
+                  limit={u.pkg.storageGb}
+                  unit="GB"
+                />
+              ) : (
+                <p className="text-[0.9375rem] text-graphite">
+                  {u.storageUsedGb} GB in archive storage, kept for seven years
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </Panel>
+  )
+}
+
+function ExportReleases() {
+  const { data, apply } = useDemoStore()
+  const toast = useToast()
+  const requests = data.exportRequests ?? []
+  return (
+    <Panel aria-labelledby="exports-title" className="mb-6 overflow-hidden">
+      <PanelHeader
+        id="exports-title"
+        title="Export release requests"
+        description="An ACSP asks for its verification file after the decision. You release the download. You never open the evidence."
+      />
+      {requests.length === 0 ? (
+        <p className="px-6 py-8 text-center text-base text-slate">
+          No export requests.
+        </p>
+      ) : (
+        <ul className="divide-y divide-line/70">
+          {requests.map((x) => {
+            const acsp = data.acsps.find((a) => a.id === x.acspId)
+            return (
+              <li
+                key={x.id}
+                className="flex flex-wrap items-center gap-4 px-5 py-4 sm:px-6"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-medium text-ink">
+                    <span className="font-mono">{x.id}</span> · case{' '}
+                    <span className="font-mono">{x.caseId}</span>
+                  </p>
+                  <p className="text-[0.9375rem] text-slate">
+                    {acsp?.name}, requested by {x.requestedBy} on{' '}
+                    {formatDateTime(x.requestedAt)}. {x.reason}.
+                  </p>
+                </div>
+                {x.status === 'requested' ? (
+                  <Button
+                    onClick={() => {
+                      apply((d) => releaseExport(d, x.id, PLATFORM_ADMIN))
+                      toast({
+                        title: 'Download released',
+                        description:
+                          'The ACSP can now download the file behind step-up. Recorded in the audit trail.',
+                      })
+                    }}
+                  >
+                    Release the download
+                  </Button>
+                ) : (
+                  <StateBadge tone={x.status === 'downloaded' ? 'ok' : 'info'}>
+                    {x.status === 'downloaded'
+                      ? 'Downloaded by the ACSP'
+                      : `Released ${x.releasedAt ? formatDateTime(x.releasedAt) : ''}`}
+                  </StateBadge>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Panel>
   )
 }

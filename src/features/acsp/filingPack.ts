@@ -5,6 +5,8 @@ export interface FilingField {
   key: string
   label: string
   value: string
+  /** A code the filer enters at Companies House. No input and nothing to copy. */
+  filerEntered?: boolean
 }
 
 /**
@@ -50,9 +52,16 @@ export function filingPack(data: DemoData, task: CorrectionTask) {
       value: `Case ${task.caseId}, opened ${formatDate(task.createdAt)}`,
     },
     {
+      key: 'auth-code',
+      label: 'Company authentication code',
+      value: 'Entered by the filer at Companies House',
+      filerEntered: true,
+    },
+    {
       key: 'code',
       label: 'Director personal code (if the form asks)',
       value: 'Entered by the filer at Companies House',
+      filerEntered: true,
     },
   ]
   const checks = [

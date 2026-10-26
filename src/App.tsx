@@ -25,6 +25,16 @@ const BulkInvite = lazy(() =>
     default: m.BulkInvite,
   })),
 )
+const PartnerRequests = lazy(() =>
+  import('@/features/bulk/PartnerRequests').then((m) => ({
+    default: m.PartnerRequests,
+  })),
+)
+const AdminRequests = lazy(() =>
+  import('@/features/bulk/AdminRequests').then((m) => ({
+    default: m.AdminRequests,
+  })),
+)
 const CompanyLookup = lazy(() =>
   import('@/features/partner/CompanyLookup').then((m) => ({
     default: m.CompanyLookup,
@@ -171,6 +181,11 @@ const CommissionsPage = lazy(() =>
     default: m.CommissionsPage,
   })),
 )
+const ComplaintsPage = lazy(() =>
+  import('@/features/admin/ComplaintsPage').then((m) => ({
+    default: m.ComplaintsPage,
+  })),
+)
 const StoragePage = lazy(() =>
   import('@/features/admin/StoragePage').then((m) => ({
     default: m.StoragePage,
@@ -179,9 +194,9 @@ const StoragePage = lazy(() =>
 const SuperHome = lazy(() =>
   import('@/features/super/SuperHome').then((m) => ({ default: m.SuperHome })),
 )
-const PointsForCall = lazy(() =>
-  import('@/features/guided/PointsForCall').then((m) => ({
-    default: m.PointsForCall,
+const DecisionsPage = lazy(() =>
+  import('@/features/guided/DecisionsPage').then((m) => ({
+    default: m.DecisionsPage,
   })),
 )
 
@@ -227,7 +242,11 @@ export default function App() {
                 <Route path="join/acsp" element={<JoinAcsp />} />
 
                 {/* Presenter only */}
-                <Route path="points" element={<PointsForCall />} />
+                <Route path="decisions" element={<DecisionsPage />} />
+                <Route
+                  path="points"
+                  element={<Navigate to="/decisions" replace />}
+                />
 
                 {/* Old paths */}
                 <Route
@@ -252,6 +271,11 @@ export default function App() {
                     element={<BulkInvite />}
                   />
                   <Route path="invites" element={<InviteLog />} />
+                  <Route path="requests" element={<PartnerRequests />} />
+                  <Route
+                    path="requests/:requestId"
+                    element={<PartnerRequests />}
+                  />
                 </Route>
 
                 {/* Individual, shown in the phone frame */}
@@ -286,9 +310,15 @@ export default function App() {
                 <Route path="admin/approvals" element={<ApprovalsPage />} />
                 <Route path="admin/matching" element={<MatchingPage />} />
                 <Route path="admin/monitoring" element={<MonitoringPage />} />
+                <Route path="admin/requests" element={<AdminRequests />} />
+                <Route
+                  path="admin/requests/:requestId"
+                  element={<AdminRequests />}
+                />
                 <Route path="admin/fees" element={<FeesPage />} />
                 <Route path="admin/commissions" element={<CommissionsPage />} />
                 <Route path="admin/storage" element={<StoragePage />} />
+                <Route path="admin/complaints" element={<ComplaintsPage />} />
                 <Route path="super" element={<SuperHome />} />
                 <Route path="admin/compliance" element={<CompliancePage />} />
                 <Route path="admin/audit" element={<AuditTrailPage />} />

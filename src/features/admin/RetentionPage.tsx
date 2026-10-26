@@ -26,6 +26,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { formatDate, fullName, retentionExpiry } from '@/lib/format'
+import { hasSubscription } from '@/lib/billing'
 import { currentRuleSet } from '@/lib/rules'
 import { cn } from '@/lib/utils'
 import { liftHold, placeHold } from '@/store/adminActions'
@@ -35,7 +36,6 @@ import { getPerson } from '@/store/selectors'
 import type { VerificationCase } from '@/types/domain'
 import { AdminHeader, Figure, StateBadge } from './kit'
 
-const DAY = 86_400_000
 const holdReasons = [
   'Regulatory information request',
   'Litigation hold',
@@ -69,22 +69,21 @@ export function RetentionPage() {
     .map((c) => {
       const start = retentionStart(c)
       const until = start ? retentionExpiry(start) : undefined
-      const bioDue = start
-        ? new Date(start).getTime() + rs.params.biometric_deletion_days * DAY
-        : undefined
+      const acsp = data.acsps.find((a) => a.id === c.acspId)
       return {
         c,
         person: getPerson(data, c.personId),
         start,
         until,
-        bioDue,
+        // Live storage with a paid subscription, archive storage without one. Kept seven years either way.
+        live: !!acsp && hasSubscription(data, acsp),
         hold: holds[c.id],
       }
     })
     .sort((a, b) => (b.start ?? '9').localeCompare(a.start ?? '9'))
 
   const retained = rows.filter((r) => r.start)
-  const bioPending = retained.filter((r) => r.bioDue && r.bioDue > now)
+  const archived = retained.filter((r) => !r.live)
   const earliest = retained.map((r) => r.until!).sort()[0]
 
   return (
@@ -107,9 +106,9 @@ export function RetentionPage() {
             detail="Destruction suspended"
           />
           <Figure
-            label="Biometric deletions due"
-            value={bioPending.length}
-            detail={`Within ${rs.params.biometric_deletion_days} days of completion`}
+            label="In archive storage"
+            value={archived.length}
+            detail="ACSP without a paid subscription. Still kept seven years"
           />
           <Figure
             label="Earliest destruction review"
@@ -121,7 +120,7 @@ export function RetentionPage() {
 
       <Lifecycle
         years={rs.params.retention_years}
-        days={rs.params.biometric_deletion_days}
+        livenessYears={rs.params.liveness_media_retention_years}
       />
 
       <Panel aria-labelledby="records-title" className="overflow-hidden">
@@ -151,7 +150,7 @@ export function RetentionPage() {
                   Kept until
                 </th>
                 <th scope="col" className="py-2.5 pr-4 font-normal">
-                  Biometric samples
+                  Liveness media and storage
                 </th>
                 <th scope="col" className="py-2.5 pr-4 font-normal">
                   State
@@ -162,10 +161,7 @@ export function RetentionPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ c, person, start, until, bioDue, hold }) => {
-                const bioLeft = bioDue
-                  ? Math.ceil((bioDue - now) / DAY)
-                  : undefined
+              {rows.map(({ c, person, start, until, live, hold }) => {
                 const past = until ? new Date(until).getTime() < now : false
                 return (
                   <tr key={c.id} className="border-t border-line/70 align-top">
@@ -195,27 +191,18 @@ export function RetentionPage() {
                       )}
                     </td>
                     <td className="py-4 pr-4">
-                      {bioLeft === undefined ? (
-                        <span className="text-[0.9375rem] text-slate">
-                          Held while open
-                        </span>
-                      ) : bioLeft > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 text-[0.9375rem] text-graphite">
-                          <Fingerprint
-                            className="size-4 text-slate"
-                            aria-hidden="true"
-                          />
-                          Deleted in {bioLeft} {bioLeft === 1 ? 'day' : 'days'}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-[0.9375rem] text-graphite">
-                          <Fingerprint
-                            className="size-4 text-approve"
-                            aria-hidden="true"
-                          />
-                          Deleted
-                        </span>
-                      )}
+                      <span className="inline-flex items-center gap-1.5 text-[0.9375rem] text-graphite">
+                        <Fingerprint
+                          className="size-4 text-slate"
+                          aria-hidden="true"
+                        />
+                        {until
+                          ? `Kept with the record until ${formatDate(until)}`
+                          : 'Held while open'}
+                      </span>
+                      <p className="mt-1 text-[0.8125rem] text-slate">
+                        {live ? 'Live storage' : 'Archive storage'}
+                      </p>
                     </td>
                     <td className="py-4 pr-4">
                       {hold ? (
@@ -376,7 +363,13 @@ export function RetentionPage() {
   )
 }
 
-function Lifecycle({ years, days }: { years: number; days: number }) {
+function Lifecycle({
+  years,
+  livenessYears,
+}: {
+  years: number
+  livenessYears: number
+}) {
   const steps = [
     {
       icon: Gavel,
@@ -385,8 +378,8 @@ function Lifecycle({ years, days }: { years: number; days: number }) {
     },
     {
       icon: Fingerprint,
-      title: `Biometrics deleted`,
-      body: `Raw samples removed within ${days} days`,
+      title: 'Liveness media kept',
+      body: `Kept with the case for ${livenessYears} years. The identity provider deletes its own copy after 7 days`,
     },
     {
       icon: Archive,

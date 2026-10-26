@@ -130,17 +130,17 @@ export function CompliancePage() {
           to: '/admin/retention',
         },
         {
-          label: 'Biometric deletion',
-          status: `Within ${rs.params.biometric_deletion_days} days`,
+          label: 'Liveness media',
+          status: `Kept ${rs.params.liveness_media_retention_years} years`,
           detail:
-            'Raw samples deleted after completion. Next run tomorrow at 02:00',
+            'Kept with the case. The identity provider deletes its own copy after 7 days',
           tone: 'ok',
         },
         {
           label: 'Personal code',
-          status: 'Never held',
+          status: 'Never asked for',
           detail:
-            'Companies House emails it to the individual. Evidence One does not receive or keep it',
+            'Companies House emails it to the individual. The individual may pass it to the ACSP as a code message, which platform staff cannot open and which is deleted 30 days after the ACSP has it',
           tone: 'ok',
         },
       ],

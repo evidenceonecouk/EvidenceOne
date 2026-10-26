@@ -53,7 +53,7 @@ export function partnerStatusFor(
   return partnerStatusForCase(latestCaseFor(data, personId))
 }
 
-/** A Referral Partner outside the UK sees status only (P11, pending the client's DPIA). */
+/** A Referral Partner outside the UK sees status only (P11, decided 19 October; the client's DPIA is noted). */
 export const partnerSeesChecks = (partner: Pick<ReferralPartner, 'country'>) =>
   partner.country === 'United Kingdom'
 
@@ -116,6 +116,83 @@ export const partnerCheckLabels: Record<keyof PartnerChecks, string> = {
 export const hasFlaggedCheck = (c: PartnerChecks) =>
   Object.values(c).includes('flagged') ||
   Object.values(c).includes('not_passed')
+
+/**
+  M3, decided 19 October: when an ACSP lapses, the Referral Partner is notified
+  of its own clients who are affected and sees only those. Status, which ACSP
+  lapsed and any offer to move to another ACSP. Never documents or evidence.
+  The full ACSP-12 list stays with a Platform Administrator and that ACSP.
+*/
+export interface AffectedClient {
+  caseId: string
+  personId: string
+  name: string
+  companyNumber: string
+  status: PartnerStatus | null
+  lapsedAcspName: string
+  lapsedStatus: 'suspended' | 'ceased' | 'withdrawn'
+  /** Verified by the lapsed ACSP, so may need to verify again; or still open. */
+  kind: 'verified' | 'open'
+  offer?: {
+    acspName: string
+    response: 'pending' | 'agreed' | 'declined'
+  }
+}
+
+const VERIFIED_STATUSES: CaseStatus[] = [
+  'approved',
+  'submission_started',
+  'submitted',
+  'confirmed',
+]
+const OPEN_STATUSES: CaseStatus[] = [
+  'in_progress',
+  'in_review',
+  'info_requested',
+]
+
+export function affectedClientsForPartner(
+  data: DemoData,
+  partnerId: string,
+): AffectedClient[] {
+  const out: AffectedClient[] = []
+  for (const vc of data.cases) {
+    if (vc.partnerId !== partnerId) continue
+    const lapsedId = vc.reallocation?.fromAcspId ?? vc.acspId
+    const acsp = data.acsps.find((a) => a.id === lapsedId)
+    if (
+      !acsp ||
+      (acsp.status !== 'suspended' &&
+        acsp.status !== 'ceased' &&
+        acsp.status !== 'withdrawn')
+    )
+      continue
+    const verified = VERIFIED_STATUSES.includes(vc.status)
+    if (!verified && !OPEN_STATUSES.includes(vc.status)) continue
+    const person = data.people.find((p) => p.id === vc.personId)
+    const offered =
+      vc.reallocation &&
+      data.acsps.find((a) => a.id === vc.reallocation!.offeredAcspId)
+    out.push({
+      caseId: vc.id,
+      personId: vc.personId,
+      name: person ? `${person.givenNames} ${person.familyName}` : vc.personId,
+      companyNumber: vc.companyNumber,
+      status: partnerStatusForCase(vc),
+      lapsedAcspName: acsp.name,
+      lapsedStatus: acsp.status,
+      kind: verified ? 'verified' : 'open',
+      offer:
+        vc.reallocation && offered
+          ? {
+              acspName: offered.name,
+              response: vc.reallocation.individualResponse,
+            }
+          : undefined,
+    })
+  }
+  return out
+}
 
 /* Flags on a person: status-level only. */
 export type PartnerFlag =

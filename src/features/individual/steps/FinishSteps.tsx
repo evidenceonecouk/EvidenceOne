@@ -1,4 +1,4 @@
-import { ChevronRight, Info, ShieldCheck } from 'lucide-react'
+import { ChevronRight, CreditCard, Info, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { AttributionNote } from '@/components/AttributionNote'
 import { Checkbox } from '@/components/app/Page'
@@ -6,7 +6,6 @@ import {
   PendingMarker,
   CompletionTick,
 } from '@/components/brand/CompletionTick'
-import { PendingDecision } from '@/components/PendingDecision'
 import { Button } from '@/components/ui/button'
 import { ALREADY_VERIFIED_MESSAGE, DECLINE_MESSAGE } from '@/data/reasonCodes'
 import { fill, getStrings } from '@/data/i18n'
@@ -18,6 +17,7 @@ import {
   submitForReview,
   updateJourney,
 } from '@/store/actions'
+import { PAYMENT_STATUS_LABEL } from '@/lib/paymentStatus'
 import { useDemoStore } from '@/store/DemoStore'
 import {
   answerCodeReceipt,
@@ -53,7 +53,7 @@ const ContinueButton = ({
   </Button>
 )
 
-/** Proof of current address from every individual, dated within the supporting evidence period (ADDL-02, P3). */
+/** Proof of current address from every individual, dated within the supporting evidence period (ADDL-02, P3 decided 19 October). */
 export function AddressStep({ vc, person, next }: StepProps) {
   const { data } = useDemoStore()
   const months = currentRuleSet(data).params.supporting_evidence_months
@@ -64,14 +64,14 @@ export function AddressStep({ vc, person, next }: StepProps) {
       <ScreenTitle kicker="Proof of address">
         One proof of your current address
       </ScreenTitle>
-      <p className="mt-2">
-        <PendingDecision code="P3" />
-      </p>
       <Lead>
-        We ask everyone for one proof of their current address, dated within the
-        last {months} months. We ask even if your identity document shows an
-        address. This is not a second identity document.
+        Please provide a document confirming your current residential address,
+        dated within the last {months} months.
       </Lead>
+      <p className="mt-2 text-base text-graphite">
+        We ask everyone, even if your identity document shows an address. This
+        is not a second identity document.
+      </p>
       <div className="mt-4 rounded-2xl border border-line bg-white p-4">
         <p className="text-sm text-slate">Current address</p>
         <p className="mt-0.5 text-base text-ink">
@@ -159,7 +159,7 @@ export function ReviewStep({ vc, person, company, next }: StepProps) {
   const [consent, setConsent] = useState(false)
   const acsp = reviewerOrgName(data, vc.acspId) ?? 'your ACSP'
   const docType = vc.journey?.documentType ?? 'passport'
-  const payment = vc.journey?.payment
+  const payment = vc.payment ?? vc.journey?.payment
   const items = vc.journey?.supportingItems ?? []
   const lang = state.language
   const tr = getStrings(lang).declarations
@@ -182,9 +182,9 @@ export function ReviewStep({ vc, person, company, next }: StepProps) {
   rows.push([
     'Payment',
     payment?.method === 'agent_payment_code'
-      ? `Paid by ${payment.payerName}`
+      ? `Paid by ${payment.payerName} on your behalf, taken on approval`
       : payment
-        ? `${formatMoney(payment.amount)} paid to ${acsp}`
+        ? `${formatMoney(payment.amount)} to ${acsp}. Authorised, not yet taken`
         : 'Recorded',
   ])
 
@@ -399,14 +399,14 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
   }
 
   const stages = [
-    { label: 'Details and payment', at: 0 },
+    { label: 'Details and payment authorised', at: 0 },
     {
       label:
         vc.option === 2 ? 'Person check requested' : 'Identity checks complete',
       at: 0,
     },
     { label: `Review by ${acsp}`, at: 3 },
-    { label: `Approved by ${acsp}`, at: 3 },
+    { label: `Approved by ${acsp}, payment taken`, at: 3 },
     { label: 'Your ACSP has started the submission to Companies House', at: 4 },
     { label: 'Submitted to Companies House', at: 5 },
     { label: 'Companies House has confirmed your verification', at: 6 },
@@ -422,6 +422,7 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
     return rank >= stages[i].at
   }
   const visible = declined ? stages.slice(0, 3) : stages
+  const trackedPayment = vc.payment ?? vc.journey?.payment
   const currentIdx = visible.findIndex((_, i) => !reached(i))
 
   return (
@@ -447,6 +448,21 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
         provider.
       </p>
 
+      {trackedPayment && (
+        <p className="mt-3 flex gap-2.5 rounded-2xl border border-line bg-white px-4 py-3 text-[0.9375rem] leading-relaxed text-ink">
+          <CreditCard className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-medium">
+              Payment: {PAYMENT_STATUS_LABEL[trackedPayment.status]}.
+            </span>{' '}
+            {trackedPayment.status === 'authorised'
+              ? `You are only charged when ${acsp} approves your verification.`
+              : trackedPayment.status === 'taken'
+                ? `${formatMoney(trackedPayment.amount)} was taken when ${acsp} approved. Your invoice is issued in ${acsp}’s name.`
+                : 'The authorisation was released.'}
+          </span>
+        </p>
+      )}
       {declined && (
         <p className="mt-3 rounded-2xl bg-decline-wash px-4 py-3 text-[0.9375rem] leading-relaxed text-decline">
           {DECLINE_MESSAGE}
@@ -469,7 +485,8 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
         <p className="mt-3 flex gap-2.5 rounded-2xl border border-line bg-white px-4 py-3 text-[0.9375rem] leading-relaxed text-ink">
           <ShieldCheck className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
           Companies House will email the personal code directly to {fullName}.
-          Evidence One does not receive or keep it.
+          Evidence One does not receive it from Companies House and never asks
+          for it.
         </p>
       )}
 
@@ -567,9 +584,7 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
 
       {s === 'confirmed' && !askCode && (
         <div className="mt-5 rounded-2xl border border-dashed border-silver p-3">
-          <p className="flex flex-wrap items-center gap-2 text-sm text-slate">
-            Presenter control <PendingDecision code="M7" />
-          </p>
+          <p className="text-sm text-slate">Presenter control</p>
           <Button
             className="mt-2"
             variant="outline"
@@ -582,11 +597,8 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
       )}
       {askCode && (
         <div className="mt-5 rounded-2xl border border-line bg-white p-4">
-          <p className="flex flex-wrap items-center gap-2">
-            <span className="text-base font-medium text-ink">
-              Please confirm that the code has arrived from Companies House
-            </span>
-            <PendingDecision code="M7" />
+          <p className="text-base font-medium text-ink">
+            Please confirm that the code has arrived from Companies House
           </p>
           {receipt?.answer ? (
             <p className="mt-2 text-[0.9375rem] text-graphite" role="status">
@@ -612,7 +624,8 @@ export function StatusStep({ vc, person, entry, go }: StepProps) {
             </div>
           )}
           <p className="mt-2 text-sm text-slate">
-            Please do not type the code anywhere. We never ask for it.
+            We never ask for the code. If {acsp} needs it, you can send it as a
+            code message below.
           </p>
         </div>
       )}

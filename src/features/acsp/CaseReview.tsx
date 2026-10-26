@@ -34,12 +34,12 @@ import {
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { DECLINE_MESSAGE } from '@/data/reasonCodes'
 import { AttributionNote } from '@/components/AttributionNote'
-import { PendingDecision } from '@/components/PendingDecision'
 import { allocationLabel, sourceDetail } from '@/lib/attribution'
 import { highlightCite } from '@/lib/cite'
 import {
   formatDate,
   formatDateTime,
+  formatMoney,
   fullName,
   shortHash,
   timeAgo,
@@ -66,6 +66,7 @@ import {
 } from '@/store/selectors'
 import type { DecisionOutcome, VerificationCase } from '@/types/domain'
 import { CopilotPanel } from '@/features/copilot/CopilotPanel'
+import { LinkedCasesPanel } from '@/features/bulk/LinkedCasesPanel'
 import {
   DocumentSection,
   EvidenceSection,
@@ -170,8 +171,12 @@ export function CaseReview() {
             : 'Information requested',
       description:
         o === 'approve'
-          ? 'Next, prepare the Companies House submission.'
-          : 'Recorded in the audit trail.',
+          ? vc.payment?.status === 'authorised'
+            ? 'Payment taken and client invoice issued. Next, prepare the Companies House submission.'
+            : 'Next, prepare the Companies House submission.'
+          : o === 'decline' && vc.payment?.status === 'authorised'
+            ? 'Authorisation released. Nothing was taken. Recorded in the audit trail.'
+            : 'Recorded in the audit trail.',
     })
     if (o === 'approve') navigate(`/acsp/cases/${vc.id}/submit`)
   }
@@ -274,8 +279,10 @@ export function CaseReview() {
               person={person}
               acspName={acsp.name}
               reviewerName={actingReviewer.name}
+              reviewerId={actingReviewer.id}
             />
             <TimelinePanel caseId={vc.id} />
+            <LinkedCasesPanel caseId={vc.id} />
           </div>
 
           <div className="space-y-6 xl:sticky xl:top-24">
@@ -294,6 +301,13 @@ export function CaseReview() {
           outcome={outcome}
           personName={name}
           defaultNote={requestNote}
+          paymentNote={
+            vc.payment?.status !== 'authorised'
+              ? undefined
+              : outcome === 'approve'
+                ? `Approving takes the authorised ${formatMoney(vc.payment.amount)}${vc.source === 'own_client' ? '' : `, deducts the platform fee of ${formatMoney(data.billing.settings.platformFee)} plus VAT`} and issues the client invoice in ${acsp.name}’s name.`
+                : 'Declining releases the authorisation. Nothing is taken from the client.'
+          }
           onClose={() => setOutcome(null)}
           onConfirm={confirm}
         />
@@ -559,13 +573,11 @@ function CodeReceipt({ vc, name }: { vc: VerificationCase; name: string }) {
   if (!r && vc.status !== 'confirmed') return null
   return (
     <Panel className="p-5 sm:p-6" aria-label="Personal code">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <MonoLabel>Personal code</MonoLabel>
-        <PendingDecision code="M7" />
-      </div>
+      <MonoLabel>Personal code</MonoLabel>
       <p className="mt-3 text-[0.9375rem] leading-relaxed text-graphite">
         Companies House will email the personal code directly to {name}.
-        Evidence One does not receive or keep it.
+        Evidence One does not receive it from Companies House and never asks for
+        it. {name} may send it to you as a code message in the case messages.
       </p>
       <p className="mt-3 text-base text-ink">
         {r?.answer === 'yes'

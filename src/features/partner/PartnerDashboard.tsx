@@ -7,6 +7,7 @@ import {
   Flag,
   Hourglass,
   Info,
+  Layers,
   Link2,
   Plus,
   RefreshCw,
@@ -27,7 +28,6 @@ import {
   PanelHeader,
   StatTile,
 } from '@/components/app/Page'
-import { PendingDecision } from '@/components/PendingDecision'
 import { PartnerCheckChip, PartnerStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
@@ -52,6 +52,7 @@ import {
   type PersonRow,
 } from '@/store/selectors'
 import type { Company, PartnerStatus } from '@/types/domain'
+import { AffectedClientsNotice } from './AffectedClientsNotice'
 import { useActingPartnerUser } from './usePartnerUser'
 
 /* One column template shared by the header row and every person row, so all companies line up. */
@@ -68,7 +69,7 @@ const segment: Record<PartnerStatus | 'none', string> = {
 }
 
 export function PartnerDashboard() {
-  const { data, state } = useDemoStore()
+  const { data } = useDemoStore()
   const partner = useActingPartner()
   const { can } = useActingPartnerUser()
   const companies = companiesForPartner(data, partner.id)
@@ -99,7 +100,6 @@ export function PartnerDashboard() {
                 ? 'You see status only'
                 : 'You see status and check results only'}
             </span>
-            {statusOnly && <PendingDecision code="P11" />}
           </>
         }
         actions={
@@ -108,6 +108,12 @@ export function PartnerDashboard() {
               <Link to="/partner/invites">
                 <Send aria-hidden="true" />
                 Invite log
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/partner/requests">
+                <Layers aria-hidden="true" />
+                Bulk / Bespoke Request
               </Link>
             </Button>
             {can.connect ? (
@@ -126,6 +132,8 @@ export function PartnerDashboard() {
           </>
         }
       />
+
+      <AffectedClientsNotice partnerId={partner.id} />
 
       <div className="mb-8 grid items-start gap-5 lg:grid-cols-2">
         <SignedInAs />
@@ -200,20 +208,6 @@ export function PartnerDashboard() {
         <FlagsPanel flags={flags} />
         <ActivityPanel />
       </div>
-
-      {state.guided.on && (
-        <aside
-          aria-label="Presenter note"
-          className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-dashed border-line bg-mist/60 px-5 py-3.5 text-[0.9375rem] text-graphite"
-        >
-          <PendingDecision code="M3" />
-          <span>
-            Presenter note: if an ACSP lapses, a Referral Partner is not shown
-            which of its own clients are affected. Whether partners should see
-            this is for the client to decide.
-          </span>
-        </aside>
-      )}
     </Page>
   )
 }
@@ -451,9 +445,9 @@ function CompanyBlock({ company }: { company: Company }) {
           >
             <Send aria-hidden="true" />
             {selected.length
-              ? `Invite ${selected.length} selected`
+              ? `Refer ${selected.length} selected`
               : invitable.length
-                ? 'Invite people'
+                ? 'Refer to an ACSP'
                 : 'Everyone invited'}
           </Button>
         </div>
@@ -615,7 +609,10 @@ function ActivityPanel() {
   const safe: Record<string, (caseId?: string) => string> = {
     'invite.sent': (id) => `Invite sent to ${name(id)}`,
     'invite.opened': (id) => `${name(id)} opened their invite`,
-    'payment.completed': (id) => `${name(id)}: payment made to the ACSP`,
+    'payment.authorised': (id) =>
+      `${name(id)}: payment authorised, taken only on approval`,
+    'payment.taken': (id) => `${name(id)}: payment taken on approval`,
+    'payment.released': (id) => `${name(id)}: nothing was taken`,
     'case.submitted': (id) => `${name(id)}: In progress, with the ACSP`,
     'case.decision.request_info': (id) =>
       `${name(id)}: Further information required`,

@@ -1,6 +1,7 @@
 import { FileUp, HelpCircle, Loader2, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
+import { HeldOptionBadge } from '@/components/HeldOption'
 import { Button } from '@/components/ui/button'
 import { ModelTag, AI_LABEL } from '@/components/visual/AiObservationCard'
 import { Checkbox } from '@/components/app/Page'
@@ -8,7 +9,7 @@ import { getStrings } from '@/data/i18n'
 import { answerHelper, helperChips, type HelperReply } from '@/lib/languageHelp'
 import { currentRuleSet } from '@/lib/rules'
 import { cn } from '@/lib/utils'
-import { useDemoStore } from '@/store/DemoStore'
+import { useDemoStore, useShowHeldOptions } from '@/store/DemoStore'
 import {
   logHelperExchange,
   recordSupportingUpload,
@@ -66,6 +67,8 @@ export function SupportingUpload({
   onUploaded?: (input: Omit<SupportingUploadInput, 'purpose'>) => void
 }) {
   const { data, apply } = useDemoStore()
+  // Bank statement redaction is option O3, held until after go-live.
+  const held = useShowHeldOptions()
   const months = currentRuleSet(data).params.supporting_evidence_months
   const saved = data.cases
     .find((c) => c.id === caseId)
@@ -110,7 +113,7 @@ export function SupportingUpload({
     if (phase !== 'checking') return
     if (resolved >= checks.length) {
       setPhase('checked')
-      if (type !== 'bank_statement') record(false)
+      if (type !== 'bank_statement' || !held) record(false)
       return
     }
     const id = window.setTimeout(() => setResolved((r) => r + 1), 600)
@@ -227,19 +230,17 @@ export function SupportingUpload({
         </div>
       )}
 
-      {phase === 'checked' && type === 'bank_statement' && (
+      {phase === 'checked' && type === 'bank_statement' && held && (
         <div className="mt-4 rounded-2xl border border-line bg-white p-4">
           <p className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-ink px-2.5 py-0.5 text-[0.8125rem] font-medium text-ink">
-              Option
-            </span>
+            <HeldOptionBadge code="O3" />
             <span className="text-base font-medium text-ink">
               Hide amounts and payees
             </span>
           </p>
           <p className="mt-1 text-[0.9375rem] text-graphite">
-            Optional and priced separately. Your ACSP then only sees a copy with
-            transaction amounts and payees masked.
+            Optional. Your ACSP then only sees a copy with transaction amounts
+            and payees masked.
           </p>
           {redactionChoice === 'none' && (
             <div className="mt-3 flex flex-col gap-2">
@@ -326,6 +327,7 @@ export function uploadRecorded(
 /** "Which document can I use?" Deterministic, answers only from the approved list. */
 export function DocumentHelper({ caseId }: { caseId: string }) {
   const { state, data, apply } = useDemoStore()
+  const held = useShowHeldOptions()
   const lang = state.language
   const s = getStrings(lang).helper
   const months = currentRuleSet(data).params.supporting_evidence_months
@@ -337,6 +339,8 @@ export function DocumentHelper({ caseId }: { caseId: string }) {
     setReply(r)
     apply((d) => logHelperExchange(d, caseId, question, r.id, lang))
   }
+  // Part of language help, option O1, held until after go-live.
+  if (!held) return null
   return (
     <section
       aria-labelledby="helper-h"
@@ -349,6 +353,7 @@ export function DocumentHelper({ caseId }: { caseId: string }) {
         <HelpCircle className="size-4" aria-hidden="true" />
         Which document can I use?
       </h2>
+      <HeldOptionBadge code="O1" className="mt-1.5" />
       {lang !== 'en' && (
         <p lang={lang} className="mt-0.5 text-[0.9375rem] text-graphite">
           {s.title}

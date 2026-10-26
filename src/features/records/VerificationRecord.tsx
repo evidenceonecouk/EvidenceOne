@@ -1,27 +1,21 @@
 import { auditEventKey } from '@/lib/audit'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Download,
-  ShieldCheck,
-  ShieldX,
-} from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, ArrowRight, ShieldCheck, ShieldX } from 'lucide-react'
 import { Link, useParams } from 'react-router'
-import { StepUpDialog } from '@/components/app/StepUpDialog'
 import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
 import { CaseStatusChip } from '@/components/StatusChip'
-import { Button } from '@/components/ui/button'
 import { Avatar, CompanyMark } from '@/components/visual/Avatar'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { reasonCodes } from '@/data/reasonCodes'
 import { recordAttribution, sourceDetail } from '@/lib/attribution'
+import { chipResultFor, chipResultLabel, securityFeaturesFor } from '@/lib/chip'
+import { isCodeMessage, ordinaryMessages } from '@/lib/codeWarning'
 import { formatDate, formatDateTime, fullName, shortHash } from '@/lib/format'
 import { documentName, ruleSetFor } from '@/lib/rules'
 import { cn } from '@/lib/utils'
-import { recordExport, reviewerName } from '@/store/actions'
+import { reviewerName } from '@/store/actions'
 import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
 import { chainIntact } from './chain'
+import { ExportControl } from './ExportControl'
 import { CasePayment } from '@/features/acsp/CasePayment'
 import {
   auditForCase,
@@ -36,9 +30,8 @@ import {
 /** Evidence One File: the audit-ready record of one verification. */
 export function VerificationRecord() {
   const { caseId = '' } = useParams()
-  const { data, apply } = useDemoStore()
+  const { data } = useDemoStore()
   const { acsp: actingAcsp, reviewer: actingReviewer } = useActingAcsp()
-  const [stepUp, setStepUp] = useState(false)
   const vc = getCase(data, caseId)
   const person = vc && getPerson(data, vc.personId)
   const company = vc && getCompany(data, vc.companyNumber)
@@ -113,6 +106,21 @@ export function VerificationRecord() {
         ? `Option 2: person check by a trained reviewer, register comparison${pep ? ', PEP and sanctions screening' : ''}`
         : `Option 1, certified identity provider: document authenticity, liveness, face match${vc.idvt.faceMatchScore ? ` ${vc.idvt.faceMatchScore}%` : ''}, register comparison${pep ? ', PEP and sanctions screening' : ''}`,
     ],
+    ...(vc.option === 1
+      ? ([
+          [
+            'Chip',
+            chipResultLabel[
+              chipResultFor(vc, person.document) ?? 'not_applicable'
+            ],
+          ],
+          [
+            'Security features validated',
+            securityFeaturesFor(vc, person.document).join('; ') ||
+              'Not yet recorded',
+          ],
+        ] as [string, string][])
+      : []),
     [
       'Decision',
       vc.decision
@@ -139,7 +147,18 @@ export function VerificationRecord() {
           ],
         ] as [string, string][])
       : []),
-    ['Secure messages', `${vc.messages?.length ?? 0} kept with the record`],
+    [
+      'Secure messages',
+      `${ordinaryMessages(vc.messages).length} kept with the record`,
+    ],
+    ...(vc.messages?.some(isCodeMessage)
+      ? ([
+          [
+            'Code messages',
+            'Not part of the record or its export. Deleted 30 days after the ACSP marks the code received',
+          ],
+        ] as [string, string][])
+      : []),
     ['Rule set applied', `Route A rule set ${rs.version}`],
     [
       'Companies House verification reference',
@@ -153,8 +172,8 @@ export function VerificationRecord() {
         : `Kept for ${rs.params.retention_years} years from the decision`,
     ],
     [
-      'Biometrics',
-      `Raw biometric samples deleted within ${rs.params.biometric_deletion_days} days of completion`,
+      'Liveness media',
+      `Kept with the record for ${rs.params.liveness_media_retention_years} years. The certified identity provider deletes its own copy after 7 days`,
     ],
   ]
 
@@ -168,10 +187,7 @@ export function VerificationRecord() {
           <ArrowLeft className="size-4" aria-hidden="true" />
           All records
         </Link>
-        <Button variant="outline" onClick={() => setStepUp(true)}>
-          <Download aria-hidden="true" />
-          Export as PDF
-        </Button>
+        <ExportControl vc={vc} actor={reviewerName(data, actingReviewer.id)} />
       </div>
 
       {/* The statement, laid out like a document */}
@@ -235,13 +251,13 @@ export function VerificationRecord() {
             <p className="mt-8 rounded-2xl bg-mist px-5 py-4 text-[0.9375rem] leading-relaxed text-graphite">
               Records of the documents checked, the checks completed and any
               failed attempts are kept for {rs.params.retention_years} years
-              from the decision timestamp, until {formatDate(retention)}. Raw
-              biometric samples are deleted within{' '}
-              {rs.params.biometric_deletion_days} days of completion.
-              Destruction after the retention date is a deliberate, audited
-              action, and a regulatory or litigation hold suspends it. Companies
-              House emails the personal code to the individual; Evidence One
-              does not receive or keep it.
+              from the decision timestamp, until {formatDate(retention)}.
+              Liveness media are kept with the record for the same{' '}
+              {rs.params.liveness_media_retention_years} years. Destruction
+              after the retention date is a deliberate, audited action, and a
+              regulatory or litigation hold suspends it. Companies House emails
+              the personal code to the individual; Evidence One does not receive
+              it from Companies House, and no code is part of this record.
             </p>
           )}
         </div>
@@ -323,18 +339,6 @@ export function VerificationRecord() {
         fictional.
       </p>
       <MonoLabel className="sr-only">End of record</MonoLabel>
-      <StepUpDialog
-        open={stepUp}
-        action="export this record"
-        onClose={() => setStepUp(false)}
-        onConfirmed={(ref) => {
-          setStepUp(false)
-          apply((d) =>
-            recordExport(d, vc.id, ref, reviewerName(d, actingReviewer.id)),
-          )
-          window.setTimeout(() => window.print(), 300)
-        }}
-      />
     </Page>
   )
 }

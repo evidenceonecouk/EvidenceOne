@@ -1,7 +1,7 @@
 import { Lock, ScanFace } from 'lucide-react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
 
-/* Decorative rendering of the browser capture step: a browser window, no app, no chip scene. */
+/* Decorative rendering of the browser capture step: a browser window, no Evidence One app. */
 export function BrowserCapture({
   className = 'w-[440px]',
 }: {

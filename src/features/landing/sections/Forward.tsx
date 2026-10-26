@@ -11,6 +11,8 @@ import {
 import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/visual/Avatar'
+import { company, footerCopy, forwardCopy } from '@/data/copy'
+import { guidedSteps } from '@/features/guided/steps'
 import { useDemoStore } from '@/store/DemoStore'
 import { container } from '../parts'
 import { RuleKicker } from './Hero'
@@ -110,22 +112,22 @@ export function Forward() {
         className={`${container} grid items-center gap-14 lg:grid-cols-[0.9fr_1.1fr]`}
       >
         <div>
-          <RuleKicker>A simpler way forward</RuleKicker>
+          <RuleKicker>{forwardCopy.kicker}</RuleKicker>
           <h2
             id="forward-title"
             className="mt-6 text-[2.5rem] leading-[1.05] font-normal tracking-[-0.04em] text-ink sm:text-[3.25rem]"
           >
-            Connecting businesses, ACSPs and Companies House.
+            {forwardCopy.title}
           </h2>
           <p className="mt-4 text-[1.5rem] tracking-[-0.02em] text-[#6d7279]">
-            Less complexity. More progress.
+            {forwardCopy.subtitle}
           </p>
           <Button
             size="lg"
             onClick={() => setGuided({ on: true, step: 0 })}
             className="mt-9 h-14 rounded-full bg-highlight px-9 text-lg text-ink hover:bg-[#ffcf26]"
           >
-            Start the guided demo
+            Start the guided demo, {guidedSteps.length} steps
             <ArrowRight aria-hidden="true" />
           </Button>
         </div>
@@ -169,18 +171,29 @@ export function DarkFooter() {
           </ul>
         </nav>
         <p className="flex items-center gap-4 text-[0.8125rem] font-medium tracking-[0.28em] text-paper/70 uppercase">
-          <span aria-hidden="true" className="h-px w-12 bg-white/30" />A clearer
-          tomorrow
+          <span aria-hidden="true" className="h-px w-12 bg-white/30" />
+          {footerCopy.tagline}
         </p>
       </div>
       <div
         className={`${container} relative flex flex-col gap-2 border-t border-white/10 py-6 text-[0.875rem] text-paper/60 sm:flex-row sm:justify-between`}
       >
-        <p>
-          Demonstration prototype. Every person, company and document shown is
-          fictional.
-        </p>
-        <p>Not affiliated with Companies House or GOV.UK.</p>
+        <div className="space-y-1">
+          <p>{footerCopy.legal}</p>
+          <p>
+            Contact for notices:{' '}
+            <a
+              href={`mailto:${company.email}`}
+              className="text-paper/80 underline underline-offset-2 hover:text-paper"
+            >
+              {company.email}
+            </a>
+          </p>
+        </div>
+        <div className="space-y-1 sm:text-right">
+          <p>{footerCopy.disclaimer}</p>
+          <p>{footerCopy.notAffiliated}</p>
+        </div>
       </div>
     </footer>
   )

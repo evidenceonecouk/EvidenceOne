@@ -6,6 +6,7 @@ import { Stepper } from '@/components/app/Stepper'
 import { useToast } from '@/components/app/Toaster'
 import { PendingDecision } from '@/components/PendingDecision'
 import { Button } from '@/components/ui/button'
+import { PACKAGES_PROVISIONAL_NOTE } from '@/data/packages'
 import { submitApplication } from '@/store/onboardingActions'
 import { useDemoStore } from '@/store/DemoStore'
 import type { OnboardingApplication } from '@/types/domain'
@@ -82,7 +83,9 @@ interface Form {
     payoutConnected: boolean
     vatRegistered: boolean
     vatNumber: string
-    pepScreening: 'on' | 'off'
+    /** No platform default: each ACSP chooses (P6, decided 19 October). */
+    pepScreening: '' | 'on' | 'off'
+    addressCheck: '' | 'on' | 'off'
   }
   evidence: {
     retention: 'platform' | 'own'
@@ -192,7 +195,8 @@ const SEED: Form = {
     payoutConnected: false,
     vatRegistered: true,
     vatNumber: 'GB 288 4410 63',
-    pepScreening: 'on',
+    pepScreening: '',
+    addressCheck: '',
   },
   evidence: {
     retention: 'platform',
@@ -266,6 +270,11 @@ function missing(step: number, f: Form): string[] {
     need(f.commercial.feeStandard > 0, 'A standard fee')
     need(f.commercial.perDay > 0, 'A daily maximum')
     need(f.commercial.payoutConnected, 'A connected payout account')
+    need(!!f.commercial.pepScreening, 'A choice on PEP and sanctions screening')
+    need(
+      !!f.commercial.addressCheck,
+      'A choice on the electronic address check',
+    )
   }
   if (step === 4) {
     need(f.evidence.retentionConfirmed, 'Retention period confirmation')
@@ -332,8 +341,9 @@ function toAnswers(f: Form): OnboardingApplication['answers'] {
       vatRegistered: f.commercial.vatRegistered,
       vatNumber: f.commercial.vatRegistered ? f.commercial.vatNumber : '',
       pepAndSanctionsScreening: f.commercial.pepScreening,
+      electronicAddressCheck: f.commercial.addressCheck,
       referredCasesPlan: 'Platform fee deducted automatically',
-      ownClientsPlan: 'Subscription, price not set',
+      ownClientsPlan: 'Easy, Pro or Scale package, chosen after approval',
     },
     evidenceAndRetention: {
       evidenceRetention: f.evidence.retention,
@@ -857,18 +867,46 @@ function CommercialStep({ form: f, setForm }: StepProps) {
           />
         )}
       </Subsection>
-      <Subsection title="PEP and sanctions screening">
-        <RadioGroup
+      <Subsection title="Optional checks">
+        <p className="text-base text-graphite">
+          Each check is your choice. There is no platform default, and the price
+          of the identity checks does not change.
+        </p>
+        <RadioGroup<'on' | 'off'>
           name="pep"
-          legend="Screening for your cases"
-          value={f.commercial.pepScreening}
+          legend="PEP and sanctions screening"
+          value={f.commercial.pepScreening as 'on' | 'off'}
           onChange={(v) => set({ pepScreening: v })}
           options={[
             { value: 'on', label: 'On', hint: 'Screening runs on your cases.' },
             { value: 'off', label: 'Off' },
           ]}
         />
-        <PendingDecision code="P6" />
+        <RadioGroup<'on' | 'off'>
+          name="address-check"
+          legend="Electronic address check (UK residents)"
+          value={f.commercial.addressCheck as 'on' | 'off'}
+          onChange={(v) => set({ addressCheck: v })}
+          options={[
+            {
+              value: 'on',
+              label: 'On',
+              hint: 'The address of a UK resident is checked electronically.',
+            },
+            { value: 'off', label: 'Off' },
+          ]}
+        />
+        <div className="rounded-xl bg-mist px-4 py-3 text-[0.9375rem] text-graphite">
+          <p>
+            Proof of address is still requested from every individual. Whether a
+            passing electronic address check removes the need for the document
+            is not yet decided.
+          </p>
+          <PendingDecision className="mt-2" />
+        </div>
+        <p className="text-[0.9375rem] text-slate">
+          Ongoing PEP and sanctions monitoring: on a package only. Later.
+        </p>
       </Subsection>
       <Subsection title="Plan">
         <ul className="list-disc space-y-2 pl-5 text-base text-graphite">
@@ -877,11 +915,19 @@ function CommercialStep({ form: f, setForm }: StepProps) {
             deducted automatically from each payment.
           </li>
           <li>
-            Your own clients are on a monthly subscription. Price not set. Terms
-            to be set by the client by 4 January 2027.
+            For your own clients you can take a monthly package: Easy £29 (up to
+            5 cases, 2 GB), Pro £89 (up to 25 cases, 10 GB) or Scale £199 (up to
+            60 cases, 25 GB), each with £5 per additional case. Referred cases
+            never count towards the package.
+          </li>
+          <li>
+            Route B filings and ongoing monitoring are available on a package
+            only. You can choose a package after approval.
           </li>
         </ul>
-        <PendingDecision />
+        <p className="text-[0.9375rem] text-slate">
+          {PACKAGES_PROVISIONAL_NOTE}
+        </p>
       </Subsection>
     </div>
   )

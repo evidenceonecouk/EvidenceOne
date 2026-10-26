@@ -5,7 +5,7 @@ import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getAcsp, getPartner } from '@/store/selectors'
-import { useDemoStore } from '@/store/DemoStore'
+import { useDemoStore, useShowHeldOptions } from '@/store/DemoStore'
 import type { PersonaId } from '@/types/domain'
 
 interface NavItem {
@@ -19,6 +19,7 @@ const navByPersona: Record<PersonaId, NavItem[]> = {
     { to: '/partner', label: 'Dashboard', end: true },
     { to: '/partner/lookup', label: 'Companies House lookup' },
     { to: '/partner/invites', label: 'Invites' },
+    { to: '/partner/requests', label: 'Requests' },
   ],
   reviewer: [
     { to: '/acsp/queue', label: 'Review queue' },
@@ -94,7 +95,13 @@ export function ProductHeader({
   publicNav?: boolean
   className?: string
 }) {
-  const items = publicNav ? [] : navByPersona[persona]
+  const showHeldOptions = useShowHeldOptions()
+  // Route B filings are a held option (O2): hidden with the held options.
+  const items = publicNav
+    ? []
+    : navByPersona[persona].filter(
+        (i) => showHeldOptions || i.to !== '/acsp/filings',
+      )
   return (
     <header
       className={cn(

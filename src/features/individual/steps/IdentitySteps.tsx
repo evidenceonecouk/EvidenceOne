@@ -7,9 +7,7 @@ import {
   IdCard,
   Loader2,
   MinusCircle,
-  Monitor,
-  Smartphone,
-  Upload,
+  Nfc,
   UserRoundCheck,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -20,11 +18,8 @@ import { portraitFor } from '@/data/portraits'
 import { useProgress } from '@/hooks/useProgress'
 import { useSequence } from '@/hooks/useSequence'
 import { documentFacts } from '@/lib/idDocument'
-import {
-  DOCUMENT_LABEL,
-  GROUP_B_DOCUMENTS,
-  planChecks,
-} from '@/lib/identityChecks'
+import { hasChipStep } from '@/lib/chip'
+import { DOCUMENT_LABEL, planChecks } from '@/lib/identityChecks'
 import { formatDate } from '@/lib/format'
 import { currentRuleSet } from '@/lib/rules'
 import { cn } from '@/lib/utils'
@@ -32,10 +27,11 @@ import { requestOption2 } from '@/store/actions'
 import { useDemoStore } from '@/store/DemoStore'
 import {
   chooseDocument,
-  continueWithSupportingDocument,
   recordCheckFailure,
+  recordChipResult,
   recordDocumentCapture,
   recordLivenessCapture,
+  recordPhoneJourney,
   switchDocument,
 } from '@/store/identityActions'
 import { reviewerOrgName } from '@/store/selectors'
@@ -64,13 +60,13 @@ const documents: {
   {
     type: 'passport',
     label: 'Passport',
-    note: 'From any country. Checked in your browser.',
+    note: 'From any country. If it has a chip, the identity provider’s chip reader reads it.',
     icon: BookUser,
   },
   {
     type: 'driving_licence',
     label: 'Photocard driving licence',
-    note: 'UK. Checked in your browser, on a computer or a phone.',
+    note: 'UK. Captured with a phone or tablet camera.',
     icon: Car,
   },
   {
@@ -108,9 +104,6 @@ export function DocumentStep({ vc, next, person, go }: StepProps) {
     vc.journey?.documentType ?? person.document?.type ?? 'passport',
   )
   const [eVisa, setEVisa] = useState(!!vc.journey?.eVisa)
-  const [second, setSecond] = useState<string>(
-    vc.journey?.eVisaSecondDocument ?? GROUP_B_DOCUMENTS[0],
-  )
   const chosen = eVisa ? 'passport' : type
 
   return (
@@ -121,19 +114,13 @@ export function DocumentStep({ vc, next, person, go }: StepProps) {
             className="w-full"
             size="lg"
             onClick={() => {
-              apply((d) =>
-                chooseDocument(
-                  d,
-                  vc.id,
-                  chosen,
-                  eVisa,
-                  eVisa ? second : undefined,
-                ),
-              )
+              apply((d) => chooseDocument(d, vc.id, chosen, eVisa))
               next()
             }}
           >
-            Continue with {DOCUMENT_LABEL[chosen].toLowerCase()}
+            {eVisa
+              ? 'Continue with my eVisa'
+              : `Continue with ${DOCUMENT_LABEL[chosen].toLowerCase()}`}
           </Button>
           <Button
             className="w-full"
@@ -208,90 +195,16 @@ export function DocumentStep({ vc, next, person, go }: StepProps) {
             <BookUser className="size-5" aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-base font-medium text-ink">
-              I hold an eVisa
-            </span>
+            <span className="block text-base font-medium text-ink">eVisa</span>
             <span className="block text-base leading-snug text-slate">
-              Your passport plus one other document
+              Checked with the Home Office. Have the passport linked to your
+              eVisa ready.
             </span>
           </span>
           <RadioMark on={eVisa} />
         </label>
       </fieldset>
-      {eVisa && (
-        <div className="mt-4 rounded-2xl border border-line bg-white p-4">
-          <p className="text-base text-graphite">
-            For now we ask for your passport plus any one document from Group B.
-            We will change this when the certified identity provider can check
-            an eVisa in the browser.
-          </p>
-          <fieldset className="mt-3 space-y-2">
-            <legend className="text-base font-medium text-ink">
-              Your second document
-            </legend>
-            {GROUP_B_DOCUMENTS.map((g) => (
-              <label
-                key={g}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2.5 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ink"
-              >
-                <input
-                  type="radio"
-                  name="groupb"
-                  className="sr-only"
-                  checked={second === g}
-                  onChange={() => setSecond(g)}
-                />
-                <RadioMark on={second === g} />
-                <span className="text-base text-ink">{g}</span>
-              </label>
-            ))}
-          </fieldset>
-        </div>
-      )}
     </Screen>
-  )
-}
-
-function ChoiceCard({
-  icon: Icon,
-  title,
-  note,
-  badge,
-  onClick,
-}: {
-  icon: typeof Upload
-  title: string
-  note: string
-  badge?: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full cursor-pointer items-start gap-3 rounded-2xl border border-line bg-white p-4 text-left hover:border-ink focus-visible:ring-[3px] focus-visible:ring-ink focus-visible:outline-none"
-    >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-mist text-ink">
-        <Icon className="size-5" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-2 text-base font-medium text-ink">
-          {title}
-          {badge && (
-            <span className="rounded-full bg-mist px-2 py-0.5 text-[0.875rem] font-medium text-graphite">
-              {badge}
-            </span>
-          )}
-        </span>
-        <span className="mt-0.5 block text-base leading-snug text-slate">
-          {note}
-        </span>
-      </span>
-      <ChevronRight
-        className="mt-2 size-5 shrink-0 text-slate"
-        aria-hidden="true"
-      />
-    </button>
   )
 }
 
@@ -304,49 +217,116 @@ function ContinueButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-export function ScanStep({ vc, person, next, viewMode }: StepProps) {
+/*
+  The certified identity provider needs a phone or tablet camera. On desktop
+  the whole provider journey (document, chip where the document has one, and
+  the selfie video) is finished on the phone or tablet, and this screen then
+  shows the result. On mobile the capture is direct. There is no webcam-only
+  route. The return to this case is simulated.
+*/
+export function ScanStep({ vc, person, next, go, viewMode }: StepProps) {
   const { apply } = useDemoStore()
   const mode = useViewMode(viewMode)
   const mobile = mode === 'mobile'
   const already = !!vc.journey?.photoPageDone
   const type = vc.journey?.documentType ?? 'passport'
   const isPassport = type === 'passport'
-  const [route, setRoute] = useState<'upload' | 'phone' | 'camera' | undefined>(
-    vc.journey?.captureRoute ?? (mobile ? 'camera' : undefined),
-  )
-  const activeRoute = mobile && route !== 'phone' ? 'camera' : route
+  const chipStep = hasChipStep(person.document, type)
   const [running, setRunning] = useState(false)
-  const [receiving, setReceiving] = useState(false)
+  const [receiving, setReceiving] = useState<'read' | 'not_read' | null>(null)
   const progress = useProgress(scanDuration(isPassport), running)
   const done = already || progress >= 100
   const phase = scanPhase(progress, isPassport, running, done)
   const facts = useMemo(() => documentFacts(person, type), [person, type])
 
   useEffect(() => {
-    if (!done || already || !activeRoute || activeRoute === 'phone') return
-    apply((d) => recordDocumentCapture(d, vc.id, type, activeRoute))
-  }, [done, already, apply, vc.id, type, activeRoute])
+    if (!mobile || !done || already) return
+    apply((d) => recordDocumentCapture(d, vc.id, type, 'camera'))
+  }, [mobile, done, already, apply, vc.id, type])
 
   useEffect(() => {
     if (!receiving) return
     const id = window.setTimeout(() => {
-      apply((d) => recordDocumentCapture(d, vc.id, type, 'phone'))
-      setReceiving(false)
+      apply((d) => recordPhoneJourney(d, vc.id, receiving))
+      setReceiving(null)
     }, 1500)
     return () => window.clearTimeout(id)
-  }, [receiving, apply, vc.id, type])
+  }, [receiving, apply, vc.id])
 
-  const upload = activeRoute === 'upload'
+  const toOption2 = () => {
+    apply((d) => requestOption2(d, vc.id, 'no_smartphone'))
+    go('status')
+  }
+
+  if (!mobile) {
+    const returned =
+      !!vc.journey?.photoPageDone && !!vc.journey?.selfieDone && !receiving
+    if (returned) {
+      const chip = vc.journey?.chipResult
+      return (
+        <Screen
+          footer={
+            <Button className="w-full" size="lg" onClick={() => go('checks')}>
+              Continue
+              <ChevronRight aria-hidden="true" />
+            </Button>
+          }
+        >
+          <ScreenTitle kicker="Identity document">
+            We have your result, continue
+          </ScreenTitle>
+          <Lead>
+            You finished on your phone and you are back in your case. You will
+            not need to add anything again.
+          </Lead>
+          <ProviderLabel className="mt-3" />
+          <ul
+            className="mt-5 space-y-2.5"
+            aria-label="Returned from your phone"
+          >
+            <ResultRow label={`${DOCUMENT_LABEL[type]} captured`} ok />
+            {chipStep && (
+              <ResultRow
+                label={chip === 'not_read' ? 'No chip read' : 'Chip read'}
+                ok={chip !== 'not_read'}
+                note={
+                  chip === 'not_read'
+                    ? 'This does not stop your case. Your ACSP’s reviewer will decide.'
+                    : undefined
+                }
+              />
+            )}
+            <ResultRow label="Selfie video recorded" ok />
+          </ul>
+        </Screen>
+      )
+    }
+    return (
+      <Screen>
+        <ScreenTitle kicker="Identity document">
+          Continue on your phone or tablet
+        </ScreenTitle>
+        <ProviderLabel className="mt-3" />
+        <PhoneHandoff
+          purpose="journey"
+          caseId={vc.id}
+          mobile={person.mobile}
+          chipStep={chipStep}
+          receiving={!!receiving}
+          onReturn={() => setReceiving('read')}
+          onChipNotRead={() => setReceiving('not_read')}
+          onNoSmartphone={toOption2}
+        />
+      </Screen>
+    )
+  }
+
   const status: Record<typeof phase, string> = {
-    idle: upload
-      ? 'Choose a clear photo or scan of the page. Good light, no glare, all four corners visible.'
-      : 'Good light, no glare, all four corners visible.',
+    idle: 'Good light, no glare, all four corners visible.',
     align: isPassport
       ? 'Hold the page flat inside the frame'
       : 'Hold the card flat inside the frame',
-    page: upload
-      ? 'Uploading and reading the photo page'
-      : 'Reading the photo page',
+    page: 'Reading the photo page',
     mrz: 'Reading the machine-readable zone',
     front: 'Reading the front',
     turn: 'Now turn it over',
@@ -355,133 +335,185 @@ export function ScanStep({ vc, person, next, viewMode }: StepProps) {
         ? 'Reading the back'
         : 'Reading the machine-readable zone',
     capture: 'Hold steady',
-    done:
-      activeRoute === 'phone'
-        ? 'Received from your phone’s browser. You are back in your case, and you will not add it again.'
-        : 'Added. We reuse this for every check, so you will not add it again.',
+    done: 'Added. We reuse this for every check, so you will not add it again.',
   }
 
-  const title = isPassport
-    ? 'Place the photo page in the frame'
-    : 'Place your document in the frame'
-
-  let body: ReactNode
-  let footer: ReactNode
-  if (done) {
-    footer = <ContinueButton onClick={next} />
-    body = (
-      <>
-        <ScreenTitle kicker="Identity document">Document added</ScreenTitle>
-        <ProviderLabel className="mt-3" />
-        <DocumentScan
-          facts={facts}
-          look={portraitFor(person)}
-          progress={100}
-          phase="done"
-        />
-        <p className="mt-4 text-base text-graphite" role="status">
-          {status.done}
-        </p>
-      </>
-    )
-  } else if (!activeRoute) {
-    footer = undefined
-    body = (
-      <>
-        <ScreenTitle kicker="Identity document">
-          How would you like to add your document?
-        </ScreenTitle>
-        <ProviderLabel className="mt-3" />
-        <div className="mt-5 space-y-2.5">
-          <ChoiceCard
-            icon={Upload}
-            title="Upload your document"
-            note="Choose a photo or scan from this computer."
-            onClick={() => setRoute('upload')}
-          />
-          <ChoiceCard
-            icon={Smartphone}
-            title="Continue on your phone"
-            note="Scan a code or get a link. You add the document in your phone’s browser and come back to this case."
-            onClick={() => setRoute('phone')}
-          />
-        </div>
-      </>
-    )
-  } else if (activeRoute === 'phone') {
-    footer = undefined
-    body = (
-      <>
-        <ScreenTitle kicker="Identity document">
-          Continue on your phone
-        </ScreenTitle>
-        <ProviderLabel className="mt-3" />
-        <PhoneHandoff
-          purpose="document"
-          caseId={vc.id}
-          mobile={person.mobile}
-          receiving={receiving}
-          onReturn={() => setReceiving(true)}
-          onChoose={() => setRoute(mobile ? 'camera' : undefined)}
-        />
-      </>
-    )
-  } else {
-    footer = (
-      <>
-        <Button
-          className="w-full disabled:opacity-100"
-          size="lg"
-          disabled={running}
-          onClick={() => setRunning(true)}
-        >
-          {running ? (
-            <Loader2 className="animate-spin" aria-hidden="true" />
-          ) : upload ? (
-            <Upload aria-hidden="true" />
-          ) : null}
-          {running
-            ? 'Hold steady'
-            : upload
-              ? 'Choose a file from this computer'
+  return (
+    <Screen
+      footer={
+        done ? (
+          <ContinueButton onClick={next} />
+        ) : (
+          <Button
+            className="w-full disabled:opacity-100"
+            size="lg"
+            disabled={running}
+            onClick={() => setRunning(true)}
+          >
+            {running && <Loader2 className="animate-spin" aria-hidden="true" />}
+            {running
+              ? 'Hold steady'
               : isPassport
                 ? 'Scan the photo page'
                 : 'Scan my document'}
-        </Button>
-        {!mobile && !running && (
-          <Button
-            className="w-full"
-            variant="ghost"
-            onClick={() => setRoute(undefined)}
-          >
-            Choose another way
           </Button>
-        )}
-      </>
-    )
-    body = (
-      <>
-        <ScreenTitle kicker="Identity document">{title}</ScreenTitle>
-        <ProviderLabel className="mt-3" />
-        <DocumentScan
-          facts={facts}
-          look={portraitFor(person)}
-          progress={progress}
-          phase={phase}
-        />
-        <p className="mt-4 text-base text-graphite" role="status">
-          {status[phase]}
-        </p>
-        {upload && (
-          <p className="mt-2 text-[0.875rem] text-slate">
-            Demo: the specimen document is used. No file is read or sent.
-          </p>
-        )}
-      </>
-    )
-  }
+        )
+      }
+    >
+      <ScreenTitle kicker="Identity document">
+        {done
+          ? 'Document added'
+          : isPassport
+            ? 'Place the photo page in the frame'
+            : 'Place your document in the frame'}
+      </ScreenTitle>
+      <ProviderLabel className="mt-3" />
+      <DocumentScan
+        facts={facts}
+        look={portraitFor(person)}
+        progress={done ? 100 : progress}
+        phase={done ? 'done' : phase}
+      />
+      <p className="mt-4 text-base text-graphite" role="status">
+        {status[done ? 'done' : phase]}
+      </p>
+    </Screen>
+  )
+}
 
-  return <Screen footer={footer}>{body}</Screen>
+function ResultRow({
+  label,
+  ok,
+  note,
+}: {
+  label: string
+  ok: boolean
+  note?: string
+}) {
+  return (
+    <li className="flex items-start gap-3 rounded-2xl border border-line bg-white px-4 py-3.5">
+      {ok ? (
+        <CompletionTick className="mt-0.5 size-5" label="Done" />
+      ) : (
+        <Flag
+          className="mt-0.5 size-5 text-info"
+          aria-label="Recorded for the reviewer"
+        />
+      )}
+      <span>
+        <span className="block text-base text-ink">{label}</span>
+        {note && <span className="block text-base text-slate">{note}</span>}
+      </span>
+    </li>
+  )
+}
+
+/*
+  The chip step sits inside the certified identity provider's journey, after
+  the document capture. The chip is read by the provider's own chip reader on
+  the person's phone. Evidence One has no app and reads no chip. The return to
+  this case is simulated; where the step sits is to be confirmed with the
+  provider.
+*/
+export function ChipStep({ vc, person, next, viewMode }: StepProps) {
+  const { apply } = useDemoStore()
+  const mode = useViewMode(viewMode)
+  const mobile = mode === 'mobile'
+  const result = vc.journey?.chipResult
+  const [receiving, setReceiving] = useState<'read' | 'not_read' | null>(null)
+
+  useEffect(() => {
+    if (!receiving) return
+    const id = window.setTimeout(() => {
+      apply((d) => recordChipResult(d, vc.id, receiving))
+      setReceiving(null)
+    }, 1500)
+    return () => window.clearTimeout(id)
+  }, [receiving, apply, vc.id])
+
+  const kicker = 'Identity document · Passport chip'
+  const title =
+    'Read your passport chip with the identity provider’s chip reader'
+
+  if (result && !receiving)
+    return (
+      <Screen footer={<ContinueButton onClick={next} />}>
+        <ScreenTitle kicker={kicker}>
+          {result === 'read' ? 'Your passport chip was read' : 'No chip read'}
+        </ScreenTitle>
+        <ProviderLabel className="mt-3" />
+        <ul className="mt-5 space-y-2.5">
+          <ResultRow
+            label={result === 'read' ? 'Chip read' : 'No chip read'}
+            ok={result === 'read'}
+            note={
+              result === 'read'
+                ? 'The identity provider’s chip reader read the chip. You are back in your case.'
+                : 'You can continue. Your case records that no chip was read, and your ACSP’s reviewer will decide.'
+            }
+          />
+        </ul>
+      </Screen>
+    )
+
+  if (!mobile)
+    return (
+      <Screen>
+        <ScreenTitle kicker={kicker}>{title}</ScreenTitle>
+        <ProviderLabel className="mt-3" />
+        <PhoneHandoff
+          purpose="chip"
+          caseId={vc.id}
+          mobile={person.mobile}
+          receiving={!!receiving}
+          onReturn={() => setReceiving('read')}
+          onChipNotRead={() => setReceiving('not_read')}
+        />
+      </Screen>
+    )
+
+  return (
+    <Screen
+      footer={
+        <>
+          <Button
+            className="w-full disabled:opacity-100"
+            size="lg"
+            disabled={!!receiving}
+            onClick={() => setReceiving('read')}
+          >
+            {receiving ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Nfc aria-hidden="true" />
+            )}
+            {receiving ? 'Reading the chip' : 'Open the chip reader'}
+          </Button>
+          {!receiving && (
+            <Button
+              className="w-full"
+              variant="ghost"
+              onClick={() => setReceiving('not_read')}
+            >
+              I cannot read the chip, continue without it
+            </Button>
+          )}
+        </>
+      }
+    >
+      <ScreenTitle kicker={kicker}>{title}</ScreenTitle>
+      <ProviderLabel className="mt-3" />
+      <Lead>
+        Hold your passport flat against the back of this phone until it
+        finishes. It takes a few seconds.
+      </Lead>
+      <p className="mt-4 rounded-2xl bg-mist px-4 py-3 text-base text-graphite">
+        The chip reader belongs to the certified identity provider and opens on
+        this phone. It is not an Evidence One app. You come straight back to
+        this case.
+      </p>
+    </Screen>
+  )
 }
 
 export function SelfieStep({ vc, person, next, viewMode }: StepProps) {
@@ -489,9 +521,6 @@ export function SelfieStep({ vc, person, next, viewMode }: StepProps) {
   const mode = useViewMode(viewMode)
   const mobile = mode === 'mobile'
   const already = !!vc.journey?.selfieDone
-  const [route, setRoute] = useState<'phone' | 'computer' | undefined>(
-    vc.journey?.livenessRoute ?? (mobile ? 'computer' : undefined),
-  )
   const [running, setRunning] = useState(false)
   const [receiving, setReceiving] = useState(false)
   const attempts = vc.journey?.checkAttempts ?? 0
@@ -501,14 +530,14 @@ export function SelfieStep({ vc, person, next, viewMode }: StepProps) {
   const recording = beat?.ring === 'rec'
 
   useEffect(() => {
-    if (!done || already || !route || route === 'phone') return
-    apply((d) => recordLivenessCapture(d, vc.id, mobile ? 'phone' : 'computer'))
-  }, [done, already, apply, vc.id, route, mobile])
+    if (!mobile || !done || already) return
+    apply((d) => recordLivenessCapture(d, vc.id))
+  }, [mobile, done, already, apply, vc.id])
 
   useEffect(() => {
     if (!receiving) return
     const id = window.setTimeout(() => {
-      apply((d) => recordLivenessCapture(d, vc.id, 'phone'))
+      apply((d) => recordLivenessCapture(d, vc.id))
       setReceiving(false)
     }, 1500)
     return () => window.clearTimeout(id)
@@ -518,33 +547,13 @@ export function SelfieStep({ vc, person, next, viewMode }: StepProps) {
     ? `Selfie video, attempt ${attempts + 1} of 3`
     : 'Selfie video'
 
-  if (!done && !route)
+  // Desktop hands off to the phone or tablet. There is no webcam-only route.
+  if (!done && !mobile)
     return (
       <Screen>
-        <ScreenTitle kicker={kicker}>Show us it is really you</ScreenTitle>
-        <ProviderLabel className="mt-3" />
-        <div className="mt-5 space-y-2.5">
-          <ChoiceCard
-            icon={Smartphone}
-            title="Continue on your phone"
-            badge="Recommended"
-            note="A phone camera usually gives a clearer result."
-            onClick={() => setRoute('phone')}
-          />
-          <ChoiceCard
-            icon={Monitor}
-            title="Use this computer’s camera"
-            note="A supported choice if you do not have a smartphone."
-            onClick={() => setRoute('computer')}
-          />
-        </div>
-      </Screen>
-    )
-
-  if (!done && route === 'phone' && !mobile)
-    return (
-      <Screen>
-        <ScreenTitle kicker={kicker}>Continue on your phone</ScreenTitle>
+        <ScreenTitle kicker={kicker}>
+          Continue on your phone or tablet
+        </ScreenTitle>
         <ProviderLabel className="mt-3" />
         <PhoneHandoff
           purpose="liveness"
@@ -552,7 +561,6 @@ export function SelfieStep({ vc, person, next, viewMode }: StepProps) {
           mobile={person.mobile}
           receiving={receiving}
           onReturn={() => setReceiving(true)}
-          onChoose={() => setRoute(undefined)}
         />
       </Screen>
     )
@@ -581,9 +589,9 @@ export function SelfieStep({ vc, person, next, viewMode }: StepProps) {
     >
       <ScreenTitle kicker={kicker}>Show us it is really you</ScreenTitle>
       <ProviderLabel className="mt-3" />
-      {done && already && route === 'phone' && !mobile ? (
+      {done && already && !mobile ? (
         <p className="mt-5 text-base text-graphite" role="status">
-          Received from your phone’s browser. You are back in your case.
+          Received from your phone. You are back in your case.
         </p>
       ) : (
         <LivenessCamera look={portraitFor(person)} beat={beat} />
@@ -682,8 +690,8 @@ export function ChecksStep({ vc, next, go, person }: StepProps) {
     apply((d) => requestOption2(d, vc.id, reason))
     go('status')
   }
-  const useLicence = (why: 'expired' | 'other_document') => {
-    apply((d) => switchDocument(d, vc.id, 'driving_licence', why))
+  const useLicence = () => {
+    apply((d) => switchDocument(d, vc.id, 'driving_licence'))
     go('scan')
   }
 
@@ -719,29 +727,24 @@ export function ChecksStep({ vc, next, go, person }: StepProps) {
     panel = (
       <Panel
         title={`Your ${DOCUMENT_LABEL[vc.journey?.documentType ?? 'passport'].toLowerCase()} expired on ${expiredDate}`}
-        badge={
-          plan.expiry?.passport ? <PendingDecision code="H1" /> : undefined
-        }
       >
         <p>
-          For now we ask for another document. A UK photocard driving licence is
-          checked in your browser. You can also continue with this one and send
-          one supporting document, and the reviewer decides.
+          {plan.expiry?.passport
+            ? 'An expired passport cannot be accepted. Please use another document.'
+            : 'This document has expired beyond the period we can accept. Please use another document.'}{' '}
+          A UK photocard driving licence is accepted.
         </p>
         <div className="mt-3 space-y-2">
-          <Button className="w-full" onClick={() => useLicence('expired')}>
+          <Button className="w-full" onClick={useLicence}>
             <Car aria-hidden="true" />
             Use a UK photocard driving licence
           </Button>
           <Button
             className="w-full"
             variant="outline"
-            onClick={() => {
-              apply((d) => continueWithSupportingDocument(d, vc.id))
-              setResolved(total)
-            }}
+            onClick={() => go('document')}
           >
-            Continue and send one supporting document
+            Choose another document
           </Button>
           <Button
             className="w-full"
@@ -753,36 +756,12 @@ export function ChecksStep({ vc, next, go, person }: StepProps) {
         </div>
       </Panel>
     )
-  } else if (done && plan.outcome === 'other_document') {
-    panel = (
-      <Panel title="We need a different document">
-        <p>
-          This document cannot be used on its own at the moment. A UK photocard
-          driving licence is checked in your browser. If you do not have one, a
-          trained person can check your identity instead.
-        </p>
-        <div className="mt-3 space-y-2">
-          <Button
-            className="w-full"
-            onClick={() => useLicence('other_document')}
-          >
-            <Car aria-hidden="true" />
-            Use a UK photocard driving licence
-          </Button>
-          <Button
-            className="w-full"
-            variant="ghost"
-            onClick={() => toOption2('unsupported_document')}
-          >
-            I do not have one
-          </Button>
-        </div>
-      </Panel>
-    )
   }
 
   const proceed = done && !failed && plan.outcome === 'clear'
-  const flaggedNote = plan.rows.find((r) => r.state === 'flagged')?.note
+  const flaggedNotes = plan.rows.flatMap((r) =>
+    r.state === 'flagged' && r.note ? [r.note] : [],
+  )
   void person
 
   return (
@@ -877,11 +856,15 @@ export function ChecksStep({ vc, next, go, person }: StepProps) {
           )
         })}
       </ul>
-      {done && flaggedNote && (
-        <p className="mt-4 rounded-2xl bg-info-wash px-4 py-3 text-base text-ink">
-          {flaggedNote}
-        </p>
-      )}
+      {done &&
+        flaggedNotes.map((n) => (
+          <p
+            key={n}
+            className="mt-4 rounded-2xl bg-info-wash px-4 py-3 text-base text-ink"
+          >
+            {n}
+          </p>
+        ))}
       {panel}
     </Screen>
   )
@@ -914,6 +897,7 @@ export function OptionTwoStep({ vc, go }: StepProps) {
   const reviewer = data.acsps
     .find((a) => a.id === vc.acspId)
     ?.reviewers.find((r) => r.attestation)
+  const noSmartphone = vc.option2?.reason === 'no_smartphone'
   const reason = attemptsUsed ? 'attempts_used' : 'unsupported_document'
   return (
     <Screen
@@ -943,13 +927,18 @@ export function OptionTwoStep({ vc, go }: StepProps) {
       <ScreenTitle kicker="Option 2 · Fallback only">
         {attemptsUsed
           ? 'The digital checks did not pass'
-          : 'Your document can’t be checked digitally'}
+          : noSmartphone
+            ? 'You do not have a smartphone or tablet'
+            : 'Your document can’t be checked digitally'}
       </ScreenTitle>
       <Lead>
-        The digital checks (Option 1) cannot support your case. A trained person
-        at {acsp} can check your identity instead. They will contact you to
-        arrange it.
+        {noSmartphone
+          ? 'The digital checks need a phone or tablet camera. '
+          : 'The digital checks (Option 1) cannot support your case. '}
+        A trained person at {acsp} can check your identity instead. They will
+        contact you to arrange it.
       </Lead>
+      {noSmartphone && <PendingDecision className="mt-3" />}
       <ul className="mt-5 space-y-2.5 text-base text-graphite">
         <li className="rounded-2xl border border-line bg-white px-4 py-3">
           You will need two documents: two from Group A, or one from Group A and

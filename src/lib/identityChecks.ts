@@ -1,3 +1,4 @@
+import { hasChipStep } from '@/lib/chip'
 import { formatDate } from '@/lib/format'
 import {
   monthYear,
@@ -86,15 +87,14 @@ export function computeRegisterDifferences(
 export type ChecksOutcome =
   /** Nothing further is needed from the person. */
   | 'clear'
-  /** DOC-EXP-01: the document is expired and another document is asked for (H1). */
+  /** DOC-EXP-01 to DOC-EXP-03: the document is expired and another document is asked for. */
   | 'expired'
-  /** IDVT-01 with `chip_not_read_fallback` set to request another Option 1 document. */
-  | 'other_document'
 
 export type CheckRowState = 'passed' | 'not_switched_on' | 'flagged'
 
 export interface CheckRow {
-  key: 'document' | 'liveness' | 'face' | 'pep' | 'register'
+  key:
+    'document' | 'chip' | 'liveness' | 'face' | 'pep' | 'address' | 'register'
   label: string
   by: string
   state: CheckRowState
@@ -121,13 +121,6 @@ export const DOCUMENT_LABEL: Record<IdDocumentType, string> = {
   biometric_residence_permit: 'Biometric residence permit',
 }
 
-/** The Group B documents offered with a passport to an eVisa holder. */
-export const GROUP_B_DOCUMENTS = [
-  'Bank or credit card statement with recent transactions',
-  'Utility bill or council tax bill',
-  'Insurance policy document showing your home address',
-] as const
-
 /**
   What the checks show for this case. Pure and deterministic: the same case and
   rule set always give the same rows and the same outcome.
@@ -147,9 +140,6 @@ export function planChecks(
   const doc = person?.document?.type === type ? person.document : undefined
   const differences =
     person && entry ? computeRegisterDifferences(person, doc, entry) : []
-  const settings = rs.settings
-  const handling = settings.expired_passport_handling ?? 'ask_other_document'
-  const fallback = settings.chip_not_read_fallback ?? 'accept_web_result'
 
   let expiry: ChecksPlan['expiry']
   if (doc && new Date(doc.expiresOn).getTime() < now) {
@@ -171,25 +161,43 @@ export function planChecks(
       : type === 'biometric_residence_permit'
         ? rs.params.brp_expiry
         : 0
+  // An expired passport is not accepted (H1, decided 19 October).
   const expiredBeyond =
-    !!expiry &&
-    vc.journey?.expiredChoice !== 'supporting_document' &&
-    (type === 'passport' && handling === 'ask_other_document'
-      ? true
-      : expiry.monthsExpired > tolerance)
+    !!expiry && (type === 'passport' || expiry.monthsExpired > tolerance)
 
-  const chipDocument = !!doc?.hasChip && type !== 'driving_licence'
-  const otherDocument =
-    chipDocument && fallback === 'request_other_then_option2' && !expiredBeyond
-
+  const chip = hasChipStep(doc, type)
+    ? (vc.journey?.chipResult ?? 'read')
+    : undefined
   const pepOn = !!acsp?.profile.pepScreening
+  const ukResident =
+    person?.addressHistory.find((a) => !a.to)?.address.country ===
+    'United Kingdom'
+  const addressOn = !!acsp?.profile.addressCheck && ukResident
   const rows: CheckRow[] = [
     {
       key: 'document',
-      label: 'Document is genuine',
+      label: 'Document is genuine, security features checked',
       by: PROVIDER,
       state: 'passed',
     },
+    ...(chip
+      ? [
+          chip === 'read'
+            ? {
+                key: 'chip' as const,
+                label: 'Chip read',
+                by: 'The identity provider’s chip reader',
+                state: 'passed' as const,
+              }
+            : {
+                key: 'chip' as const,
+                label: 'No chip read',
+                by: 'Recorded on your case',
+                state: 'flagged' as const,
+                note: 'The chip was not read. This does not stop your case. Your ACSP’s reviewer will decide.',
+              },
+        ]
+      : []),
     {
       key: 'liveness',
       label: 'You are a live person',
@@ -215,6 +223,16 @@ export function planChecks(
           by: 'Not switched on for this ACSP',
           state: 'not_switched_on',
         },
+    ...(addressOn
+      ? [
+          {
+            key: 'address' as const,
+            label: 'Electronic address check',
+            by: PROVIDER,
+            state: 'passed' as const,
+          },
+        ]
+      : []),
     {
       key: 'register',
       label: 'Details compared with the register',
@@ -226,11 +244,7 @@ export function planChecks(
     },
   ]
   return {
-    outcome: expiredBeyond
-      ? 'expired'
-      : otherDocument
-        ? 'other_document'
-        : 'clear',
+    outcome: expiredBeyond ? 'expired' : 'clear',
     rows,
     differences,
     expiry,
@@ -246,7 +260,7 @@ const adjectives: Record<string, string> = {
   Ukraine: 'Ukrainian',
 }
 
-/** For example "UK passport, captured in the browser". Never "chip read". */
+/** For example "UK passport, captured in the phone's browser". The chip result is recorded separately. */
 export function evidenceLabel(
   doc: IdDocument,
   route: 'upload' | 'phone' | 'camera' | undefined,

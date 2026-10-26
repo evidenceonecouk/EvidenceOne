@@ -14,6 +14,7 @@ import type {
   YearlyUpload,
 } from '@/types/domain'
 import type { ActionResult } from './actions'
+import { authorisePayment, releasePayment, then } from './paymentActions'
 
 /*
   Platform Administrator actions: approving ACSPs and Referral Partners,
@@ -92,7 +93,7 @@ export function allocationState(
     open: true,
     reason:
       acsp.status === 'not_yet_listed'
-        ? 'Open while it registers (Time to register: to be set)'
+        ? 'Open while it registers (Time to register: 3 months)'
         : 'Open',
   }
 }
@@ -215,7 +216,7 @@ function buildAcsp(
     status,
     statusNote: listed
       ? `Approved by ${actor}. Name matched to the Companies House published list of ACSPs.`
-      : `Approved by ${actor}. Not found on the Companies House published list of ACSPs. Time to register: to be set (Pending your decision, M4). Can become Active when the listing arrives.`,
+      : `Approved by ${actor}. Not found on the Companies House published list of ACSPs. Time to register: 3 months. Can become Active when the listing arrives.`,
     approval: 'approved',
     reviewers: [
       {
@@ -258,7 +259,8 @@ function buildAcsp(
         currency: 'GBP',
       },
       evidenceRetention: 'platform',
-      pepScreening: true,
+      pepScreening: answerOf(app, 'pepandsanctionsscreening') === 'on',
+      addressCheck: answerOf(app, 'electronicaddresscheck') === 'on',
       address:
         asText(answerOf(app, 'address', 'registeredaddress')) ??
         'Address as given in the application',
@@ -272,7 +274,7 @@ function buildAcsp(
       nameMatchConfirmedBy: listed ? actor : undefined,
       notYetListedSince: listed ? undefined : at,
     },
-    plan: { invoiceMode: 'per_case', subscription: 'monthly_only' },
+    plan: { invoiceMode: 'per_case', packageId: null, storageUsedGb: 0 },
     b2cAllocationShare: 0,
     b2cAllocatedThisMonth: 0,
   }
@@ -355,7 +357,7 @@ export function approveApplication(
       actor,
       actorType: 'person',
       action: 'onboarding.acsp_approved',
-      detail: `${app.name} approved as an ACSP (application ${app.id}). Status ${status === 'active' ? 'Active: name found on the Companies House published list' : 'Not yet listed: name not found on the published list. Time to register: to be set'}.`,
+      detail: `${app.name} approved as an ACSP (application ${app.id}). Status ${status === 'active' ? 'Active: name found on the Companies House published list' : 'Not yet listed: name not found on the published list. Time to register: 3 months'}.`,
     })
   } else {
     const partner = buildPartner(data, app)
@@ -594,6 +596,15 @@ function applyLapse(
   // Offer each open case to another ACSP, with the individual's agreement (ACSP-13).
   const open = openCasesOf(next, acspId).filter((c) => !c.reallocation)
   for (const c of open) {
+    // P10: nothing is taken from the client of a lapsed ACSP. The authorisation is released.
+    const released = releasePayment(
+      next,
+      c.id,
+      `${acsp.name} lapsed before a decision`,
+      at,
+    )
+    next = released.data
+    audit.push(...released.audit)
     const offer = suggestAcsps(next, criteriaForCase(next, c)).find(
       (s) => s.acsp.id !== acspId,
     )
@@ -633,6 +644,24 @@ function applyLapse(
       detail: `Open case offered to ${offer.acsp.name}. It moves only if the individual agrees (ACSP-13).`,
     })
   }
+  // M3: each Referral Partner is notified of its own affected clients, and sees only those.
+  const byPartner = new Map<string, number>()
+  for (const c of next.cases)
+    if (
+      c.partnerId &&
+      (c.acspId === acspId || c.reallocation?.fromAcspId === acspId)
+    )
+      byPartner.set(c.partnerId, (byPartner.get(c.partnerId) ?? 0) + 1)
+  for (const [partnerId, n] of byPartner) {
+    const partner = next.partners.find((p) => p.id === partnerId)
+    audit.push({
+      at,
+      actor: 'Platform, automatic',
+      actorType: 'system',
+      action: 'partner.affected_clients_notified',
+      detail: `${partner?.name ?? partnerId} notified of ${n} of its own client${n === 1 ? '' : 's'} affected by the lapse of ${acsp.name} (ACSP-12, M3). Status and which ACSP lapsed only, never documents.`,
+    })
+  }
   return { data: next, audit }
 }
 
@@ -654,7 +683,7 @@ function applyNotListed(
               ...a,
               status: 'not_yet_listed',
               statusNote:
-                'Not found on the Companies House published list of ACSPs. Time to register: to be set (Pending your decision, M4). Can become Active when the listing arrives.',
+                'Not found on the Companies House published list of ACSPs. Time to register: 3 months. Can become Active when the listing arrives.',
               monitoring: {
                 ...a.monitoring,
                 lastCheckAt: at,
@@ -671,7 +700,7 @@ function applyNotListed(
         actor,
         actorType: 'person',
         action: 'acsp.status_changed',
-        detail: `${acsp.name} is now Not yet listed. Time to register: to be set (Pending your decision, M4). It is not blocked and becomes Active when the listing arrives.`,
+        detail: `${acsp.name} is now Not yet listed. Time to register: 3 months. It is not blocked and becomes Active when the listing arrives.`,
       },
     ],
   }
@@ -982,7 +1011,7 @@ export function respondToReallocation(
   const who = person ? fullName(person) : 'The individual'
   const to = data.acsps.find((a) => a.id === vc.reallocation!.offeredAcspId)
   const from = data.acsps.find((a) => a.id === vc.reallocation!.fromAcspId)
-  return {
+  const moved: ActionResult = {
     data: {
       ...data,
       cases: data.cases.map((c) =>
@@ -1020,6 +1049,19 @@ export function respondToReallocation(
       },
     ],
   }
+  // The earlier authorisation was released at the lapse. Agreeing authorises the new ACSP's own fee, taken only on its approval.
+  const p = vc.payment
+  if (response !== 'agreed' || !to || !p) return moved
+  return then(moved, (d) =>
+    authorisePayment(d, caseId, {
+      method: p.method,
+      amount: to.profile.fee.standard,
+      payeeAcspId: to.id,
+      code: p.code,
+      payerName: p.payerName,
+      reference: p.reference,
+    }),
+  )
 }
 
 /** Where each open case offered after a lapse stands, for the monitoring page. */

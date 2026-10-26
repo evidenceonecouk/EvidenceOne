@@ -1,5 +1,6 @@
 import { PRIMARY_REVIEWER_ID } from '@/data/organisations'
 import { ruleById } from '@/data/rules'
+import { chipResultFor } from '@/lib/chip'
 import { formatDate, fullName } from '@/lib/format'
 import {
   historyCovers,
@@ -104,10 +105,7 @@ export function ruleSetFor(
 
 /** The outcome a rule produces under a version, after any decision setting. */
 export function outcomeUnder(ruleId: string, rs: RuleSetVersion): RuleOutcome {
-  if (ruleId === 'IDVT-01')
-    return rs.settings.chip_not_read_fallback === 'accept_web_result'
-      ? 'pass'
-      : 'request'
+  void rs
   return ruleById(ruleId)?.outcome ?? 'flag'
 }
 
@@ -308,10 +306,9 @@ function nameDifference(docName: string, regName: string): string {
 
 /**
   Whether an identity document is expired beyond its exception (rules DOC-EXP-01
-  to DOC-EXP-03). A passport is asked for another document while
-  expired_passport_handling is "ask_other_document" (H1). Evidence One does not
-  read chips, so the six-month allowance for a validated chip is a reviewer
-  decision when that setting is chosen.
+  to DOC-EXP-03). An expired passport is not accepted (H1, decided 19 October),
+  so any expired passport is beyond its exception and another document is
+  asked for.
 */
 export function expiryStatus(
   doc: Pick<IdDocument, 'type' | 'expiresOn'>,
@@ -319,13 +316,7 @@ export function expiryStatus(
   at: number,
 ): 'in_date' | 'within_exception' | 'beyond_exception' {
   if (new Date(doc.expiresOn).getTime() >= at) return 'in_date'
-  if (doc.type === 'passport') {
-    if (rs.settings.expired_passport_handling === 'ask_other_document')
-      return 'beyond_exception'
-    return addMonths(doc.expiresOn, rs.params.passport_expiry_option1) < at
-      ? 'beyond_exception'
-      : 'within_exception'
-  }
+  if (doc.type === 'passport') return 'beyond_exception'
   if (doc.type === 'biometric_residence_permit')
     return addMonths(doc.expiresOn, rs.params.brp_expiry) < at
       ? 'beyond_exception'
@@ -351,8 +342,10 @@ export function evidenceTriggers(
   now = Date.now(),
 ): EvidenceTrigger[] {
   const out: EvidenceTrigger[] = []
+  // An expired passport is never accepted: DOC-EXP-01 asks for another document (H1).
   if (
     doc &&
+    doc.type !== 'passport' &&
     'expiresOn' in doc &&
     expiryStatus(doc, rs, now) === 'beyond_exception'
   )
@@ -637,25 +630,14 @@ export function evaluateCase(
     if (vc.option === 2) {
       // Option 2 expiry tolerances are tested under OPT-06.
     } else if (doc.type === 'passport') {
-      const handling: Citation = {
-        kind: 'setting',
-        ref: 'expired_passport_handling',
-        label: 'Setting: expired passports',
-      }
       add(
         'DOC-EXP-01',
         'document',
-        status === 'in_date'
-          ? 'pass'
-          : status === 'beyond_exception'
-            ? 'request'
-            : 'mandatory',
+        status === 'in_date' ? 'pass' : 'request',
         status === 'in_date'
           ? `Passport in date at the check, expires ${formatDate(doc.expiresOn)}`
-          : status === 'beyond_exception'
-            ? `Passport expired ${formatDate(doc.expiresOn)}. Until Companies House replies, another document is asked for.`
-            : `Passport expired ${formatDate(doc.expiresOn)}, within ${P.passport_expiry_option1} months. Evidence One does not read the chip, so it is not validated here. Your decision.`,
-        [docCite, handling],
+          : `Passport expired ${formatDate(doc.expiresOn)}. An expired passport is not accepted, so another document is asked for.`,
+        [docCite],
       )
     } else if (doc.type === 'biometric_residence_permit') {
       add(
@@ -707,24 +689,17 @@ export function evaluateCase(
     label,
   })
   if (vc.option === 1) {
-    if (doc?.hasChip) {
-      const accept = rs.settings.chip_not_read_fallback === 'accept_web_result'
+    const chip = chipResultFor(vc, doc)
+    if (chip === 'read' || chip === 'not_read')
       add(
         'IDVT-01',
         'idvt',
-        accept ? 'pass' : 'request',
-        accept
-          ? 'Chip not read by Evidence One. Browser route result accepted under the current setting.'
-          : 'Document has a chip and the chip is not read on the case. Another Option 1 document is needed, then Option 2.',
-        [
-          {
-            kind: 'setting',
-            ref: 'chip_not_read_fallback',
-            label: 'Setting: chip not read',
-          },
-        ],
+        chip === 'read' ? 'pass' : 'mandatory',
+        chip === 'read'
+          ? 'Chip read in the identity provider’s chip reader and its signature validated'
+          : 'Chip not read. Record why you are satisfied. Companies House does not mandate chip reading, so the case continues and you decide.',
+        [check('chip', 'Chip result')],
       )
-    }
     add(
       'IDVT-02',
       'idvt',
@@ -794,6 +769,14 @@ export function evaluateCase(
       'flag',
       `All ${P.idvt_attempts} attempts at the checks used. Routed to Option 2.`,
       [check('liveness', 'Attempts'), attemptsCite],
+    )
+  else if (vc.option2?.reason === 'no_smartphone')
+    add(
+      'IDVT-08',
+      'idvt',
+      'flag',
+      'The person has no smartphone or tablet for the identity provider’s journey. Routed to Option 2.',
+      [{ kind: 'declared', ref: 'option2', label: 'Option 2 request' }],
     )
   else if (vc.option2?.reason === 'unsupported_document')
     add(
@@ -868,13 +851,19 @@ export function evaluateCase(
   if (needsProofOfAddress(rs)) {
     const provided =
       !!vc.journey?.addressProofDone || addressEvidence.length > 0
+    // Open setting, off by default: a passing electronic address check may stand in for the document.
+    const checkPassed =
+      rs.settings.address_check_replaces_proof &&
+      vc.idvt.addressCheck === 'pass'
     add(
       'ADDL-02',
       'evidence',
-      provided ? 'pass' : 'request',
-      provided
-        ? `Proof of current address provided. It must be dated within ${P.supporting_evidence_months} months.`
-        : `We need proof of current address dated within the last ${P.supporting_evidence_months} months`,
+      provided || checkPassed ? 'pass' : 'request',
+      checkPassed && !provided
+        ? 'The electronic address check passed, and the current setting accepts it in place of the document.'
+        : provided
+          ? `Proof of current address provided. It must be dated within ${P.supporting_evidence_months} months.`
+          : `We need proof of current address dated within the last ${P.supporting_evidence_months} months`,
       [
         months,
         ...addressEvidence.map((e) => ({
@@ -981,6 +970,8 @@ export function evaluateCase(
     const reason = {
       attempts_used: 'all attempts at the digital checks were used',
       unsupported_document: 'the provider cannot support the document',
+      no_smartphone:
+        'the person has no smartphone or tablet for the identity provider’s journey',
     }[o.reason]
     add('OPT-02', 'option', 'flag', `Option 2 offered because ${reason}`, [
       { kind: 'declared', ref: 'option2', label: 'Option 2 request' },
@@ -1055,6 +1046,18 @@ export function evaluateCase(
       'decision',
       'pass',
       `Payment of £${vc.payment.amount} to ${payee?.name ?? 'the named ACSP'} as merchant of record, collected by Evidence One as its disclosed agent`,
+      [{ kind: 'declared', ref: 'payment', label: 'Payment record' }],
+    )
+    const p = vc.payment
+    add(
+      'ACSP-03',
+      'decision',
+      'pass',
+      p.status === 'taken'
+        ? `Authorised on ${formatDate(p.authorisedAt)} and taken on approval${p.paidAt ? ` on ${formatDate(p.paidAt)}` : ''}`
+        : p.status === 'released'
+          ? `Authorisation released${p.releasedAt ? ` on ${formatDate(p.releasedAt)}` : ''}. Nothing was taken`
+          : `Authorised on ${formatDate(p.authorisedAt)}, not yet taken. Taken only when you approve`,
       [{ kind: 'declared', ref: 'payment', label: 'Payment record' }],
     )
   }

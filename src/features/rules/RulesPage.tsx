@@ -214,8 +214,8 @@ function ReviewTimeline() {
         aria-hidden="true"
       />
       <span>
-        Acceptance closes Thursday 15 October 2026; signature is planned for
-        Friday 16 October 2026 (to confirm, M2).
+        Gates 2 to 5 agreement for signature by Friday 30 October 2026. Gate 2
+        starts the next business day after signature.
       </span>
     </p>
   )
@@ -577,9 +577,9 @@ function RulesList({ onOpen }: { onOpen: (r: RuleDef) => void }) {
                             Reads {r.param} = {rs.params[r.param]}
                           </span>
                         )}
-                        {r.pending && (
+                        {r.pending !== undefined && (
                           <span className="mt-1 block">
-                            <PendingDecision code={r.pending} />
+                            <PendingDecision code={r.pending || undefined} />
                           </span>
                         )}
                         {r.setting && (
@@ -697,9 +697,9 @@ function RuleDetail({
                         (o) => o.value === rs.settings[def.setting!],
                       )?.label
                   }
-                  {def.pending && (
+                  {def.pending !== undefined && (
                     <span className="mt-1 block">
-                      <PendingDecision code={def.pending} />
+                      <PendingDecision code={def.pending || undefined} />
                     </span>
                   )}
                 </dd>
@@ -928,7 +928,9 @@ function SettingsPanel({ canEdit }: { canEdit: boolean }) {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-base font-medium text-ink">{s.label}</p>
-                {s.pending && <PendingDecision code={s.pending} />}
+                {s.pending !== undefined && (
+                  <PendingDecision code={s.pending || undefined} />
+                )}
                 <span className="font-mono text-[0.8125rem] text-slate">
                   {s.rules.join(', ')}
                 </span>

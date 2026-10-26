@@ -3,7 +3,6 @@ import { DEFAULT_BILLING_SETTINGS, splitPayment } from '@/lib/fees'
 import { SLA_HOURS } from '@/lib/format'
 import type {
   AiObservation,
-  CaseSource,
   CorrectionTask,
   EvidenceItem,
   IdvtResults,
@@ -19,8 +18,10 @@ import { buildPeople } from './people'
   Cases in mixed statuses. Timestamps are relative to the moment the demo is
   seeded, so SLA countdowns are always live when a presenter opens the demo.
 
-  The journey runs in the browser for everyone. No chip is read by Evidence
-  One: passports carry a chip, but no chip result exists anywhere. Every
+  The journey runs in the browser for everyone, through the certified identity
+  provider. A biometric passport's chip is read by the provider's own chip
+  reader on the person's phone; Evidence One reads no chip. Each case records
+  the chip result (read, not read or not applicable). Every
   individual who reached review has one proof of current address dated within
   six months. Register differences are flagged for the reviewer, never halted.
 */
@@ -94,32 +95,71 @@ export function buildCases(now: number) {
     return p ? `${p.givenNames} ${p.familyName}` : 'The individual'
   }
 
-  /** Agency payment, split with the ACSP's own fee. Payout two days after payment, once it has happened. */
+  /**
+    Agency payment, authorised when the client instructs the ACSP. settle()
+    takes it on approval (with the split and a payout two days later) or
+    releases it on a decline or an abandoned case.
+  */
   const pay = (
     acspId: string,
-    source: CaseSource,
     method: PaymentMethod,
     paidOffset: number,
     reference: string,
     who: { code?: string; payerName?: string } = {},
   ): Payment => {
-    const gross = FEE[acspId]
-    const s = splitPayment(gross, source, DEFAULT_BILLING_SETTINGS)
-    const payoutOffset = paidOffset + 2 * DAY
     return {
       method,
-      amount: gross,
+      status: 'authorised',
+      authorisedAt: at(paidOffset),
+      amount: FEE[acspId],
       payeeAcspId: acspId,
       code: who.code,
       payerName: who.payerName,
-      paidAt: at(paidOffset),
       reference,
-      providerFee: s.providerFee,
-      platformFee: s.platformFee,
-      platformFeeVat: s.platformFeeVat,
-      netPayout: s.net,
-      payoutAt: payoutOffset <= 0 ? at(payoutOffset) : undefined,
     }
+  }
+
+  /** Payment is taken on approval and released on a decline, a lapse or an ACSP lapse (P10). */
+  const settle = (c: VerificationCase): VerificationCase => {
+    const p = c.payment
+    if (!p) return c
+    const approved = c.decision?.outcome === 'approve'
+    if (approved) {
+      const takenAt = c.decision!.decidedAt
+      const s = splitPayment(p.amount, c.source, DEFAULT_BILLING_SETTINGS)
+      const payoutMs = new Date(takenAt).getTime() + 2 * DAY
+      const payment: Payment = {
+        ...p,
+        status: 'taken',
+        paidAt: takenAt,
+        providerFee: s.providerFee,
+        platformFee: s.platformFee,
+        platformFeeVat: s.platformFeeVat,
+        netPayout: s.net,
+        payoutAt:
+          payoutMs <= now ? new Date(payoutMs).toISOString() : undefined,
+      }
+      return { ...c, payment }
+    }
+    const releasedAt =
+      c.decision?.outcome === 'decline'
+        ? c.decision.decidedAt
+        : c.status === 'abandoned'
+          ? c.closedAt
+          : c.reallocation?.offeredAt
+    if (!releasedAt) return c
+    const payment: Payment = {
+      ...p,
+      status: 'released',
+      releasedAt,
+      releaseReason:
+        c.status === 'abandoned'
+          ? 'Case abandoned before a decision'
+          : c.reallocation
+            ? `${ACSP_NAME[c.reallocation.fromAcspId]} lapsed before a decision`
+            : 'Verification declined',
+    }
+    return { ...c, payment }
   }
 
   const doc = (
@@ -139,7 +179,7 @@ export function buildCases(now: number) {
     kind: 'selfie',
     label: 'Liveness capture, browser',
     uploadedAt: at(offset),
-    note: 'Raw sample held until completion, then deleted.',
+    note: 'Liveness media kept with the record for seven years.',
   })
   /** Proof of current address, dated `ageDays` before it was uploaded. */
   const proof = (
@@ -243,7 +283,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -41 * DAY + 2 * HOUR,
         'PAY-2026-004118',
@@ -285,6 +324,38 @@ export function buildCases(now: number) {
         answer: 'yes',
         answeredAt: at(-38 * DAY + 5 * HOUR),
       },
+      // P4: the personal code passed to the ACSP as a code message, received and within its 30 days
+      messages: [
+        {
+          id: 'msg-EO-2026-000118-1',
+          from: 'individual',
+          authorName: 'Margaret Ashby',
+          at: at(-12 * DAY + 2 * HOUR),
+          body: 'Hello Eleanor. Fenwick & Shaw have asked whether you could link my verified identity to Ashby & Daughters Bakery Ltd for me. Do you need my personal code for that?',
+          notifiedAt: at(-12 * DAY + 2 * HOUR + MIN),
+        },
+        {
+          id: 'msg-EO-2026-000118-2',
+          from: 'reviewer',
+          authorName: 'Eleanor Marsh',
+          at: at(-12 * DAY + 5 * HOUR),
+          body: 'Yes, we can do that for you. Please send the personal code as a code message, not as an ordinary message. Only I can open it, and it is deleted 30 days after I mark it received.',
+          notifiedAt: at(-12 * DAY + 5 * HOUR + MIN),
+        },
+        {
+          id: 'msg-EO-2026-000118-3',
+          from: 'individual',
+          authorName: 'Margaret Ashby',
+          at: at(-11 * DAY - 3 * HOUR),
+          body: 'K7QD4M2XP9R',
+          notifiedAt: at(-11 * DAY - 3 * HOUR + MIN),
+          kind: 'code',
+          codeKind: 'personal_code',
+          receivedAt: at(-11 * DAY),
+          receivedBy: 'Eleanor Marsh',
+          deleteOn: at(19 * DAY),
+        },
+      ],
     },
 
     // Thomas Ashby: proof of address dated seven months before upload, so a more recent one was requested
@@ -331,7 +402,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -6 * DAY + 3 * HOUR,
         'PAY-2026-004129',
@@ -383,7 +453,7 @@ export function buildCases(now: number) {
       ],
     },
 
-    // Priya Raman: clean, passport browser result accepted, bank statement with redaction
+    // Priya Raman: biometric passport, chip NOT read in the provider's chip reader. IDVT-01 Flag and Mandatory decision. Bank statement with redaction.
     {
       id: 'EO-2026-000131',
       route: 'A',
@@ -396,7 +466,10 @@ export function buildCases(now: number) {
       createdAt: at(-2 * DAY),
       submittedForReviewAt: at(-14 * HOUR),
       slaDueAt: at(-14 * HOUR + SLA_HOURS * HOUR),
-      idvt: passAll(at(-14 * HOUR - 20 * MIN), 'IDV-7F31-2D17', 98.6),
+      idvt: {
+        ...passAll(at(-14 * HOUR - 20 * MIN), 'IDV-7F31-2D17', 98.6),
+        chipResult: 'not_read',
+      },
       allocation: { ...invited, instructedAt: at(-2 * DAY + HOUR) },
       observations: [
         regMatch('o-131-1', 'Priya'),
@@ -434,7 +507,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -2 * DAY + 2 * HOUR,
         'PAY-2026-004131',
@@ -501,7 +573,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -3 * DAY + 4 * HOUR,
         'PAY-2026-004133',
@@ -572,7 +643,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -5 * DAY + 3 * HOUR,
         'PAY-2026-004132',
@@ -630,7 +700,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -7 * DAY + 4 * HOUR,
         'PAY-2026-004127',
@@ -694,7 +763,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'b2c',
         'pay_myself',
         -1 * DAY + 20 * MIN,
         'PAY-2026-004134',
@@ -766,7 +834,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'own_client',
         'pay_myself',
         -3 * DAY + 2 * HOUR,
         'PAY-2026-004136',
@@ -826,7 +893,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -4 * DAY + 5 * HOUR,
         'PAY-2026-004137',
@@ -842,7 +908,7 @@ export function buildCases(now: number) {
       },
     },
 
-    // Hannah Pryce: passport expired two months ago. DOC-EXP-01 asks for another document (H1), ADDL-01 request.
+    // Hannah Pryce: passport expired two months ago. Not accepted (H1), so DOC-EXP-01 asks for another document. A Request, never a Halt.
     {
       id: 'EO-2026-000138',
       route: 'A',
@@ -851,31 +917,28 @@ export function buildCases(now: number) {
       ...partnerBase('partner-fenwick'),
       acspId: 'acsp-harcourt',
       option: 1,
-      status: 'in_review',
+      status: 'in_progress',
       createdAt: at(-2 * DAY),
-      submittedForReviewAt: at(-9 * HOUR),
-      slaDueAt: at(-9 * HOUR + SLA_HOURS * HOUR),
-      idvt: passAll(at(-9 * HOUR - 10 * MIN), 'IDV-7F31-3C27', 95.2),
+      idvt: pending,
       allocation: { ...invited, instructedAt: at(-2 * DAY + HOUR) },
-      observations: [addrOk('o-138-1', 'The utility bill')],
-      evidence: [
-        doc(
-          'ev-138-1',
-          'UK passport, captured in the browser',
-          -9 * HOUR - 20 * MIN,
-        ),
-        selfie('ev-138-2', -9 * HOUR - 20 * MIN),
-        proof(
-          'ev-138-3',
-          'Utility bill',
-          'utility_bill',
-          -9 * HOUR - 15 * MIN,
-          29,
-        ),
-      ],
+      journey: {
+        emailConfirmed: true,
+        mobileConfirmed: true,
+        detailsConfirmed: true,
+        personalConfirmed: true,
+        instructedAt: at(-2 * DAY + HOUR),
+        paid: true,
+        documentType: 'passport',
+        captureRoute: 'phone',
+        photoPageDone: true,
+        chipResult: 'read',
+        selfieDone: true,
+        livenessRoute: 'phone',
+      },
+      observations: [],
+      evidence: [],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -2 * DAY + 3 * HOUR,
         'PAY-2026-004138',
@@ -913,7 +976,7 @@ export function buildCases(now: number) {
       evidence: [],
     },
 
-    // Matteo Ferrante: B2C client allocated to Ashdown Trust Services (Not yet listed, still allocatable), in progress
+    // Matteo Ferrante: B2C client allocated to Ashdown Trust Services (Not yet listed, still allocatable), in progress. eVisa holder: the provider checks the eVisa with the Home Office, Option 1.
     {
       id: 'EO-2026-000140',
       route: 'A',
@@ -935,6 +998,7 @@ export function buildCases(now: number) {
         instructedAt: at(-1 * DAY),
         paid: true,
         documentType: 'passport',
+        eVisa: true,
         captureRoute: 'phone',
       },
       allocation: {
@@ -948,7 +1012,6 @@ export function buildCases(now: number) {
       evidence: [],
       payment: pay(
         'acsp-ashdown',
-        'b2c',
         'pay_myself',
         -1 * DAY + 10 * MIN,
         'PAY-2026-004140',
@@ -996,7 +1059,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-pellrowe',
-        'b2c',
         'pay_myself',
         -24 * DAY + HOUR,
         'PAY-2026-004124',
@@ -1059,7 +1121,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-fenwick',
-        'own_client',
         'pay_myself',
         -15 * DAY + 2 * HOUR,
         'PAY-2026-004126',
@@ -1114,13 +1175,16 @@ export function buildCases(now: number) {
     ).map(([id, personId, d, chv, payRef, idvRef]): VerificationCase => {
       const n = id.slice(-6)
       const isLicence = personId === 'p-eleni'
+      // Gareth was referred by Fenwick & Shaw, so the Partner is notified of him (ACSP-12, M3).
+      const referred = personId === 'p-gareth'
       return {
         id,
         route: 'A',
         personId,
         companyNumber: '99941526',
-        origin: 'b2c',
-        source: 'b2c',
+        ...(referred
+          ? partnerBase('partner-fenwick')
+          : { origin: 'b2c' as const, source: 'b2c' as const }),
         acspId: 'acsp-northbank',
         reviewerId: 'rev-basu',
         option: 1,
@@ -1154,13 +1218,7 @@ export function buildCases(now: number) {
             14,
           ),
         ],
-        payment: pay(
-          'acsp-northbank',
-          'b2c',
-          'pay_myself',
-          d * DAY + HOUR,
-          payRef,
-        ),
+        payment: pay('acsp-northbank', 'pay_myself', d * DAY + HOUR, payRef),
         decision: {
           outcome: 'approve',
           reasonCode: 'APR-01',
@@ -1185,14 +1243,13 @@ export function buildCases(now: number) {
       }
     }),
 
-    // Northbank: open case offered to Pell with the individual's agreement (pending)
+    // Northbank: open case referred by Fenwick & Shaw, offered to Pell with the individual's agreement (pending)
     {
       id: 'EO-2026-000120',
       route: 'A',
       personId: 'p-ruth',
       companyNumber: '99941526',
-      origin: 'b2c',
-      source: 'b2c',
+      ...partnerBase('partner-fenwick'),
       acspId: 'acsp-northbank',
       option: 1,
       status: 'in_review',
@@ -1200,13 +1257,7 @@ export function buildCases(now: number) {
       submittedForReviewAt: at(-30 * HOUR),
       slaDueAt: at(-30 * HOUR + SLA_HOURS * HOUR),
       idvt: passAll(at(-30 * HOUR - 15 * MIN), 'IDV-6C20-0D48', 96.0),
-      allocation: {
-        source: 'administrator',
-        suggestedAcspIds: ['acsp-northbank', 'acsp-pellrowe'],
-        confirmedBy: 'Marcus Adeyemi, Platform Administrator',
-        confirmedAt: at(-9 * DAY + 15 * MIN),
-        instructedAt: at(-9 * DAY + 25 * MIN),
-      },
+      allocation: { ...invited, instructedAt: at(-9 * DAY + 25 * MIN) },
       observations: [],
       evidence: [
         doc(
@@ -1225,7 +1276,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-northbank',
-        'b2c',
         'pay_myself',
         -9 * DAY + HOUR,
         'PAY-2026-004120',
@@ -1270,7 +1320,6 @@ export function buildCases(now: number) {
       evidence: [],
       payment: pay(
         'acsp-northbank',
-        'b2c',
         'pay_myself',
         -8 * DAY + HOUR,
         'PAY-2026-004122',
@@ -1317,7 +1366,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -352 * DAY + 3 * HOUR,
         'PAY-2025-002061',
@@ -1392,7 +1440,6 @@ export function buildCases(now: number) {
       ],
       payment: pay(
         'acsp-harcourt',
-        'referred',
         'agent_payment_code',
         -330 * DAY + 3 * HOUR,
         'PAY-2025-002088',
@@ -1412,7 +1459,7 @@ export function buildCases(now: number) {
     },
   ]
 
-  const numbered = assignClientInvoiceIds(cases)
+  const numbered = assignClientInvoiceIds(cases.map(settle))
 
   const corrections: CorrectionTask[] = [
     {
@@ -1632,23 +1679,17 @@ export function buildCases(now: number) {
           `Allocation to ${acspName} confirmed by an administrator.`,
         )
     }
-    if (c.payment?.paidAt) {
+    if (c.payment) {
       const p = c.payment
-      const payer =
-        p.method === 'agent_payment_code'
-          ? `by ${p.payerName} with Agent Payment Code ${p.code}`
-          : `by ${name} by card through the secure payment provider`
-      const fee =
-        (p.platformFee ?? 0) > 0
-          ? `Platform fee ${money(p.platformFee!)} plus VAT ${money(p.platformFeeVat ?? 0)} deducted automatically.`
-          : 'No platform fee: the client is covered by the ACSP’s subscription.'
       ev(
-        offsetOf(p.paidAt!),
+        offsetOf(p.authorisedAt),
         name,
         'person',
-        'payment.completed',
+        'payment.authorised',
         c.id,
-        `${money(p.amount)} paid to ${acspName} ${payer}. Evidence One collected the payment as ${acspName}'s disclosed agent. ${fee} Net ${money(p.netPayout ?? 0)} to the ACSP's own payment account. Invoice ${p.clientInvoiceId} issued in ${acspName}'s name.`,
+        p.method === 'agent_payment_code'
+          ? `${name} instructed ${acspName}. ${money(p.amount)} authorised, paid by ${p.payerName} on their behalf with Agent Payment Code ${p.code}. Taken only on approval.`
+          : `${name} instructed ${acspName}. Card authorised for ${money(p.amount)} through the secure payment provider. Nothing is taken until ${acspName} approves.`,
       )
     }
     if (c.idvt.completedAt) {
@@ -1704,15 +1745,50 @@ export function buildCases(now: number) {
         c.id,
         `AI observation on ${o.ruleId}: ${o.title}. Advisory only.`,
       )
-    for (const m of c.messages ?? [])
+    for (const m of c.messages ?? []) {
+      if (m.kind !== 'code') {
+        ev(
+          offsetOf(m.at),
+          m.authorName,
+          'person',
+          'case.message.sent',
+          c.id,
+          `Secure message sent ${m.from === 'reviewer' ? 'to the individual' : 'to the ACSP reviewer'}. An email notification was sent. The message text stays in the case thread.`,
+        )
+        continue
+      }
+      // Code messages: sent, viewed and received are recorded, never the code.
+      const kind =
+        m.codeKind === 'company_authentication_code'
+          ? 'company authentication code'
+          : 'personal code'
       ev(
         offsetOf(m.at),
         m.authorName,
         'person',
-        'case.message.sent',
+        'case.code_message.sent',
         c.id,
-        `Secure message sent ${m.from === 'reviewer' ? 'to the individual' : 'to the ACSP reviewer'}. An email notification was sent. The message text stays in the case thread.`,
+        `Code message sent to the allocated ACSP reviewer (${kind}). Only the allocated reviewer and the individual can open it. The code is not recorded in the audit trail.`,
       )
+      if (m.receivedAt && m.receivedBy) {
+        ev(
+          offsetOf(m.receivedAt) - 2 * MIN,
+          m.receivedBy,
+          'person',
+          'case.code_message.viewed',
+          c.id,
+          `The allocated ACSP reviewer opened a code message (${kind}). The code is not recorded in the audit trail.`,
+        )
+        ev(
+          offsetOf(m.receivedAt),
+          m.receivedBy,
+          'person',
+          'case.code_message.received',
+          c.id,
+          `The ACSP marked the code received. The message text will be deleted automatically on ${(m.deleteOn ?? '').slice(0, 10)}, 30 days later. The code is not recorded in the audit trail.`,
+        )
+      }
+    }
     if (c.decision && reviewer) {
       if (c.decision.stepUpRef)
         ev(
@@ -1734,6 +1810,32 @@ export function buildCases(now: number) {
           : c.decision.outcome === 'request_info'
             ? `More information requested. Reason ${c.decision.reasonCode}: one proof of current address dated within six months.`
             : `Declined. Reason ${c.decision.reasonCode}. Retention of 7 years starts from this decision.`,
+      )
+    }
+    if (c.payment?.status === 'taken') {
+      const p = c.payment
+      const fee =
+        (p.platformFee ?? 0) > 0
+          ? `Platform fee ${money(p.platformFee!)} plus VAT ${money(p.platformFeeVat ?? 0)} deducted automatically.`
+          : 'No platform fee: the ACSP’s own client.'
+      ev(
+        offsetOf(p.paidAt!) + 1000,
+        SYSTEM,
+        'system',
+        'payment.taken',
+        c.id,
+        `Approved, so ${money(p.amount)} was taken ${p.method === 'agent_payment_code' ? `from ${p.payerName}, paid on the client's behalf` : `from ${name}'s card`}. Evidence One collected it as ${acspName}'s disclosed agent. ${fee} Net ${money(p.netPayout ?? 0)} to the ACSP's own payment account. Invoice ${p.clientInvoiceId} issued in ${acspName}'s name.`,
+      )
+    }
+    if (c.payment?.status === 'released') {
+      const p = c.payment
+      ev(
+        offsetOf(p.releasedAt!) + 1000,
+        SYSTEM,
+        'system',
+        'payment.released',
+        c.id,
+        `${p.releaseReason}. The authorisation of ${money(p.amount)} was released. Nothing was taken and no invoice was issued.`,
       )
     }
     const s = c.submission
@@ -1821,7 +1923,7 @@ export function buildCases(now: number) {
     'system',
     'rules.request',
     'EO-2026-000138',
-    'DOC-EXP-01: the passport expired two months ago. Another document is asked for until Companies House replies (Pending your decision, H1). ADDL-01: one supporting document requested.',
+    'DOC-EXP-01: the passport expired two months ago. An expired passport is not accepted, so another document was asked for. A Request, never a Halt.',
   )
   ev(
     -14 * HOUR + MIN,
@@ -1829,7 +1931,7 @@ export function buildCases(now: number) {
     'system',
     'rules.evaluated',
     'EO-2026-000131',
-    'IDVT-01: the document has a chip and no chip was read. Browser result accepted under the current chip_not_read_fallback setting.',
+    'IDVT-01: the passport has a chip and no chip was read in the identity provider’s chip reader. The case continues and records that no chip was read. Flagged with a Mandatory decision for the reviewer.',
   )
   ev(
     -4 * DAY - 3 * HOUR + MIN,

@@ -53,7 +53,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'partner',
     route: '/partner',
     caption:
-      'Companies, directors and PSCs with status and check results: Invited, In progress, Further information required, Completed or Declined. Never documents or messages.',
+      'Companies, directors and PSCs with status and check results: Invited, In progress, Further information required, Completed or Declined. Never documents or messages. When an ACSP lapses, the Partner is notified of its own affected clients only.',
   },
   {
     id: 'lookup',
@@ -65,11 +65,27 @@ export const guidedSteps: GuidedStep[] = [
   },
   {
     id: 'bulk-invite',
-    title: 'Bulk invite',
+    title: 'Single referral',
     persona: 'partner',
     route: '/partner/companies/99520316/invite',
     caption:
-      'Invites are pre-filled from the register. Choose the instructing ACSP or let the platform suggest one, and choose who pays: the client, or the partner with a single-use Agent Payment Code.',
+      'Pre-filled client details, then the 2 or 3 best matched ACSPs, each with its own fee and turnaround. Ranked by clear criteria, not AI. The Partner selects one and chooses who pays: the client, or the Partner with a single-use Agent Payment Code.',
+  },
+  {
+    id: 'bulk-request',
+    title: 'Bulk / Bespoke Request',
+    persona: 'partner',
+    route: '/partner/requests',
+    caption:
+      'For several clients or a mix of services, the Partner writes a free-text request. The Platform Administrator agrees it in the message area and converts it into linked cases, with a greyed placeholder for the corporate verification.',
+  },
+  {
+    id: 'bulk-convert',
+    title: 'Convert to linked cases',
+    persona: 'platformAdmin',
+    route: '/admin/requests',
+    caption:
+      'The Platform Administrator converts an agreed request into one Bulk Request with individual verification cases and a placeholder for additional Companies House services. Every step is audited.',
   },
   {
     id: 'invite',
@@ -77,7 +93,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'individual',
     route: `${J}/invite`,
     caption:
-      'The journey runs in the browser, in a phone frame or on a desktop. There is nothing to install, and the language switch is always visible.',
+      'The journey runs in the browser, in a phone frame or on a desktop. There is no Evidence One app to install.',
   },
   {
     id: 'contact',
@@ -105,19 +121,11 @@ export const guidedSteps: GuidedStep[] = [
   },
   {
     id: 'instruct',
-    title: 'Instruct the named ACSP',
+    title: 'Instruct the ACSP and authorise payment',
     persona: 'individual',
     route: `${J}/instruct`,
     caption:
-      'The person sees who will verify them, the fee and the turnaround, and that Evidence One is the ACSP’s technology provider.',
-  },
-  {
-    id: 'payment',
-    title: 'Pay the ACSP',
-    persona: 'individual',
-    route: `${J}/payment`,
-    caption:
-      'The person pays the ACSP. Evidence One collects the payment as the ACSP’s agent, and the invoice is issued in the ACSP’s name.',
+      'The person sees who will verify them, the fee and the turnaround, and that Evidence One is the ACSP’s technology provider. The card is then authorised and nothing is taken yet. When the ACSP approves, the payment is taken, the £69 plus VAT platform fee is deducted on referred and B2C cases, and the invoice is issued in the ACSP’s name. On a decline or an ACSP lapse nothing is taken.',
   },
   {
     id: 'document',
@@ -125,7 +133,15 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'individual',
     route: `${J}/document`,
     caption:
-      'Browser route with no chip reading, on desktop and mobile. Upload from the computer, or continue on the phone to capture in its browser and return to the same case.',
+      'On a computer, the identity step hands off to the phone or tablet by QR code or link. The person finishes the certified identity provider’s journey there and the computer shows the result. On a phone it is direct. There is no webcam-only route.',
+  },
+  {
+    id: 'chip',
+    title: 'Passport chip',
+    persona: 'individual',
+    route: `${J}/chip`,
+    caption:
+      'A biometric passport’s chip is read by the identity provider’s own chip reader on the person’s phone, inside the same journey. It is not an Evidence One app. If the chip is not read, the case continues and the reviewer records why they are satisfied.',
   },
   {
     id: 'selfie',
@@ -133,7 +149,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'individual',
     route: `${J}/selfie`,
     caption:
-      'On a desktop, continuing on the phone is preferred, and the computer’s camera is a supported choice. Both are labelled as the certified identity provider.',
+      'Liveness and face match run in the certified identity provider’s journey on the phone or tablet. A phone camera gives a clearer result.',
   },
   {
     id: 'checks',
@@ -141,7 +157,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'individual',
     route: `${J}/checks`,
     caption:
-      'Document authenticity, liveness and face match, with up to three attempts. Option 2 is a fallback only when Option 1 cannot support the document.',
+      'Document authenticity and security features, the chip where the document has one, liveness and face match, with up to three attempts. Option 2 is a fallback only when Option 1 cannot support the document, or the person has no smartphone or tablet.',
   },
   {
     id: 'address',
@@ -149,7 +165,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'individual',
     route: `${J}/address`,
     caption:
-      'Everyone is asked for one proof of address dated within six months. Other supporting evidence appears only for an expired document or a name change.',
+      'Everyone is asked: “Please provide a document confirming your current residential address, dated within the last 6 months.” Other supporting evidence appears only for an expired document or a name change. Bank statement redaction is an option available after go-live.',
   },
   {
     id: 'idle-individual',
@@ -185,12 +201,28 @@ export const guidedSteps: GuidedStep[] = [
       'A name difference against the register is flagged, not halted. The reviewer records a decision and a reason, and the prompt to report it to Companies House is logged.',
   },
   {
+    id: 'case-chip',
+    title: 'Security features validated',
+    persona: 'reviewer',
+    route: '/acsp/cases/EO-2026-000131',
+    caption:
+      'Every case shows what the certified identity provider validated, including whether a chip was read. Here the chip was not read: the case continues, and the reviewer records why they are satisfied before approving. On approval the payment is taken.',
+  },
+  {
     id: 'case-messages',
     title: 'Case messages and proof of address',
     persona: 'reviewer',
     route: '/acsp/cases/EO-2026-000129',
     caption:
       'A secure message thread with email notifications, and a proof of address dated outside six months. Referral Partners never see messages.',
+  },
+  {
+    id: 'code-message',
+    title: 'Code message',
+    persona: 'reviewer',
+    route: '/acsp/cases/EO-2026-000118',
+    caption:
+      'The individual can send the Companies House personal code to their ACSP as a code message. Only the allocated reviewer can open it, opening it is audited without the code, and the text is deleted automatically 30 days after the ACSP marks it received. It never appears in exports, to Referral Partners, platform staff or the Copilot.',
   },
   {
     id: 'submit',
@@ -206,7 +238,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'reviewer',
     route: '/acsp/filings',
     caption:
-      'Filings and register corrections are prepared here, then handed to the ACSP’s own WebFiling account. The ACSP enters the authentication code itself.',
+      'Filings are prepared and checked here and filed from the ACSP’s own WebFiling account, where the ACSP enters the authentication code itself. Available on subscription plans only, and an option after go-live.',
   },
   {
     id: 'record',
@@ -214,7 +246,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'reviewer',
     route: '/records/EO-2026-000118',
     caption:
-      'Attribution, decision time, seven-year retention, rule set, verification reference and a hash-chained audit trail. Export sits behind step-up.',
+      'Attribution, decision time, seven-year retention with liveness media kept for the same period, rule set, verification reference and a hash-chained audit trail. Export behind step-up, straight after approval or later on request to an administrator. No code is part of the record.',
   },
   {
     id: 'billing',
@@ -222,7 +254,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'reviewer',
     route: '/acsp/billing',
     caption:
-      'Referred cases carry a platform fee of £69 plus VAT, deducted from the payment. Own clients are on the subscription, with the price not set.',
+      'Referred and B2C cases carry the £69 plus VAT platform fee, deducted when the payment is taken on approval. For its own clients an ACSP chooses Easy, Pro or Scale. Prices are provisional, referred cases never count towards the allowance, and extra own-client cases are £5.',
   },
   {
     id: 'idle-professional',
@@ -247,7 +279,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'platformAdmin',
     route: '/admin/monitoring',
     caption:
-      'Two published lists are checked, and the yearly list upload cross-checks every name. A lapse pauses new cases and lists the cases that ACSP verified.',
+      'Two published lists are checked every two weeks, and the yearly list upload sits beside that check. A Not yet listed ACSP has 3 months to register. A lapse pauses new cases, lists the cases that ACSP verified for the administrator and the ACSP, and notifies each Referral Partner of its own affected clients.',
   },
   {
     id: 'storage',
@@ -255,7 +287,7 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'platformAdmin',
     route: '/admin/storage',
     caption:
-      'What is kept and where, for seven years from decision, with an indicative estimate. Four storage questions remain open for the client.',
+      'Records are kept seven years from the decision, liveness media included. With a paid subscription records stay in live storage; without one they move to archive. An administrator releases a requested export without opening the evidence.',
   },
   {
     id: 'fees',
@@ -263,7 +295,15 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'superAdmin',
     route: '/admin/fees',
     caption:
-      'Only a Super Administrator proposes fee changes, and a second approver publishes them. The four fee types are never merged.',
+      'Only a Super Administrator proposes a change to the £69 platform fee or the Easy, Pro and Scale packages, and a second approver publishes it. The four fee types are never merged; the subscription is a separate plan charge.',
+  },
+  {
+    id: 'complaints',
+    title: 'Complaints and refunds',
+    persona: 'platformAdmin',
+    route: '/admin/complaints',
+    caption:
+      'A Platform Administrator handles complaints and refunds. A refund needs a reason and step-up and is audited. What happens to the £69 on a refunded case is still open.',
   },
   {
     id: 'commissions',
@@ -287,14 +327,14 @@ export const guidedSteps: GuidedStep[] = [
     persona: 'individual',
     route: `${J}/invite`,
     caption:
-      'Choose Arabic in the language switch to see the journey mirrored right to left. English remains the version of record.',
+      'Language help is an option available after go-live. Choose Arabic in the language switch to see the journey mirrored right to left. English remains the version of record. The presenter menu can hide every held option.',
   },
   {
     id: 'points',
-    title: 'Points for the call',
+    title: 'Decisions and open points',
     persona: 'superAdmin',
-    route: '/points',
+    route: '/decisions',
     caption:
-      'Open decisions for the client, each marked Pending your decision. This page is for the presenter only.',
+      'What the client has decided, with dates, and what is still open. This page is for the presenter only.',
   },
 ]

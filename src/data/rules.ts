@@ -82,7 +82,7 @@ export interface RuleDef {
   param?: ParamKey
   /** A decision setting that changes this rule's outcome. */
   setting?: SettingKey
-  /** Call-agenda code (for example "P3" or "H1") where the client has not decided. Shows "Pending your decision". */
+  /** Call-agenda code (for example "P5") where the client has not decided. Shows "Pending your decision". An empty string shows the badge without a code. */
   pending?: string
 }
 
@@ -110,6 +110,8 @@ const r = (
 const C6 = 'C, 6 October'
 const C7 = 'C, 7 October'
 const C9 = 'C, 9 October'
+const C19 = 'C, 19 October'
+const C23 = 'C, 23 October'
 const PROPOSED = 'Design, proposed'
 
 export const rules: RuleDef[] = [
@@ -357,17 +359,13 @@ export const rules: RuleDef[] = [
   r(
     'DOC-EXP-01',
     'document',
-    'Passport or Irish passport card is expired. The standard allows up to six months expired only where the chip is validated, so until Companies House replies another document is asked for',
+    'Passport or Irish passport card is expired. An expired passport is not accepted, so the person is asked for another document',
     'request',
-    'IDV Standard, Step 2, Option 1; C, 9 October',
+    `IDV Standard, Step 2, Option 1; ${C19}`,
     ['S', 'C'],
     ['document.type', 'document.expiry_date', 'check.completed_at'],
     {
-      outcomeNote:
-        'Ask for another document. Where an expired document triggers ADDL-01 it is a Request, never a Halt',
-      param: 'passport_expiry_option1',
-      setting: 'expired_passport_handling',
-      pending: 'H1',
+      outcomeNote: 'Request another document. Never a Halt',
     },
   ),
   r(
@@ -431,28 +429,28 @@ export const rules: RuleDef[] = [
   r(
     'DOC-06',
     'document',
-    'The person holds an eVisa. Until the provider confirms how it checks an eVisa in the browser, the person provides their passport plus any one document from Group B',
-    'request',
-    C9,
-    ['C'],
-    ['document.type', 'option2.documents'],
-    { outcomeNote: 'Request the passport and one Group B document' },
+    'The person holds an eVisa. The certified identity provider checks the eVisa directly with the Home Office, on the same Option 1 route as any other accepted document',
+    'pass',
+    `IDV Standard, Step 2; ${C23}`,
+    ['S', 'C'],
+    ['document.type', 'idvt.evisa_result'],
+    { outcomeNote: 'Accepted Option 1 document' },
   ),
 
   // 4 IDVT checks
   r(
     'IDVT-01',
     'idvt',
-    'Document has a chip and the chip is not read on the case. Outcome set by chip_not_read_fallback.',
-    'request',
-    'IDV Standard, Option 1; C, 9 October',
-    ['S', 'C'],
+    'Document has a chip and the chip was not read in the identity provider’s chip reader. Companies House does not mandate chip reading, so the case continues and the ACSP decides. The case records that no chip was read',
+    'mandatory',
+    'Design, proposed from the client’s determination of 13 October',
+    ['Design', 'C'],
     ['document.has_chip', 'idvt.chip_result'],
     {
       outcomeNote:
-        'Accepted while the Companies House answer is awaited, or another Option 1 document requested, then Option 2',
-      setting: 'chip_not_read_fallback',
-      pending: 'P1',
+        'Flag to the reviewer and a Mandatory decision: Chip not read. Record why you are satisfied',
+      // Design interpretation of the 13 October determination. Wording to confirm with the client.
+      pending: '',
     },
   ),
   r(
@@ -537,9 +535,7 @@ export const rules: RuleDef[] = [
     ['acsp.pep_screening', 'screening.completed_at'],
     {
       outcomeNote:
-        'Block until it has. Screening is a per-ACSP setting and ongoing monitoring is off',
-      setting: 'pep_screening_default',
-      pending: 'P6',
+        'Block until it has. Each ACSP switches screening on or off for itself, with no platform default (P6, C, 19 October). Ongoing monitoring is on a package only, off at launch',
     },
   ),
   r(
@@ -574,7 +570,7 @@ export const rules: RuleDef[] = [
   r(
     'ADDL-01',
     'evidence',
-    'The identity document is expired beyond its exception',
+    'The identity document, other than a passport, is expired beyond its exception. An expired passport is never accepted and another document is asked for (DOC-EXP-01)',
     'request',
     C7,
     ['C'],
@@ -587,16 +583,16 @@ export const rules: RuleDef[] = [
   r(
     'ADDL-02',
     'evidence',
-    'Every individual provides one proof of current address dated within the supporting evidence period, including people whose licence, identity card or BRP shows an address',
+    'Every individual provides one proof of current address dated within the supporting evidence period, including people whose licence, identity card or BRP shows an address. Wording: "Please provide a document confirming your current residential address, dated within the last 6 months."',
     'request',
     C7,
     ['C'],
     ['person.current_address', 'evidence.document_date'],
     {
       outcomeNote:
-        'Request until provided. The exact wording is to be confirmed',
+        'Request until provided. Wording decided (P3, C, 19 October)',
       param: 'supporting_evidence_months',
-      pending: 'P3',
+      setting: 'address_check_replaces_proof',
     },
   ),
   r(
@@ -737,9 +733,8 @@ export const rules: RuleDef[] = [
     ['C', 'Design'],
     ['user.role', 'auth.step_up'],
     {
-      outcomeNote: 'Block otherwise',
-      setting: 'step_up_channels',
-      pending: 'H2',
+      outcomeNote:
+        'Block otherwise. SMS is never used for step-up (H2, C, 19 October)',
     },
   ),
   r(
@@ -818,6 +813,21 @@ export const rules: RuleDef[] = [
     { outcomeNote: 'Block payment otherwise' },
   ),
   r(
+    'ACSP-03',
+    'acsp',
+    'The card, or a Referral Partner’s Agent Payment Code, is authorised when the client instructs the ACSP. The total is taken only when the ACSP approves, the platform fee on referred and B2C cases is deducted then, and the client invoice is issued in the ACSP’s name. On a decline, a lapse or an ACSP lapse the authorisation is released and nothing is taken',
+    'block',
+    'C, 19 and 20 October',
+    ['C'],
+    [
+      'payment.status',
+      'payment.authorised_at',
+      'case.decision.outcome',
+      'acsp.status',
+    ],
+    { outcomeNote: 'Block taking the payment before approval' },
+  ),
+  r(
     'ACSP-10',
     'acsp',
     'The ACSP is Suspended, Ceased or Withdrawn on a Companies House published file. Both files are checked at the status check interval, there is no API, and an administrator confirms every name match',
@@ -846,14 +856,14 @@ export const rules: RuleDef[] = [
   r(
     'ACSP-12',
     'acsp',
-    'Every case a lapsed ACSP verified is listed for follow-up. The list is visible to a Platform Administrator and to that ACSP only. Individuals are contacted only on the client’s instruction. Whether a Referral Partner may see its own affected clients is open, so it is not shown',
+    'Every case a lapsed ACSP verified is listed for follow-up. The full list is visible to a Platform Administrator and to that ACSP only. Each Referral Partner is notified of its own affected clients and sees only those: status and which ACSP lapsed, never documents. Individuals are contacted only on the client’s instruction',
     'flag',
-    C9,
+    'C, 9 and 19 October',
     ['C'],
-    ['acsp.status', 'case.verified_by'],
+    ['acsp.status', 'case.verified_by', 'case.partner_id'],
     {
-      outcomeNote: 'Follow-up list. Referral Partner view pending',
-      pending: 'M3',
+      outcomeNote:
+        'Follow-up list for the administrator and the ACSP. Referral Partner notice of its own clients only',
     },
   ),
   r(
@@ -872,31 +882,27 @@ export const rules: RuleDef[] = [
   r(
     'ACSP-14',
     'acsp',
-    'An ACSP not on the Companies House published list is Not yet listed, given a reasonable time to register, and can still be allocated. It becomes Active when the listing arrives',
+    'An ACSP not on the Companies House published list is Not yet listed and has 3 months to register. It can still be allocated and becomes Active when the listing arrives',
     'flag',
-    PROPOSED,
-    ['Design'],
+    C19,
+    ['C'],
     ['acsp.status', 'acsp.monitoring.not_yet_listed_since'],
     {
       outcomeNote:
-        'An administrator confirms every allocation to a Not yet listed ACSP',
-      setting: 'acsp_register_period',
-      pending: 'M4',
+        'An administrator confirms every allocation to a Not yet listed ACSP. Days left are shown on the monitoring page',
+      param: 'acsp_register_period_months',
     },
   ),
   r(
     'ACSP-15',
     'acsp',
-    'Every 12 months an administrator uploads the fresh Companies House ACSP list. The platform cross-checks it against the platform register and an administrator confirms each match',
+    'Every 12 months an administrator uploads the fresh Companies House ACSP list. The platform cross-checks it against the platform register and an administrator confirms each match. The yearly upload sits beside the two-weekly check and does not replace it',
     'pass',
-    C9,
+    'C, 9 and 19 October',
     ['C'],
     ['monitoring.yearly_upload'],
     {
-      outcomeNote:
-        'Scheduled. Whether it replaces or sits beside the fortnightly check is open',
-      setting: 'yearly_upload_role',
-      pending: 'M4',
+      outcomeNote: 'Scheduled, beside the two-weekly check',
     },
   ),
   r(
@@ -1087,12 +1093,12 @@ export const rules: RuleDef[] = [
     'acsp',
     'A Referral Partner outside the UK sees status only',
     'block',
-    PROPOSED,
-    ['Design'],
+    C19,
+    ['C'],
     ['partner.country'],
     {
-      outcomeNote: 'Awaiting the client’s data protection assessment',
-      pending: 'P11',
+      outcomeNote:
+        'Status only. The client’s data protection assessment is noted',
     },
   ),
 
@@ -1150,17 +1156,26 @@ export const rules: RuleDef[] = [
   r(
     'SUB-06',
     'records',
-    'The individual is asked to confirm that the personal code has arrived from Companies House. The timing is set by personal_code_prompt. The code itself is never collected',
+    'The day after Companies House confirms the verification, the individual is asked "Please confirm that the code has arrived from Companies House". The prompt never asks for the code',
     'pass',
-    C9,
+    'C, 19 October',
     ['C'],
     ['submission.confirmed_at', 'case.personal_code_receipt'],
     {
       outcomeNote:
         'Scheduled. A prompt to the individual, answered Yes or Not yet',
       setting: 'personal_code_prompt',
-      pending: 'M7',
     },
+  ),
+  r(
+    'SUB-07',
+    'records',
+    'Route B filings are prepared only for an ACSP on a subscription package',
+    'block',
+    'C, 19 October',
+    ['C'],
+    ['acsp.plan.package'],
+    { outcomeNote: 'Block. Filings are available on subscription plans' },
   ),
   r(
     'RET-01',
@@ -1185,12 +1200,12 @@ export const rules: RuleDef[] = [
   r(
     'RET-03',
     'records',
-    'Raw biometric samples are deleted once verification completes, and within 30 days at most',
+    'Liveness media are kept with the case for the same seven years as the record. The certified identity provider holds its own copy for 7 days',
     'pass',
-    'ICO; V4 Step 6',
-    ['ICO'],
-    ['biometrics.captured_at'],
-    { outcomeNote: 'Scheduled', param: 'biometric_deletion_days' },
+    'C, 20 October',
+    ['C'],
+    ['liveness.captured_at', 'decision.decided_at'],
+    { outcomeNote: 'Scheduled', param: 'liveness_media_retention_years' },
   ),
   r(
     'RET-04',
@@ -1212,19 +1227,55 @@ export const rules: RuleDef[] = [
     ['acsp.id', 'audit.chain'],
     { outcomeNote: 'Enforced' },
   ),
+  r(
+    'RET-06',
+    'records',
+    'Each upload is at most max_file_mb a file, and at most max_files_per_request files per request',
+    'request',
+    'C, 19 October',
+    ['C'],
+    ['upload.size', 'upload.count'],
+    {
+      outcomeNote: 'Request a smaller or fewer files',
+      param: 'max_file_mb',
+    },
+  ),
+  r(
+    'RET-07',
+    'records',
+    'The ACSP downloads its verification file immediately after Approve, or later within the seven years only once a Platform Administrator has released it. The administrator never opens the evidence. Every download needs step-up',
+    'block',
+    'C, 19 October',
+    ['C'],
+    ['decision.decided_at', 'export_request.released_at', 'step_up.ref'],
+    { outcomeNote: 'Block the download until released' },
+  ),
 
   // 11 Case messages
   r(
     'MSG-01',
     'messages',
-    'A case message that looks like a personal code or a company authentication code is refused with a warning and is not kept',
-    'block',
-    C9,
+    'The individual may pass the personal code or the company authentication code to the allocated ACSP as a code message. Only the allocated ACSP reviewer and the individual can open it. The text is deleted automatically 30 days after the ACSP marks it received. It is never exported and never shown to Referral Partners, platform administrators, the Copilot or any AI feature. The audit trail records sent, viewed, received and deleted, never the code',
+    'pass',
+    'C, 19 and 20 October',
+    ['C'],
+    ['message.kind', 'message.received_at', 'audit.code_message'],
+    {
+      outcomeNote:
+        'Enforced. Deleted 30 days after "Code received". Never exported',
+    },
+  ),
+  r(
+    'MSG-03',
+    'messages',
+    'An ordinary message that looks like a code shows a gentle prompt to send it as a code message instead. The message is not blocked',
+    'pass',
+    'C, 19 and 20 October',
     ['C'],
     ['message.body'],
     {
       outcomeNote:
-        '"Please do not share codes here. Companies House sends the personal code directly to the person."',
+        '"This looks like a code. Send it as a code message so only [ACSP] can see it and it is deleted after 30 days."',
     },
   ),
   r(
@@ -1270,9 +1321,9 @@ export const paramDefs: ParamDef[] = [
   {
     key: 'passport_expiry_option1',
     label:
-      'Passport expiry tolerance, Option 1 (only where the chip is validated)',
+      'Passport expiry tolerance, Option 1. Not applied: an expired passport is not accepted',
     unit: 'months',
-    basis: 'IDV Standard, Option 1',
+    basis: `IDV Standard, Option 1; ${C19}`,
     min: 0,
     max: 6,
   },
@@ -1317,12 +1368,28 @@ export const paramDefs: ParamDef[] = [
     max: 100,
   },
   {
-    key: 'biometric_deletion_days',
-    label: 'Raw biometric samples deleted within',
-    unit: 'days',
-    basis: 'ICO; V4 Step 6',
+    key: 'liveness_media_retention_years',
+    label: 'Liveness media kept with the case',
+    unit: 'years',
+    basis: 'C, 20 October',
+    min: 7,
+    max: 15,
+  },
+  {
+    key: 'max_file_mb',
+    label: 'Largest upload',
+    unit: 'MB a file',
+    basis: 'C, 19 October',
     min: 1,
-    max: 30,
+    max: 25,
+  },
+  {
+    key: 'max_files_per_request',
+    label: 'Most files per request',
+    unit: 'files',
+    basis: 'C, 19 October',
+    min: 1,
+    max: 10,
   },
   {
     key: 'retention_years',
@@ -1396,6 +1463,22 @@ export const paramDefs: ParamDef[] = [
     min: 1,
     max: 24,
   },
+  {
+    key: 'acsp_register_period_months',
+    label: 'Time for a Not yet listed ACSP to register',
+    unit: 'months',
+    basis: C19,
+    min: 1,
+    max: 12,
+  },
+  {
+    key: 'code_message_retention_days',
+    label: 'Code message deleted after',
+    unit: 'days',
+    basis: 'C, 19 and 20 October',
+    min: 30,
+    max: 30,
+  },
 ]
 
 export interface SettingOption {
@@ -1419,63 +1502,6 @@ export interface SettingDef {
 
 export const settingDefs: SettingDef[] = [
   {
-    key: 'chip_not_read_fallback',
-    label: 'Chip not read',
-    question: 'When a document has a chip and the chip is not read on the case',
-    options: [
-      {
-        value: 'accept_web_result',
-        label:
-          'Accept a passing web-route result while the Companies House answer is awaited',
-      },
-      {
-        value: 'request_other_then_option2',
-        label: 'Request another Option 1 document, then Option 2',
-      },
-    ],
-    rules: ['IDVT-01'],
-    pending: 'P1',
-    help: 'Evidence One does not read passport chips. Companies House has not yet answered whether Option 1 requires the chip to be read. Chip reading in the identity provider’s own app is an optional later step that would exist only if the chosen provider needs it and Companies House requires it. It is not built into the journey.',
-  },
-  {
-    key: 'expired_passport_handling',
-    label: 'Expired passports',
-    question: 'How to treat an expired passport (DOC-EXP-01)',
-    options: [
-      {
-        value: 'ask_other_document',
-        label: 'Ask for another document until Companies House replies',
-      },
-      {
-        value: 'accept_to_six_months_if_chip_validated',
-        label: 'Accept up to six months expired where the chip is validated',
-      },
-    ],
-    rules: ['DOC-EXP-01', 'ADDL-01'],
-    pending: 'H1',
-    help: 'The standard allows an expired passport up to six months only where the chip is validated. Evidence One does not read the chip, so for now an expired passport is asked for another document. Where it triggers ADDL-01 it is a Request, never a Halt.',
-  },
-  {
-    key: 'step_up_channels',
-    label: 'Step-up channels',
-    question:
-      'Which channels confirm "Confirm it’s you" before approve, decline, export or starting a submission',
-    options: [
-      {
-        value: 'passkey_or_authenticator',
-        label: 'Passkey or authenticator code only',
-        recommended: true,
-      },
-      {
-        value: 'passkey_authenticator_or_sms',
-        label: 'Also allow SMS (not recommended)',
-      },
-    ],
-    rules: ['DEC-01'],
-    pending: 'H2',
-    help: 'SMS is never used for step-up in the demo. Passkey or authenticator code only is recommended because of SIM swap. SMS stays for individuals’ one-time codes and for confirming mobile numbers.',
-  },
-  {
     key: 'personal_code_prompt',
     label: 'Personal code prompt',
     question:
@@ -1485,55 +1511,29 @@ export const settingDefs: SettingDef[] = [
         value: 'day_after_confirmation',
         label: 'The day after Companies House confirms the verification',
       },
-      {
-        value: 'day_after_submission',
-        label: 'The day after submission',
-      },
     ],
     rules: ['SUB-06'],
-    pending: 'M7',
-    help: 'The earlier documents said the day after submission. The platform never collects the code itself: the individual answers Yes or Not yet.',
+    help: 'Decided on 19 October (M7). The prompt asks only whether the code has arrived, answered Yes or Not yet, and never asks for the code. The individual may pass a code to the ACSP as a code message (MSG-01).',
   },
   {
-    key: 'acsp_register_period',
-    label: 'ACSP time to register',
+    key: 'address_check_replaces_proof',
+    label: 'Electronic address check and proof of address',
     question:
-      'How long an ACSP that is Not yet listed has to appear on the Companies House published list',
+      'Whether a passing electronic address check for a UK resident removes the need for the proof of address document',
     options: [
-      { value: 'to_be_set', label: 'To be set' },
-      { value: '30_days', label: '30 days' },
-      { value: '60_days', label: '60 days' },
-      { value: '90_days', label: '90 days' },
+      {
+        value: false,
+        label: 'No: the document is still requested',
+        recommended: true,
+      },
+      {
+        value: true,
+        label: 'Yes: a passing check is enough for a UK resident',
+      },
     ],
-    rules: ['ACSP-14'],
-    pending: 'M4',
-    help: 'A Not yet listed ACSP is not blocked. It can still be allocated, with an administrator confirming each allocation, and becomes Active when the listing arrives.',
-  },
-  {
-    key: 'yearly_upload_role',
-    label: 'Yearly list upload',
-    question:
-      'Whether the yearly upload of the Companies House ACSP list replaces the fortnightly check or sits beside it',
-    options: [
-      { value: 'sits_beside', label: 'Sits beside the fortnightly check' },
-      { value: 'replaces', label: 'Replaces the fortnightly check' },
-    ],
-    rules: ['ACSP-15', 'ACSP-10'],
-    pending: 'M4',
-    help: 'An administrator uploads the list and confirms each name match either way. Companies House publishes files and has no API.',
-  },
-  {
-    key: 'pep_screening_default',
-    label: 'PEP and sanctions screening default',
-    question:
-      'Whether screening is switched on by default for a new ACSP. Each ACSP can change it for itself',
-    options: [
-      { value: 'on', label: 'On by default' },
-      { value: 'off', label: 'Off by default' },
-    ],
-    rules: ['AML-01'],
-    pending: 'P6',
-    help: 'Screening is a per-ACSP setting. Ongoing monitoring is off. Where screening is switched off for an ACSP, AML-01 to AML-04 do not apply to its cases.',
+    rules: ['ADDL-02'],
+    pending: '',
+    help: 'Off by default: proof of address is requested from every individual. The electronic address check runs only where the ACSP switched it on.',
   },
   {
     key: 'escalate_enabled',
@@ -1569,7 +1569,9 @@ export const defaultParams: Record<ParamKey, number> = {
   idvt_attempts: 3,
   recent_appointment_days: 30,
   many_appointments: 10,
-  biometric_deletion_days: 30,
+  liveness_media_retention_years: 7,
+  max_file_mb: 10,
+  max_files_per_request: 5,
   retention_years: 7,
   review_target_hours: 36,
   reminder_day_1: 2,
@@ -1579,16 +1581,13 @@ export const defaultParams: Record<ParamKey, number> = {
   invite_valid_days: 14,
   acsp_status_check_days: 14,
   acsp_reconfirmation_months: 12,
+  acsp_register_period_months: 3,
+  code_message_retention_days: 30,
 }
 
 export const defaultSettings: RuleSettings = {
-  chip_not_read_fallback: 'accept_web_result',
-  expired_passport_handling: 'ask_other_document',
-  step_up_channels: 'passkey_or_authenticator',
   personal_code_prompt: 'day_after_confirmation',
-  acsp_register_period: 'to_be_set',
-  yearly_upload_role: 'sits_beside',
-  pep_screening_default: 'on',
+  address_check_replaces_proof: false,
   escalate_enabled: false,
   referral_commissions: false,
 }

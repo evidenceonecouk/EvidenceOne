@@ -1,37 +1,27 @@
+import { seeItWorkingCopy as copy } from '@/data/copy'
 import { container } from '../parts'
 import { ProductStage } from '../stage/ProductStage'
 import { RuleKicker } from './Hero'
 
-const capabilities = [
-  'Companies House identity standard',
-  'Option 1 certified IDVT',
-  'Browser capture, desktop and mobile',
-  'Liveness and face match',
-  'PEP and sanctions screening',
-  'Register comparison',
-  'Route B filings',
-  'GOV.UK One Login handoff',
-  'Seven-year records',
-  'Hash-chained audit trail',
-]
+const { capabilities } = copy
 
 /** The real product, shown working: case review with the browser capture in front. */
 export function SeeItWorking() {
   return (
     <section aria-labelledby="see-title" className="bg-white pt-24">
       <div className={`${container} mb-12 text-center`}>
-        <RuleKicker className="justify-center">The product</RuleKicker>
+        <RuleKicker className="justify-center">{copy.kicker}</RuleKicker>
         <h2
           id="see-title"
           className="mx-auto mt-6 max-w-3xl text-[2.5rem] leading-[1.05] font-normal tracking-[-0.04em] text-ink sm:text-[3.25rem]"
         >
-          Every check, every decision, in front of the reviewer.
+          {copy.title}
         </h2>
       </div>
       <ProductStage />
       <div
         className="mask-fade-x mx-auto max-w-[88rem] overflow-hidden py-12"
-        aria-label="Capabilities"
+        aria-label={copy.capabilitiesLabel}
       >
         <ul className="animate-marquee flex w-max gap-12">
           {[...capabilities, ...capabilities].map((c, i) => (

@@ -383,7 +383,7 @@ export const capabilities: {
   },
 ]
 
-/** Sign-in and step-up, shown on the Users and roles page. Step-up channels are Pending your decision (H2). */
+/** Sign-in and step-up, shown on the Users and roles page. Step-up never uses SMS (H2, decided 19 October). */
 export const signIn = {
   individuals: 'One-time code or passkey',
   professionals: 'Passkey or authenticator app',
@@ -608,7 +608,7 @@ export interface Obligation {
 export function buildObligations(now = Date.now()): Obligation[] {
   return [
     {
-      label: 'Biometric samples deletion run',
+      label: 'Archive move for ACSPs without a paid subscription',
       due: new Date(now + 1 * DAY).toISOString(),
       owner: 'Platform, automatic',
     },

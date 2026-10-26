@@ -173,13 +173,9 @@ export function InviteLog() {
                       )}
                     </td>
                     <td className="py-4 pr-4 text-[0.9375rem] text-graphite">
-                      {inv.instructingAcspId === 'platform_suggest'
-                        ? 'Suggested by Evidence One'
-                        : vc && reviewerOrgName(data, vc.acspId)}
+                      {vc && reviewerOrgName(data, vc.acspId)}
                       <span className="block text-slate">
-                        {inv.instructingAcspId === 'platform_suggest'
-                          ? 'The person chooses from the ranked list'
-                          : 'Named by you, the person instructs them'}
+                        Selected by you, the person instructs them
                       </span>
                     </td>
                     <td className="py-4 pr-4">

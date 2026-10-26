@@ -2,7 +2,8 @@ import { Check, ChevronDown, Languages } from 'lucide-react'
 import { useState } from 'react'
 import { languageByCode, languages } from '@/data/i18n'
 import { cn } from '@/lib/utils'
-import { useDemoStore } from '@/store/DemoStore'
+import { HeldOptionBadge } from '@/components/HeldOption'
+import { useDemoStore, useShowHeldOptions } from '@/store/DemoStore'
 
 /**
   Language switch for every individual-facing screen: a compact menu button
@@ -12,7 +13,10 @@ import { useDemoStore } from '@/store/DemoStore'
 export function LanguageSwitch({ className }: { className?: string }) {
   const { state, setLanguage } = useDemoStore()
   const [open, setOpen] = useState(false)
+  const held = useShowHeldOptions()
   const current = languageByCode(state.language)
+  // Language help is option O1, held until after go-live. Hidden, the journey runs in English.
+  if (!held) return null
   return (
     <div
       className={cn('relative', className)}
@@ -31,41 +35,42 @@ export function LanguageSwitch({ className }: { className?: string }) {
         <ChevronDown className="size-4" aria-hidden="true" />
       </button>
       {open && (
-        <ul
-          role="listbox"
-          aria-label="Language"
-          className="absolute end-0 top-full z-50 mt-1 w-56 rounded-xl border border-line bg-white p-1 shadow-lg"
-        >
-          {languages.map((l) => (
-            <li
-              key={l.code}
-              role="option"
-              aria-selected={l.code === state.language}
-            >
-              <button
-                type="button"
-                lang={l.code}
-                onClick={() => {
-                  setLanguage(l.code)
-                  setOpen(false)
-                }}
-                className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 text-start text-base text-ink hover:bg-mist focus-visible:ring-2 focus-visible:ring-ink focus-visible:outline-none"
+        <div className="absolute end-0 top-full z-50 mt-1 w-64 rounded-xl border border-line bg-white p-1 shadow-lg">
+          <p className="px-2 pt-1.5 pb-1">
+            <HeldOptionBadge code="O1" />
+          </p>
+          <ul role="listbox" aria-label="Language">
+            {languages.map((l) => (
+              <li
+                key={l.code}
+                role="option"
+                aria-selected={l.code === state.language}
               >
-                <span>
-                  {l.native}
-                  {l.native !== l.label && (
-                    <span className="ms-2 text-[0.875rem] text-slate">
-                      {l.label}
-                    </span>
+                <button
+                  type="button"
+                  lang={l.code}
+                  onClick={() => {
+                    setLanguage(l.code)
+                    setOpen(false)
+                  }}
+                  className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 text-start text-base text-ink hover:bg-mist focus-visible:ring-2 focus-visible:ring-ink focus-visible:outline-none"
+                >
+                  <span>
+                    {l.native}
+                    {l.native !== l.label && (
+                      <span className="ms-2 text-[0.875rem] text-slate">
+                        {l.label}
+                      </span>
+                    )}
+                  </span>
+                  {l.code === state.language && (
+                    <Check className="size-4" aria-hidden="true" />
                   )}
-                </span>
-                {l.code === state.language && (
-                  <Check className="size-4" aria-hidden="true" />
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )

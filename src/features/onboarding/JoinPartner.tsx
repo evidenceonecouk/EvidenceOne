@@ -17,7 +17,6 @@ import {
   PanelHeader,
 } from '@/components/app/Page'
 import { Stepper } from '@/components/app/Stepper'
-import { PendingDecision } from '@/components/PendingDecision'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
@@ -1071,8 +1070,7 @@ function DataAuthority({ form, patch }: SectionProps) {
         onChange={(v) => set({ transfersOutsideUk: v })}
       />
       <p className="text-[0.9375rem] text-slate">
-        Referral Partners outside the UK see status only.{' '}
-        <PendingDecision code="P11" />
+        Referral Partners outside the UK see status only.
       </p>
     </>
   )

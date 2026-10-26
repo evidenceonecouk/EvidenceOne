@@ -10,12 +10,15 @@ export function CopyRow({
   done,
   onToggle,
   disabled,
+  copyable = true,
 }: {
   label: string
   value: string
   done?: boolean
   onToggle?: () => void
   disabled?: boolean
+  /** False for a row with nothing to copy, such as a code the filer enters at Companies House. */
+  copyable?: boolean
 }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -39,24 +42,28 @@ export function CopyRow({
       </dt>
       <dd className="min-w-0 text-base break-words text-ink">{value}</dd>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={copy}
-          aria-label={`Copy ${label}`}
-          className={cn(
-            'inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-[0.875rem] transition-colors duration-150',
-            copied
-              ? 'border-approve/30 bg-approve-wash text-approve'
-              : 'border-line bg-white text-ink hover:bg-mist',
-          )}
-        >
-          {copied ? (
-            <Check className="size-4" aria-hidden="true" />
-          ) : (
-            <Copy className="size-4" aria-hidden="true" />
-          )}
-          <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
-        </button>
+        {copyable && (
+          <button
+            type="button"
+            onClick={copy}
+            aria-label={`Copy ${label}`}
+            className={cn(
+              'inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-[0.875rem] transition-colors duration-150',
+              copied
+                ? 'border-approve/30 bg-approve-wash text-approve'
+                : 'border-line bg-white text-ink hover:bg-mist',
+            )}
+          >
+            {copied ? (
+              <Check className="size-4" aria-hidden="true" />
+            ) : (
+              <Copy className="size-4" aria-hidden="true" />
+            )}
+            <span className="hidden sm:inline">
+              {copied ? 'Copied' : 'Copy'}
+            </span>
+          </button>
+        )}
         {onToggle && (
           <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-[0.875rem] text-graphite">
             <Checkbox

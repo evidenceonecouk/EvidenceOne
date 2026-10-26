@@ -26,7 +26,7 @@ export const it: LanguageStrings = {
     instruct:
       'Questo è lo studio che verificherà la tua identità. È responsabile della verifica e stabilisce da sé il proprio compenso. Evidence One è il suo fornitore di tecnologia.',
     payment:
-      'Paghi l’ACSP indicato. Evidence One incassa il pagamento a suo nome, come agente. I dati della carta si inseriscono presso un fornitore di pagamenti sicuro.',
+      'Paghi l’ACSP indicato. Evidence One incassa il pagamento a suo nome, come agente. I dati della carta si inseriscono presso un fornitore di pagamenti sicuro. La carta viene autorizzata ora e l’addebito avviene solo quando l’ACSP approva la verifica.',
     document:
       'Scegli un documento d’identità. Di solito ne basta uno. Tutto avviene nel browser, senza installare nulla.',
     scan: 'Fotografa il documento o carica una foto nitida. Devono essere visibili i quattro angoli e tutto il testo.',

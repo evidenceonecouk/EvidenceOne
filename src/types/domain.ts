@@ -168,7 +168,7 @@ export interface ReferralPartner {
   id: string
   name: string
   kind: string
-  /** Country the partner operates from. A partner outside the UK sees status only (P11, Pending your decision). */
+  /** Country the partner operates from. A partner outside the UK sees status only (P11, decided 19 October). */
   country: string
   /** True when this firm is also onboarded separately as an ACSP (two memberships, never merged). */
   alsoAcspId?: string
@@ -229,8 +229,10 @@ export interface AcspProfile {
   targetTurnaroundHours: number
   fee: AcspFee
   evidenceRetention: 'platform' | 'own'
-  /** PEP and sanctions screening on or off for this ACSP (P6, Pending your decision for the default). */
+  /** PEP and sanctions screening on or off for this ACSP. Each ACSP chooses (P6). */
   pepScreening: boolean
+  /** Electronic address check for UK residents, on or off for this ACSP. Each ACSP chooses. */
+  addressCheck?: boolean
   vatNumber?: string
   address: string
   /** Payment account connected through the secure payment provider. Synthetic identifier. */
@@ -275,9 +277,33 @@ export interface AcspFirm {
 export interface AcspPlan {
   /** How Evidence One invoices the platform fee it deducts from each referred payment. */
   invoiceMode: 'per_case' | 'monthly'
-  /** Own clients are covered by a subscription. Price and terms are not set. */
-  subscription: 'monthly_only' | 'monthly_with_cases'
-  casesIncluded?: number
+  /** Subscription package for the ACSP's own clients, or null for none. Referred cases carry the platform fee either way. */
+  packageId: PackageId | null
+  /** Usage earlier this month, before the cases held in the demo. Referred cases are shown but never counted. */
+  usageBaseline?: { ownClientCases: number; referredCases: number }
+  /** Account storage used, in GB, against the package's limit. */
+  storageUsedGb: number
+}
+
+export type PackageId = 'easy' | 'pro' | 'scale'
+
+/**
+  A provisional subscription package for an ACSP's own clients (client email of
+  15 October). Every value is a setting, changed only by a Super Administrator
+  with a second approver. Referred cases sit outside the allowance.
+*/
+export interface SubscriptionPackage {
+  id: PackageId
+  name: string
+  monthlyPrice: number
+  /** Own-client cases included each month. */
+  casesIncluded: number
+  filesPerCase: number
+  maxFileMb: number
+  /** Account total, kept for seven years. */
+  storageGb: number
+  /** Each own-client case over the allowance. */
+  extraCaseFee: number
 }
 
 export interface Reviewer {
@@ -317,7 +343,19 @@ export interface IdvtResults {
   attempts?: number
   /** Register comparison result, shown to Referral Partners as passed or flagged. */
   registerComparison?: CheckResult
+  /**
+    Chip result from the certified identity provider's chip reader on the
+    person's phone. Not applicable where the document has no chip. Evidence One
+    itself never reads a chip.
+  */
+  chipResult?: ChipResult
+  /** Security features the certified identity provider validated on this case. */
+  securityFeatures?: string[]
+  /** Electronic address check (UK residents), where the ACSP switched it on. */
+  addressCheck?: CheckResult
 }
+
+export type ChipResult = 'read' | 'not_read' | 'not_applicable'
 
 export type ObservationSeverity = 'info' | 'attention' | 'mismatch'
 
@@ -371,12 +409,26 @@ export interface EvidenceItem {
 export type PaymentMethod = 'pay_myself' | 'agent_payment_code'
 
 /**
+  The card is authorised when the client instructs the ACSP and the total is
+  taken only when the ACSP approves. On a decline, a lapse or an ACSP lapse the
+  authorisation is released and nothing is taken (P10).
+*/
+export type PaymentStatus = 'authorised' | 'taken' | 'released'
+
+/**
   Agency model. The individual pays the named ACSP. Evidence One collects the
   payment as the ACSP's disclosed agent, by split payment, with the ACSP as
   merchant of record. The four fee types are never merged.
 */
 export interface Payment {
   method: PaymentMethod
+  status: PaymentStatus
+  /** When the card or Agent Payment Code was authorised, at the instruct step. */
+  authorisedAt: ISODate
+  releasedAt?: ISODate
+  releaseReason?: string
+  /** The referral arrangement disclosure shown before authorisation. The referral record is kept when the payment is taken. */
+  disclosure?: { acknowledgedAt: ISODate; consentAt?: ISODate }
   /** The ACSP's professional fee, paid by the client or by the Partner on their behalf. */
   amount: number
   /** ACSP that received the payment (merchant of record). */
@@ -384,6 +436,7 @@ export interface Payment {
   code?: string
   /** Who paid, for Agent Payment Codes. */
   payerName?: string
+  /** When the payment was taken, on the ACSP's approval. Absent while only authorised. */
   paidAt?: ISODate
   reference: string
   /** Payment provider fee, borne by the ACSP and shown on its statement. */
@@ -426,7 +479,7 @@ export interface SubmissionCorrection {
 
 /**
   The ACSP submits through the Companies House service. Companies House emails the
-  personal code to the individual; the platform never collects or keeps it.
+  personal code to the individual; the submission never asks for or holds it.
 */
 export interface Submission {
   startedAt?: ISODate
@@ -440,7 +493,11 @@ export interface Submission {
   corrections?: SubmissionCorrection[]
 }
 
-export type Option2Reason = 'attempts_used' | 'unsupported_document'
+export type Option2Reason =
+  | 'attempts_used'
+  | 'unsupported_document'
+  /** The person has no smartphone or tablet for the provider's journey (Pending your decision). */
+  | 'no_smartphone'
 
 export interface Option2State {
   reason: Option2Reason
@@ -527,7 +584,24 @@ export interface CaseMessage {
   body: string
   /** Email notification sent to the other party. Shown as a sent-notification row. */
   notifiedAt?: ISODate
+  /**
+    'code': a Companies House code the individual passes to the allocated ACSP
+    (P4). Only the allocated ACSP reviewer and the individual can open it. It is
+    never exported and never shown to Referral Partners, platform staff, the
+    Copilot or any AI feature. The audit trail never holds the value.
+  */
+  kind?: 'message' | 'code'
+  codeKind?: CodeKind
+  /** The ACSP marked "Code received". The text is deleted 30 days later. */
+  receivedAt?: ISODate
+  receivedBy?: string
+  /** receivedAt plus code_message_retention_days. */
+  deleteOn?: ISODate
+  /** The text was deleted automatically. The body is then empty. */
+  deletedAt?: ISODate
 }
+
+export type CodeKind = 'personal_code' | 'company_authentication_code'
 
 export interface DiscrepancyReport {
   /** What differs, for example "First name: AIDAN on the document, AIDEN on the register". */
@@ -569,20 +643,25 @@ export interface JourneyState {
     languages: string[]
   }
   documentType?: IdDocumentType
-  /** Document capture: upload from this computer, continue on the phone's browser, or direct camera on mobile. */
+  /**
+    Document capture. On desktop the provider journey continues on a phone or
+    tablet ('phone'); on mobile it is direct ('camera'). 'upload' is kept only
+    for cases recorded before the provider required a phone or tablet.
+  */
   captureRoute?: 'upload' | 'phone' | 'camera'
-  /** Liveness: continue on the phone (preferred) or use this computer's camera. */
-  livenessRoute?: 'phone' | 'computer'
+  /** Liveness: on the phone or tablet the person handed off to, or direct on mobile. There is no webcam-only route. */
+  livenessRoute?: 'phone'
   photoPageDone?: boolean
+  /** The chip step in the provider's journey, where the document has a chip. Absent until the step is done. */
+  chipResult?: ChipResult
   selfieDone?: boolean
   checksDone?: boolean
   /** Failed attempts at the identity checks so far (IDVT-07). After idvt_attempts, Option 2 is offered (IDVT-08). */
   checkAttempts?: number
-  /** The person holds an eVisa: passport plus any one Group B document until the provider confirms an eVisa check in the browser. */
+  /** The person holds an eVisa. The certified identity provider checks it directly with the Home Office, on the same Option 1 route. */
   eVisa?: boolean
-  eVisaSecondDocument?: string
-  /** Expired document (DOC-EXP-01, H1): use another document, or continue with one supporting document (ADDL-01, a Request). */
-  expiredChoice?: 'other_document' | 'supporting_document'
+  /** Expired document (DOC-EXP-01): an expired passport is not accepted, so another document is used (a Request). */
+  expiredChoice?: 'other_document'
   /** The individual confirmed they instruct the named ACSP (rules ACSP-01 and ACSP-02). */
   instructedAt?: ISODate
   /** Proof of current address uploaded (ADDL-02, every individual). */
@@ -627,8 +706,10 @@ export interface Invite {
   paymentCodeUsedAt?: ISODate
   status: 'sent' | 'opened' | 'accepted' | 'amendment_requested' | 'expired'
   caseId?: string
-  /** The instructing ACSP chosen by the Partner, or 'platform_suggest' to let the platform suggest. */
-  instructingAcspId?: string | 'platform_suggest'
+  /** The instructing ACSP the Partner selected from the 2 or 3 matched ACSPs shown, or an administrator confirmed for a Bulk Request. */
+  instructingAcspId?: string
+  /** The matched ACSPs shown to the Partner, best first. Ranked by clear criteria, not AI. */
+  shownAcspIds?: string[]
   payer?: 'client' | 'partner'
 }
 
@@ -659,7 +740,9 @@ export type ParamKey =
   | 'idvt_attempts'
   | 'recent_appointment_days'
   | 'many_appointments'
-  | 'biometric_deletion_days'
+  | 'liveness_media_retention_years'
+  | 'max_file_mb'
+  | 'max_files_per_request'
   | 'retention_years'
   | 'review_target_hours'
   | 'reminder_day_1'
@@ -669,27 +752,20 @@ export type ParamKey =
   | 'invite_valid_days'
   | 'acsp_status_check_days'
   | 'acsp_reconfirmation_months'
+  /** M4, decided 19 October: a Not yet listed ACSP has 3 months to register. */
+  | 'acsp_register_period_months'
+  /** P4, decided 19 and 20 October: a code message is deleted this many days after the ACSP marks it received. */
+  | 'code_message_retention_days'
 
 /**
   Decision settings. Most carry a "Pending your decision" badge on the Rules page
   because the client has not decided them. They are settings, never hard-coded.
 */
 export interface RuleSettings {
-  /** IDVT-01. Pending Companies House's answer on whether Option 1 requires the chip to be read (P1). */
-  chip_not_read_fallback: 'accept_web_result' | 'request_other_then_option2'
-  /** DOC-EXP-01 (H1). An expired passport is asked for another document until Companies House replies. */
-  expired_passport_handling:
-    'ask_other_document' | 'accept_to_six_months_if_chip_validated'
-  /** H2. SMS is never used for step-up. */
-  step_up_channels: 'passkey_or_authenticator' | 'passkey_authenticator_or_sms'
-  /** M7. */
-  personal_code_prompt: 'day_after_confirmation' | 'day_after_submission'
-  /** M4. How long a Not yet listed ACSP has to register. */
-  acsp_register_period: 'to_be_set' | '30_days' | '60_days' | '90_days'
-  /** M4. Whether the yearly upload replaces or sits beside the fortnightly check. */
-  yearly_upload_role: 'sits_beside' | 'replaces'
-  /** P6. PEP and sanctions screening is a per-ACSP setting; this is its default. */
-  pep_screening_default: 'on' | 'off'
+  /** M7, decided 19 October: the day after Companies House confirms. The prompt never asks for the code. */
+  personal_code_prompt: 'day_after_confirmation'
+  /** Open: whether a passing electronic address check for a UK resident removes the proof of address document. Off by default. */
+  address_check_replaces_proof: boolean
   escalate_enabled: boolean
   /** Referral commissions are off at launch. Switching on needs a second approver. */
   referral_commissions: boolean
@@ -756,14 +832,8 @@ export interface BillingSettings {
   /** Platform fee per referred case, ex VAT. Set only by a Super Administrator with a second approver. */
   platformFee: number
   vatRate: number
-  subscription: {
-    structure: 'monthly_only' | 'monthly_with_cases'
-    /** null means "Price not set". */
-    price: number | null
-    casesIncluded: number | null
-    /** The client sets the terms by this date. */
-    termsDueBy: ISODate
-  }
+  /** Provisional packages. The client confirms the final price and structure before go-live. */
+  packages: SubscriptionPackage[]
 }
 
 export interface BillingData {
@@ -782,12 +852,7 @@ export type ApprovalKind =
 /** The value a change would apply on approval. Absent on older records; the action then reads the "to" text. */
 export type ApprovalPayload =
   | { kind: 'platform_fee'; platformFee: number }
-  | {
-      kind: 'subscription_plan'
-      structure: 'monthly_only' | 'monthly_with_cases'
-      price: number | null
-      casesIncluded: number | null
-    }
+  | { kind: 'subscription_plan'; package: SubscriptionPackage }
   | { kind: 'disclosure_text'; version: string }
   | { kind: 'referral_commissions'; value: boolean }
 
@@ -887,6 +952,91 @@ export interface DemoData {
   monitoring: MonitoringState
   /** Retention holds by case ID. A hold suspends destruction until it is lifted. */
   retentionHolds?: Record<string, RetentionHold>
+  /** Bulk / Bespoke Requests from Referral Partners (option O4), handled by a Platform Administrator. */
+  bulkRequests?: BulkRequest[]
+  /** Complaints and refunds, handled by a Platform Administrator (P10). */
+  complaints?: Complaint[]
+  /** ACSP requests to download a verification file after the decision, released by a Platform Administrator. */
+  exportRequests?: ExportRequest[]
+}
+
+/* Bulk / Bespoke Request (option O4). Separate from normal automated referrals. */
+
+export interface BulkRequestMessage {
+  id: string
+  from: 'partner' | 'admin'
+  authorName: string
+  at: ISODate
+  body: string
+}
+
+/**
+  A Referral Partner asks in free text for several verifications or a mix of
+  services. The Platform Administrator agrees it in the message area, then
+  converts it into linked cases: one Bulk Request, several individual
+  verification cases, and placeholders for anything else.
+*/
+export interface BulkRequest {
+  id: string
+  partnerId: string
+  submittedBy: string
+  submittedAt: ISODate
+  /** The request as the Partner wrote it. */
+  request: string
+  status: 'open' | 'converted'
+  messages: BulkRequestMessage[]
+  convertedAt?: ISODate
+  convertedBy?: string
+  /** Individual verification cases created on conversion. */
+  caseIds: string[]
+  /** Placeholder rows for additional Companies House services, arranged separately. */
+  additionalServices: string[]
+  /** A corporate verification was asked for. Added later, when Companies House publishes the final requirements (G2-19). */
+  corporateRequested: boolean
+}
+
+/**
+  A client's complaint about a case. A Platform Administrator handles it and may
+  refund a payment that was taken. What happens to the platform fee on a
+  refunded case is not yet decided, so a refund never changes it here.
+*/
+export interface Complaint {
+  id: string
+  caseId: string
+  raisedBy: string
+  raisedAt: ISODate
+  summary: string
+  status: 'open' | 'refunded' | 'closed'
+  refund?: {
+    amount: number
+    reason: string
+    at: ISODate
+    by: string
+    stepUpRef: string
+  }
+  /** Why it was closed without a refund. */
+  closedNote?: string
+  closedAt?: ISODate
+  closedBy?: string
+}
+
+/**
+  An ACSP asks for its verification file within the seven years. A Platform
+  Administrator releases the download and never opens the evidence. The ACSP
+  downloads behind step-up.
+*/
+export interface ExportRequest {
+  id: string
+  caseId: string
+  acspId: string
+  requestedBy: string
+  requestedAt: ISODate
+  reason: string
+  status: 'requested' | 'released' | 'downloaded'
+  releasedBy?: string
+  releasedAt?: ISODate
+  downloadedAt?: ISODate
+  stepUpRef?: string
 }
 
 export interface RetentionHold {

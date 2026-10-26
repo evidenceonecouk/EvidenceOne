@@ -81,9 +81,17 @@ const UNSUPPORTED_RX =
 
 const RULE_ID = /\b([A-Z]{2,4}(?:-EXP)?-\d{2})\b/i
 
+/** Questions about Companies House codes. The Copilot never reads code messages. */
+const CODES_RX =
+  /\b(personal|authentication|auth)\s+code|\bcode messages?\b|\bwhat (is|was) the code\b/i
+
+export const NO_CODES =
+  'I can’t read code messages. Only the allocated reviewer can open them in the case messages, and they are never shared with the Copilot or any AI feature.'
+
 /** Classifies a free-text question into one of the supported intents, or a refusal. */
 export function classify(scope: CopilotScope, q: string): string {
   if (DECISION.some((rx) => rx.test(q))) return 'decision'
+  if (CODES_RX.test(q)) return 'codes'
   if (UNSUPPORTED_RX.test(q)) return 'unsupported'
   const s = q.toLowerCase()
   if (scope.kind === 'rules') {
@@ -137,6 +145,11 @@ export function answerQuestion(
       statements: [
         { text: NO_DECISIONS, cites: [rule('DEC-01'), rule('DEC-02')] },
       ],
+    }
+  if (intent === 'codes')
+    return {
+      intent,
+      statements: [{ text: NO_CODES, cites: [rule('MSG-01')] }],
     }
   if (intent === 'unsupported' || intent === 'none')
     return {
@@ -520,15 +533,9 @@ function rulesAnswer(
       (r) =>
         outcomeUnder(r.id, rs) === 'block' &&
         r.group !== 'acsp' &&
-        ![
-          'SUB-01',
-          'SUB-02',
-          'SUB-03',
-          'SUB-04',
-          'SUB-05',
-          'RET-04',
-          'MSG-01',
-        ].includes(r.id),
+        !['SUB-01', 'SUB-02', 'SUB-03', 'SUB-04', 'SUB-05', 'RET-04'].includes(
+          r.id,
+        ),
     )
     return {
       intent,

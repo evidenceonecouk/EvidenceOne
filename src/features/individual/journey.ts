@@ -1,3 +1,4 @@
+import { hasChipStep } from '@/lib/chip'
 import { currentRuleSet, evidenceTriggers } from '@/lib/rules'
 import type { DemoData, VerificationCase } from '@/types/domain'
 
@@ -13,6 +14,8 @@ export type StepId =
   | 'payment'
   | 'document'
   | 'scan'
+  /** The identity provider's chip reader, inside the provider journey, where the document has a chip. */
+  | 'chip'
   | 'selfie'
   | 'checks'
   /** Proof of current address from every individual (ADDL-02). */
@@ -83,16 +86,16 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Who will verify you',
       title: 'Instruct the named ACSP',
-      body: 'The ACSP is the service provider and Evidence One is its technology provider. The ACSP takes the payment and makes the verification statement.',
+      body: 'The ACSP is the service provider and Evidence One is its technology provider. The ACSP takes the payment, only on approval, and makes the verification statement.',
     },
   },
   {
     id: 'payment',
     stage: 1,
     caption: {
-      kicker: 'Payment to the ACSP',
-      title: "The ACSP's own fee, collected as its agent",
-      body: "Evidence One collects the payment on the ACSP's behalf. The invoice is issued in the ACSP's name. A Referral Partner may pay with a single-use Agent Payment Code.",
+      kicker: 'Authorise payment to the ACSP',
+      title: 'Authorised now, taken only on approval',
+      body: "The card is authorised when the client instructs the ACSP. The ACSP's own fee is taken only when it approves, and the invoice is issued in its name then. Nothing is taken on a decline. A Referral Partner may pay with a single-use Agent Payment Code, on the same terms.",
     },
   },
   {
@@ -101,7 +104,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Step 2 · One identity document',
       title: 'Verify with just one document',
-      body: 'Passports, licences, identity cards and residence permits all go through the browser. Upload from this computer, continue on your phone, or use the camera directly on a phone. Option 2 is a fallback only.',
+      body: 'Passports, licences, identity cards, residence permits and eVisas all go through the certified identity provider. Expired passports are not accepted. Option 2 is a fallback only.',
     },
   },
   {
@@ -109,8 +112,17 @@ export const steps: StepSpec[] = [
     stage: 2,
     caption: {
       kicker: 'Step 3 · Is the document real?',
-      title: 'Document capture',
-      body: 'The document goes straight to the certified identity provider, once. It is never uploaded twice.',
+      title: 'Document capture, on a phone or tablet',
+      body: 'The provider needs a phone or tablet camera. On a computer the person scans a QR code or asks for a link, finishes on the phone, and the computer shows the result. On a phone it is direct. There is no webcam-only route.',
+    },
+  },
+  {
+    id: 'chip',
+    stage: 2,
+    caption: {
+      kicker: 'Step 3 · Passport chip',
+      title: "The identity provider's chip reader",
+      body: "A biometric passport's chip is read by the identity provider's own chip reader on the person's phone, inside the same journey. It is not an Evidence One app. If the chip is not read, the case continues and the reviewer decides.",
     },
   },
   {
@@ -119,7 +131,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Step 4 · Does it belong to them?',
       title: 'Liveness and face match',
-      body: "A phone camera usually gives a clearer result, and this computer's camera is a supported choice.",
+      body: 'Recorded on the phone or tablet, or directly on a phone. A phone camera gives a clearer result.',
     },
   },
   {
@@ -128,7 +140,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Steps 3 and 4 · Automated checks',
       title: 'Checks run while they wait',
-      body: 'Document authenticity, liveness, face match and, where the ACSP uses it, PEP and sanctions screening. The rules then compare details with the register, the same way every time.',
+      body: 'Document authenticity and security features, the chip where it was read, liveness, face match and, where the ACSP switched them on, PEP and sanctions screening and the electronic address check. The rules then compare details with the register, the same way every time.',
     },
   },
   {
@@ -137,7 +149,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Proof of address',
       title: 'One proof of current address',
-      body: 'Asked from every individual, dated within the last six months. The exact wording is Pending your decision (P3).',
+      body: 'Please provide a document confirming your current residential address, dated within the last 6 months. Asked from every individual.',
     },
   },
   {
@@ -173,7 +185,7 @@ export const steps: StepSpec[] = [
     caption: {
       kicker: 'Option 2 · Fallback only',
       title: 'A trained person check',
-      body: "Offered only when Option 1 cannot support the person's document. Two documents are needed, and the reviewer must hold a current training attestation.",
+      body: "Offered only when Option 1 cannot support the person's document, or the person has no smartphone or tablet (pending the client's decision). Two documents are needed, and the reviewer must hold a current training attestation.",
     },
   },
 ]
@@ -207,14 +219,10 @@ export function journeyTriggers(data: DemoData, vc: VerificationCase) {
   )
 }
 
-/** B2C clients, and invites where the Referral Partner let the platform suggest, see suggested ACSPs. */
+/** B2C clients see suggested ACSPs. A Referral Partner referral already names the ACSP the Partner selected. */
 export function needsSuggestion(data: DemoData, vc: VerificationCase) {
-  return (
-    vc.origin === 'b2c' ||
-    data.invites.some(
-      (i) => i.caseId === vc.id && i.instructingAcspId === 'platform_suggest',
-    )
-  )
+  void data
+  return vc.origin === 'b2c'
 }
 
 /** The ordered path for this case, skipping steps that do not apply. */
@@ -230,6 +238,15 @@ export function pathFor(data: DemoData, vc: VerificationCase): StepId[] {
     'checks',
     'address',
   )
+  // The chip step sits after the document capture; its exact place is to be confirmed with the provider.
+  const person = data.people.find((p) => p.id === vc.personId)
+  if (
+    hasChipStep(
+      person?.document,
+      vc.journey?.documentType ?? person?.document?.type,
+    )
+  )
+    path.splice(path.indexOf('scan') + 1, 0, 'chip')
   if (journeyTriggers(data, vc).length) path.push('evidence')
   path.push('review', 'status')
   return vc.origin === 'b2c' ? path.filter((s) => s !== 'invite') : path

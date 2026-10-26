@@ -10,7 +10,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Panel, PanelHeader } from '@/components/app/Page'
 import { CompletionTick } from '@/components/brand/CompletionTick'
-import { PendingDecision } from '@/components/PendingDecision'
+import { HeldOptionBadge } from '@/components/HeldOption'
 import { RuleIdTag } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { AiObservationCard } from '@/components/visual/AiObservationCard'
@@ -20,6 +20,7 @@ import {
   formatShortDate,
   fullName,
 } from '@/lib/format'
+import { chipResultFor, chipResultLabel, securityFeaturesFor } from '@/lib/chip'
 import { NORMALISATION_NOTE } from '@/lib/register'
 import {
   comparisonRows,
@@ -41,6 +42,7 @@ import type {
 } from '@/types/domain'
 import { DiscrepancyPrompt } from './DiscrepancyPrompt'
 import { EvidenceThumb } from './EvidenceThumb'
+import { useRouteB } from './RouteBGate'
 import { RuleList } from './RuleList'
 
 export interface SectionProps {
@@ -176,6 +178,7 @@ export function RegisterSection(p: SectionProps) {
   const task = vc.correctionTaskId
     ? data.corrections.find((t) => t.id === vc.correctionTaskId)
     : undefined
+  const routeB = useRouteB()
   return (
     <StepPanel
       id="sec-register"
@@ -185,7 +188,7 @@ export function RegisterSection(p: SectionProps) {
       step="register"
       p={p}
       actions={
-        task && task.status !== 'register_updated' ? (
+        task && task.status !== 'register_updated' && routeB.shown ? (
           <Button asChild size="sm" variant="outline">
             <Link to="/acsp/filings">
               <Waypoints aria-hidden="true" />
@@ -321,7 +324,7 @@ export function RegisterSection(p: SectionProps) {
 
 const captureLabel = {
   upload: 'Uploaded from a computer, in the browser',
-  phone: 'Captured in the phone’s browser, then returned to the case',
+  phone: 'Captured on the person’s phone or tablet, then returned to the case',
   camera: 'Direct camera capture in the mobile browser',
 } as const
 
@@ -332,9 +335,7 @@ export function DocumentSection(p: SectionProps) {
   const items = vc.evidence.filter(
     (e) => e.kind === 'identity_document' || e.kind === 'selfie',
   )
-  const setting = ruleSetFor(data, vc).settings.chip_not_read_fallback
-  const isPassport =
-    (vc.journey?.documentType ?? doc?.type) === 'passport' && vc.option === 1
+  void data
   return (
     <StepPanel
       id="sec-document"
@@ -362,14 +363,6 @@ export function DocumentSection(p: SectionProps) {
             </div>
           ))}
         </dl>
-      )}
-      {isPassport && (
-        <p className="flex flex-wrap items-center gap-2 border-t border-line/70 px-5 py-3 text-[0.9375rem] text-slate sm:px-6">
-          {setting === 'accept_web_result'
-            ? 'Chip not read by Evidence One. Browser route result accepted under the current setting.'
-            : 'Chip not read by Evidence One. The current setting asks for another Option 1 document, then Option 2.'}
-          <PendingDecision code="P1" />
-        </p>
       )}
       {items.length > 0 && (
         <ul className="grid gap-4 border-t border-line/70 p-5 sm:grid-cols-2 sm:p-6">
@@ -416,13 +409,42 @@ const checkLabel: Record<CheckResult, string> = {
   not_applicable: 'Not applicable',
 }
 
+/*
+  Security features validated: the per-case evidence of what the certified
+  identity provider checked, including whether a chip was read. Optional
+  checks appear only where the ACSP switched them on.
+*/
 export function IdvtSection(p: SectionProps) {
+  const { data } = useDemoStore()
   const i = p.vc.idvt
-  const mismatch = comparisonRows(p.person, p.person.document, p.entry).some(
+  const doc = p.person.document
+  const acsp = data.acsps.find((a) => a.id === p.vc.acspId)
+  const mismatch = comparisonRows(p.person, doc, p.entry).some(
     (r) => r.result === 'mismatch',
   )
+  const chip = chipResultFor(p.vc, doc)
+  const features = securityFeaturesFor(p.vc, doc)
+  const ukResident =
+    p.person.addressHistory.find((a) => !a.to)?.address.country ===
+    'United Kingdom'
   const rows: [string, string, CheckResult, string?][] = [
-    ['authenticity', 'Document authenticity', i.documentAuthenticity],
+    [
+      'authenticity',
+      'Document authenticity and security features',
+      i.documentAuthenticity,
+    ],
+    [
+      'chip',
+      'Chip',
+      chip === 'read'
+        ? 'pass'
+        : chip === 'not_read'
+          ? 'refer'
+          : chip === 'not_applicable'
+            ? 'not_applicable'
+            : 'pending',
+      chip ? chipResultLabel[chip] : undefined,
+    ],
     ['liveness', 'Liveness', i.liveness],
     [
       'face',
@@ -440,6 +462,15 @@ export function IdvtSection(p: SectionProps) {
         ? 'Possible match'
         : undefined,
     ])
+  if (acsp?.profile.addressCheck)
+    rows.push([
+      'address',
+      'Electronic address check (UK residents)',
+      !ukResident
+        ? 'not_applicable'
+        : (i.addressCheck ?? (i.completedAt ? 'pass' : 'pending')),
+      ukResident ? undefined : 'Not a UK resident',
+    ])
   rows.push([
     'register',
     'Register comparison',
@@ -450,7 +481,7 @@ export function IdvtSection(p: SectionProps) {
     <StepPanel
       id="sec-idvt"
       kicker="Steps 3 and 4"
-      title="Identity checks"
+      title="Security features validated"
       description={`Certified identity provider${i.attempts && i.attempts > 1 ? ` · ${i.attempts} attempts` : ''}`}
       step="idvt"
       p={p}
@@ -484,9 +515,30 @@ export function IdvtSection(p: SectionProps) {
           </li>
         ))}
       </ul>
-      {!p.pepScreening && (
+      {features.length > 0 && (
+        <div className="border-t border-line/70 px-5 py-3 sm:px-6">
+          <p className="text-[0.875rem] text-slate">
+            Validated by the certified identity provider
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[0.9375rem] text-ink">
+            {features.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {(!p.pepScreening || !acsp?.profile.addressCheck) && (
         <p className="border-t border-line/70 px-5 py-3 text-[0.875rem] text-slate sm:px-6">
-          PEP and sanctions screening is switched off for your firm.
+          {[
+            !p.pepScreening && 'PEP and sanctions screening',
+            !acsp?.profile.addressCheck && 'the electronic address check',
+          ]
+            .filter(Boolean)
+            .join(' and ')
+            .replace(/^p/, 'P')
+            .replace(/^t/, 'T')}{' '}
+          {!p.pepScreening && !acsp?.profile.addressCheck ? 'are' : 'is'}{' '}
+          switched off for your firm.
         </p>
       )}
       {i.providerReference && (
@@ -568,7 +620,6 @@ export function EvidenceSection(p: SectionProps) {
       description={`Proof of current address dated within ${months} months (ADDL-02). One supporting document only when the document is expired (ADDL-01) or a name change is declared (ADDL-03), never a second identity document.`}
       step="evidence"
       p={p}
-      actions={<PendingDecision code="P3" />}
     >
       {items.length > 0 && (
         <ul className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
@@ -585,11 +636,7 @@ export function EvidenceSection(p: SectionProps) {
                 <EvidenceThumb item={e} name="" />
                 <p className="mt-3 flex flex-wrap items-center gap-2 text-[0.9375rem] font-medium text-ink">
                   {e.label}
-                  {e.redaction && (
-                    <span className="rounded-full border border-line bg-mist px-2 py-0.5 text-[0.75rem] font-medium text-graphite">
-                      Option O3
-                    </span>
-                  )}
+                  {e.redaction && <HeldOptionBadge code="O3" />}
                 </p>
                 <p className="text-[0.875rem] text-slate">
                   {e.supportingType &&

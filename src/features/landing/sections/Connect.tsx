@@ -15,7 +15,9 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
+import { HeldOptionBadge } from '@/components/HeldOption'
 import { Button } from '@/components/ui/button'
+import { connectCopy as copy } from '@/data/copy'
 import { useDemoStore } from '@/store/DemoStore'
 import type { PersonaId } from '@/types/domain'
 import { container } from '../parts'
@@ -28,33 +30,30 @@ const steps: {
   body: string
   to: string
   persona: PersonaId
+  /** A held option (O2), badged "Option. Available after go-live." */
+  held?: boolean
 }[] = [
   {
     n: '01',
     icon: UserRound,
-    label: 'Verify',
-    title: 'Verify your client',
-    body: 'Identity verification in the browser with one document, and a complete audit trail.',
+    ...copy.steps.cards.verify,
     to: '/journey/EO-2026-000135/invite',
     persona: 'individual',
   },
   {
     n: '02',
     icon: FileText,
-    label: 'Submit',
-    title: 'Submit to Companies House',
-    body: 'A prepared submission, handed off to your own GOV.UK One Login, then the Companies House verification reference recorded.',
+    ...copy.steps.cards.submit,
     to: '/acsp/queue',
     persona: 'reviewer',
   },
   {
     n: '03',
     icon: Building2,
-    label: 'File',
-    title: 'File for your client',
-    body: 'Register corrections and Companies House filings, in the same place.',
+    ...copy.steps.cards.file,
     to: '/acsp/filings',
     persona: 'reviewer',
+    held: true,
   },
 ]
 
@@ -73,8 +72,8 @@ export function Steps() {
             className="flex items-center gap-4 text-[1.0625rem] tracking-[0.24em] text-ink uppercase"
           >
             <span>
-              <span className="font-semibold">Verify. Submit. File.</span> One
-              platform.
+              <span className="font-semibold">{copy.steps.titleStrong}</span>{' '}
+              {copy.steps.titleRest}
             </span>
             <span
               aria-hidden="true"
@@ -82,7 +81,7 @@ export function Steps() {
             />
           </h2>
           <p className="text-[0.8125rem] font-medium tracking-[0.24em] text-graphite uppercase">
-            From verification to Companies House filings
+            {copy.steps.subtitle}
           </p>
         </div>
         <ol className="mt-8 grid items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
@@ -118,6 +117,9 @@ export function Steps() {
                   <p className="mt-2 text-base leading-relaxed text-graphite">
                     {s.body}
                   </p>
+                  {s.held && (
+                    <HeldOptionBadge code="O2" className="mt-3 w-fit" />
+                  )}
                   <span className="mt-5 flex size-11 items-center justify-center self-end rounded-full border border-line text-ink transition-colors duration-150 group-hover:border-ink group-hover:bg-ink group-hover:text-paper">
                     <ArrowRight className="size-5" aria-hidden="true" />
                   </span>
@@ -139,19 +141,6 @@ export function Steps() {
   )
 }
 
-const forAcsps = [
-  'Use Evidence One for your own clients',
-  'Receive referred and direct clients',
-  'Verify, submit and file',
-  'Secure audit trail and records',
-]
-const forPartners = [
-  'Invite directors and PSCs from the register',
-  'Choose the ACSP, or let the platform suggest one',
-  'Follow status and check results in one place',
-  'You are never presented as the verifying ACSP',
-]
-
 function CheckList({ items }: { items: string[] }) {
   return (
     <ul className="mt-6 space-y-3.5">
@@ -171,13 +160,9 @@ function CheckList({ items }: { items: string[] }) {
 export function Hub() {
   const { setPersona } = useDemoStore()
   const nodes: { icon: LucideIcon; title: string; body: string }[] = [
-    { icon: Users, title: 'ACSPs', body: 'Provide regulated services' },
-    { icon: UserRound, title: 'Clients', body: 'Individuals and companies' },
-    {
-      icon: Landmark,
-      title: 'Companies House',
-      body: 'Verified and compliant filings',
-    },
+    { icon: Users, ...copy.hub.nodes.acsps },
+    { icon: UserRound, ...copy.hub.nodes.clients },
+    { icon: Landmark, ...copy.hub.nodes.companiesHouse },
   ]
   return (
     <section
@@ -186,25 +171,25 @@ export function Hub() {
       className="scroll-mt-20 bg-[#f4f4f3] pb-20"
     >
       <h2 id="hub-title" className="sr-only">
-        How Evidence One connects ACSPs, Referral Partners and Companies House
+        {copy.hub.srTitle}
       </h2>
       <div className={container}>
         <div className="grid gap-10 rounded-[28px] border border-line bg-white/60 p-7 sm:p-10 lg:grid-cols-[1fr_1.35fr_1fr] lg:gap-8">
           <div>
             <p className="text-[0.875rem] font-semibold tracking-[0.24em] text-ink uppercase">
-              For ACSPs
+              {copy.hub.acsps.kicker}
             </p>
             <p className="mt-2 text-[1.375rem] tracking-[-0.02em] text-graphite">
-              Your clients. Your workflow.
+              {copy.hub.acsps.title}
             </p>
             <span
               aria-hidden="true"
               className="mt-4 block h-px w-full bg-line"
             />
-            <CheckList items={forAcsps} />
+            <CheckList items={copy.hub.acsps.items} />
             <Button asChild size="lg" className="mt-8 h-13 rounded-full px-7">
               <Link to="/join/acsp" onClick={() => setPersona('reviewer')}>
-                Join as an ACSP
+                {copy.hub.acsps.cta}
                 <ArrowRight aria-hidden="true" />
               </Link>
             </Button>
@@ -219,10 +204,10 @@ export function Hub() {
               />
               <div>
                 <p className="text-[0.8125rem] font-semibold tracking-[0.2em] text-ink uppercase">
-                  Clients and Referral Partners
+                  {copy.hub.source.title}
                 </p>
                 <p className="text-[0.9375rem] text-graphite">
-                  Need Companies House services
+                  {copy.hub.source.body}
                 </p>
               </div>
             </div>
@@ -230,7 +215,7 @@ export function Hub() {
             <div className="rounded-full bg-ink px-10 py-5 text-center shadow-[0_20px_40px_-20px_rgb(22_24_27/0.6)]">
               <Wordmark inverted tagline={false} className="items-center" />
               <p className="mt-1.5 text-[0.625rem] font-medium tracking-[0.32em] text-paper/70 uppercase">
-                Connects. Coordinates. Complies.
+                {copy.hub.motto}
               </p>
             </div>
             <div aria-hidden="true" className="mt-3 grid w-full grid-cols-3">
@@ -264,16 +249,16 @@ export function Hub() {
 
           <div id="for-partners" className="scroll-mt-20">
             <p className="text-[0.875rem] font-semibold tracking-[0.24em] text-ink uppercase">
-              For Referral Partners
+              {copy.hub.partners.kicker}
             </p>
             <p className="mt-2 text-[1.375rem] tracking-[-0.02em] text-graphite">
-              Bring your clients
+              {copy.hub.partners.title}
             </p>
             <span
               aria-hidden="true"
               className="mt-4 block h-px w-full bg-line"
             />
-            <CheckList items={forPartners} />
+            <CheckList items={copy.hub.partners.items} />
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
               <Button
                 asChild
@@ -282,7 +267,7 @@ export function Hub() {
                 className="h-13 rounded-full border-ink/25 px-7"
               >
                 <Link to="/join/partner" onClick={() => setPersona('partner')}>
-                  Join as a Referral Partner
+                  {copy.hub.partners.cta}
                   <ArrowRight aria-hidden="true" />
                 </Link>
               </Button>
@@ -291,7 +276,7 @@ export function Hub() {
                 onClick={() => setPersona('partner')}
                 className="text-base font-medium text-ink underline underline-offset-4"
               >
-                Open the partner portal
+                {copy.hub.partners.portalLink}
               </Link>
             </div>
           </div>
@@ -302,16 +287,16 @@ export function Hub() {
 }
 
 const trust: { icon: LucideIcon; label: string }[] = [
-  { icon: Lock, label: 'Secure by design' },
-  { icon: Clock3, label: 'Save time, one platform' },
-  { icon: ShieldCheck, label: 'Regulatory alignment' },
-  { icon: Users, label: 'Trusted professionals' },
-  { icon: BarChart3, label: 'Built for growth' },
+  { icon: Lock, label: copy.trust.items.secure },
+  { icon: Clock3, label: copy.trust.items.time },
+  { icon: ShieldCheck, label: copy.trust.items.regulatory },
+  { icon: Users, label: copy.trust.items.professionals },
+  { icon: BarChart3, label: copy.trust.items.growth },
 ]
 
 export function TrustStrip() {
   return (
-    <section aria-label="Why Evidence One" className="bg-[#e9eaea]">
+    <section aria-label={copy.trust.label} className="bg-[#e9eaea]">
       <ul
         className={`${container} grid grid-cols-2 gap-6 py-9 sm:grid-cols-3 lg:grid-cols-5`}
       >

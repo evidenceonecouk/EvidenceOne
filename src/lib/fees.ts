@@ -1,3 +1,4 @@
+import { SUBSCRIPTION_PACKAGES } from '@/data/packages'
 import type { BillingSettings, CaseSource } from '@/types/domain'
 
 /*
@@ -59,10 +60,5 @@ export function invoiceBreakdown(gross: number, vatRate: number) {
 export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
   platformFee: 69,
   vatRate: 0.2,
-  subscription: {
-    structure: 'monthly_only',
-    price: null,
-    casesIncluded: null,
-    termsDueBy: '2027-01-04',
-  },
+  packages: SUBSCRIPTION_PACKAGES,
 }

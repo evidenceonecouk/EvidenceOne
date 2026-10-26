@@ -4,8 +4,8 @@ import type {
   ApprovalKind,
   ApprovalPayload,
   ApprovalRequest,
-  BillingSettings,
   DemoData,
+  SubscriptionPackage,
 } from '@/types/domain'
 import type { ActionResult } from './actions'
 
@@ -34,7 +34,7 @@ export const canDecide = (approval: ApprovalRequest, actor: string) =>
 
 export const KIND_LABELS: Record<ApprovalKind, string> = {
   platform_fee: 'Platform fee',
-  subscription_plan: 'Subscription plan',
+  subscription_plan: 'Subscription package',
   referral_commissions: 'Referral commissions',
   disclosure_text: 'Disclosure text',
 }
@@ -80,16 +80,9 @@ export interface ProposeInput {
 export const feeText = (n: number) =>
   `£${Number.isInteger(n) ? n : n.toFixed(2)} plus VAT`
 
-export function subscriptionText(
-  structure: BillingSettings['subscription']['structure'],
-  casesIncluded: number | null,
-  price: number | null,
-) {
-  const shape =
-    structure === 'monthly_with_cases'
-      ? `Monthly fee with ${casesIncluded ?? 'a number of'} cases included`
-      : 'Monthly fee alone'
-  return `${shape}, ${price === null ? 'price not set' : `${formatMoney(price)} a month`}`
+/** Describes a subscription package for a summary. */
+export function packageText(p: SubscriptionPackage) {
+  return `${p.name}: ${formatMoney(p.monthlyPrice)} a month, up to ${p.casesIncluded} own-client cases, ${p.storageGb} GB storage, ${p.filesPerCase} files of up to ${p.maxFileMb} MB per request, ${formatMoney(p.extraCaseFee)} per additional case`
 }
 
 /** Proposes a change. Only one request of each kind can be pending at a time. */
@@ -159,6 +152,7 @@ function applyApproved(
     approval.kind === 'subscription_plan' &&
     payload?.kind === 'subscription_plan'
   ) {
+    const next = payload.package
     return {
       data: {
         ...data,
@@ -166,16 +160,13 @@ function applyApproved(
           ...data.billing,
           settings: {
             ...data.billing.settings,
-            subscription: {
-              ...data.billing.settings.subscription,
-              structure: payload.structure,
-              price: payload.price,
-              casesIncluded: payload.casesIncluded,
-            },
+            packages: data.billing.settings.packages.map((p) =>
+              p.id === next.id ? { ...next } : p,
+            ),
           },
         },
       },
-      note: `The subscription plan is now: ${approval.to}.`,
+      note: `The ${next.name} package is now: ${approval.to}. Still provisional until the client confirms the final price and structure.`,
     }
   }
   if (approval.kind === 'disclosure_text')

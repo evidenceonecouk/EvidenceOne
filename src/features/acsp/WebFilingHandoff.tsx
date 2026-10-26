@@ -1,6 +1,7 @@
 import { ExternalLink, Undo2 } from 'lucide-react'
 import { useParams } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
+import { HeldOptionBadge } from '@/components/HeldOption'
 import { Button } from '@/components/ui/button'
 import { fileCorrection } from '@/store/actions'
 import { useActingAcsp, useDemoStore } from '@/store/DemoStore'
@@ -41,6 +42,7 @@ export function WebFilingInterstitial({
       <p className="mt-8 font-mono text-[0.8125rem] tracking-[0.14em] text-slate uppercase">
         Evidence One · Leaving the platform
       </p>
+      <HeldOptionBadge code="O2" className="mt-3" />
       <h1 className="mt-2 text-[1.75rem] leading-tight font-medium tracking-[-0.02em] text-ink">
         You are continuing outside Evidence One
       </h1>

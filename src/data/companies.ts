@@ -136,6 +136,8 @@ export const companies: Company[] = [
     },
     sicCodes: ['11050'],
     sicDescription: 'Manufacture of beer',
+    lodgedByPartnerId: 'partner-fenwick',
+    connectedAt: '2026-04-14T09:10:00.000Z',
   },
   {
     number: '99938164',

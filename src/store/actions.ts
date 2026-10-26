@@ -1,20 +1,14 @@
 import { PRIMARY_ACSP_ID } from '@/data/organisations'
 import { paramDefs, RULE_SET_NAME, settingDefs } from '@/data/rules'
 import type { AuditInput } from '@/lib/audit'
-import { splitPayment } from '@/lib/fees'
-import { addDays, formatDate, formatMoney, fullName } from '@/lib/format'
+import { looksLikeCode } from '@/lib/codeWarning'
+import { fullName } from '@/lib/format'
+import { hasChipStep, securityFeaturesFor } from '@/lib/chip'
 import { computeRegisterDifferences, evidenceLabel } from '@/lib/identityChecks'
-import {
-  buildClientInvoice,
-  consentRequiredBy,
-  DEMO_REFERRAL_COMMISSION,
-  nextInvoiceNumber,
-  partnerReceivesCommission,
-} from '@/lib/invoicing'
 import { defaultCriteria } from '@/lib/matchCriteria'
 import { suggestAcsps } from '@/lib/matching'
 import { currentRuleSet, draftRuleSet, evaluateCase } from '@/lib/rules'
-import { criteriaForPerson } from './partnerSelectors'
+import { releasePayment, takePayment, then } from './paymentActions'
 import type {
   AiObservation,
   DecisionOutcome,
@@ -26,9 +20,7 @@ import type {
   JourneyState,
   Option2Reason,
   ParamKey,
-  Payment,
   Person,
-  ReferralRecord,
   RuleDecision,
   RuleSettings,
   RuleSetVersion,
@@ -118,18 +110,17 @@ export interface SendInvitesInput {
   personIds: string[]
   partnerId: string
   actor: string
-  /** The instructing ACSP the Partner chose, or 'platform_suggest' to let the platform suggest one. */
-  instructingAcspId: string | 'platform_suggest'
+  /** The instructing ACSP the Partner selected from the matched ACSPs shown. */
+  instructingAcspId: string
+  /** The 2 or 3 matched ACSPs shown to the Partner, best first. Ranked by clear criteria, not AI. */
+  shownAcspIds?: string[]
   /** Who pays: the client, or the Partner with a single-use Agent Payment Code tied to the invite. */
   payer: 'client' | 'partner'
-  /** Language and capacity preferences used to suggest an ACSP when the platform suggests one. */
-  languages?: string[]
-  maxTurnaroundHours?: number
 }
 
 /**
-  A Referral Partner invites people to verify. The invite names the instructing
-  ACSP (or asks the platform to suggest one) and who pays. The Partner never
+  A Referral Partner refers people to verify. The referral names the instructing
+  ACSP the Partner selected from 2 or 3 matched ACSPs, and who pays. The Partner never
   reviews or decides: every case is referred to an ACSP.
 */
 export function sendInvites(
@@ -143,7 +134,6 @@ export function sendInvites(
   const audit: AuditInput[] = []
   let inviteIds = data.invites.map((i) => i.id)
   let caseIds = data.cases.map((c) => c.id)
-  const suggest = input.instructingAcspId === 'platform_suggest'
 
   for (const personId of input.personIds) {
     const person = data.people.find((p) => p.id === personId)
@@ -159,19 +149,7 @@ export function sendInvites(
     const entry = data.register.find(
       (r) => r.personId === personId && r.companyNumber === input.companyNumber,
     )
-    // A named ACSP is the instructing ACSP. When the platform suggests, the top ranked ACSP is provisional until the individual instructs one.
-    const ranked = suggest
-      ? suggestAcsps(
-          data,
-          criteriaForPerson(data, personId, input.companyNumber, {
-            languages: input.languages,
-            maxTurnaroundHours: input.maxTurnaroundHours,
-          }),
-        ).map((s) => s.acsp.id)
-      : []
-    const acspId = suggest
-      ? (ranked[0] ?? PRIMARY_ACSP_ID)
-      : input.instructingAcspId
+    const acspId = input.instructingAcspId
     const acspName = data.acsps.find((a) => a.id === acspId)?.name ?? acspId
     invites.push({
       id: inviteId,
@@ -182,7 +160,8 @@ export function sendInvites(
       paymentCode: code,
       status: 'sent',
       caseId,
-      instructingAcspId: input.instructingAcspId,
+      instructingAcspId: acspId,
+      shownAcspIds: input.shownAcspIds,
       payer: input.payer,
     })
     cases.push({
@@ -197,9 +176,7 @@ export function sendInvites(
       option: 1,
       status: 'invited',
       createdAt: now,
-      allocation: suggest
-        ? { source: 'suggested', suggestedAcspIds: ranked }
-        : { source: 'invite' },
+      allocation: { source: 'invite' },
       idvt: {
         documentAuthenticity: 'pending',
         liveness: 'pending',
@@ -216,7 +193,7 @@ export function sendInvites(
       actorType: 'person',
       action: 'invite.sent',
       caseId,
-      detail: `Invite ${inviteId} sent to ${fullName(person)}, pre-filled from the register. ${suggest ? 'Instructing ACSP: to be suggested by the platform from clear criteria, not AI.' : `Instructing ACSP: ${acspName}.`} ${code ? `Paid by ${partner?.name ?? 'the Referral Partner'} with single-use Agent Payment Code ${code}.` : 'The individual pays the ACSP.'}${entry?.identityVerified ? ' REG-04: the register already shows this person as verified. The sender and the individual are both told.' : ''}`,
+      detail: `Invite ${inviteId} sent to ${fullName(person)}, pre-filled from the register. Instructing ACSP: ${acspName}, selected by the Referral Partner${input.shownAcspIds?.length ? ` from ${input.shownAcspIds.length} matched ACSPs ranked by clear criteria, not AI` : ''}. ${code ? `Paid by ${partner?.name ?? 'the Referral Partner'} with single-use Agent Payment Code ${code}.` : 'The individual pays the ACSP.'}${entry?.identityVerified ? ' REG-04: the register already shows this person as verified. The sender and the individual are both told.' : ''}`,
     })
   }
 
@@ -334,142 +311,6 @@ export function requestAmendment(
   }
 }
 
-export interface PaymentOptions {
-  /** The referral arrangement disclosure was shown and acknowledged, or consent given, before payment. */
-  disclosure?: { acknowledgedAt: string; consentAt?: string }
-}
-
-/**
-  Payment comes after the person has instructed the named ACSP and before the
-  identity checks. The client pays the ACSP: Evidence One collects the payment as
-  the ACSP's disclosed agent, by split payment, with the ACSP as merchant of
-  record. The platform fee (referred and B2C cases only) is deducted from the
-  payment, never added on top. The client's invoice is issued in the ACSP's name.
-*/
-export function recordPayment(
-  data: DemoData,
-  caseId: string,
-  payment: Payment,
-  options: PaymentOptions = {},
-): ActionResult {
-  const vc = data.cases.find((c) => c.id === caseId)
-  if (!vc) return { data, audit: [] }
-  const acsp = data.acsps.find(
-    (a) => a.id === (payment.payeeAcspId ?? vc.acspId),
-  )
-  if (!acsp) return { data, audit: [] }
-  const nowDate = new Date()
-  const now = nowDate.toISOString()
-  const name = personName(data, vc.personId)
-  const split = splitPayment(payment.amount, vc.source, data.billing.settings)
-  const paidBy =
-    payment.method === 'agent_payment_code'
-      ? (payment.payerName ?? 'Referral Partner')
-      : name
-  const invoice = buildClientInvoice({
-    id: nextInvoiceNumber(acsp, data.billing, nowDate.getFullYear()),
-    acsp,
-    caseId,
-    clientName: name,
-    gross: payment.amount,
-    vatRate: data.billing.settings.vatRate,
-    paidBy,
-    issuedAt: now,
-  })
-  const full: Payment = {
-    ...payment,
-    payeeAcspId: acsp.id,
-    paidAt: payment.paidAt ?? now,
-    providerFee: split.providerFee,
-    platformFee: split.platformFee,
-    platformFeeVat: split.platformFeeVat,
-    netPayout: split.net,
-    payoutAt: addDays(now, 2),
-    clientInvoiceId: invoice.id,
-  }
-  const next = patchCase(data, caseId, (c) => ({
-    ...c,
-    status: c.status === 'invited' ? 'in_progress' : c.status,
-    payment: full,
-    journey: { ...c.journey, paid: true, payment: full },
-  }))
-
-  // Referral commissions are Off at launch. When On, the nine-field referral record is kept.
-  const partner = data.partners.find((p) => p.id === vc.partnerId)
-  const commissionsOn = currentRuleSet(data).settings.referral_commissions
-  const record: ReferralRecord | undefined =
-    commissionsOn && partnerReceivesCommission(partner) && options.disclosure
-      ? {
-          referral_partner: partner!.name,
-          regulator: partner!.referralPayment.regulator!,
-          commission_type: DEMO_REFERRAL_COMMISSION.type,
-          commission_amount: DEMO_REFERRAL_COMMISSION.amount,
-          disclosure_version: DEMO_REFERRAL_COMMISSION.disclosureVersion,
-          disclosed_at: options.disclosure.acknowledgedAt,
-          consent_required: consentRequiredBy(
-            partner!.referralPayment.regulator,
-          ),
-          consent_at: options.disclosure.consentAt,
-          payment_at: full.paidAt,
-        }
-      : undefined
-
-  const platformLine =
-    split.platformFee > 0
-      ? ` Platform fee of ${formatMoney(split.platformFee)} plus VAT deducted automatically.`
-      : ' No platform fee: the ACSP’s own client.'
-  const audit: AuditInput[] = [
-    {
-      at: now,
-      actor: name,
-      actorType: 'person',
-      action: 'payment.completed',
-      caseId,
-      detail:
-        (payment.method === 'agent_payment_code'
-          ? `Paid by ${payment.payerName} on the client’s behalf with single-use Agent Payment Code ${payment.code}.`
-          : `Paid ${formatMoney(payment.amount)} to ${acsp.name} by card. Reference ${payment.reference}.`) +
-        ` Evidence One collected it as ${acsp.name}’s disclosed agent, with ${acsp.name} as merchant of record.${platformLine} Net ${formatMoney(split.net)} to ${acsp.name}’s own payment account.`,
-    },
-    {
-      at: now,
-      actor: 'Evidence One',
-      actorType: 'system',
-      action: 'invoice.issued',
-      caseId,
-      detail: `Invoice ${invoice.id} issued in the name of ${acsp.name} (${acsp.profile.vatNumber ? `VAT ${acsp.profile.vatNumber}` : 'not VAT registered'}), generated by Evidence One on its behalf.`,
-    },
-  ]
-  if (record)
-    audit.push({
-      at: now,
-      actor: 'Evidence One',
-      actorType: 'system',
-      action: 'referral.recorded',
-      caseId,
-      detail: `Referral record kept for ${record.referral_partner}: disclosure ${record.disclosure_version} shown on ${formatDate(record.disclosed_at!)}${record.consent_at ? ', consent given' : record.consent_required ? ', consent required' : ', acknowledged'}.`,
-    })
-
-  return {
-    data: {
-      ...next,
-      invites: next.invites.map((i) =>
-        i.caseId === caseId && payment.code && i.paymentCode === payment.code
-          ? { ...i, paymentCodeUsedAt: now }
-          : i,
-      ),
-      billing: {
-        ...next.billing,
-        clientInvoices: [...next.billing.clientInvoices, invoice],
-      },
-      referralRecords: record
-        ? [...next.referralRecords, record]
-        : next.referralRecords,
-    },
-    audit,
-  }
-}
-
 /** The person who sent the invite is told that the register already shows this identity as verified (REG-04). */
 export function inviterNotice(
   data: DemoData,
@@ -537,6 +378,8 @@ export function requestOption2(
     attempts_used: 'All attempts at the digital checks were used.',
     unsupported_document:
       'The certified identity provider cannot support the document.',
+    no_smartphone:
+      'The person has no smartphone or tablet for the certified identity provider’s journey.',
   }[reason]
   return {
     data: patchCase(data, caseId, (c) => ({
@@ -554,7 +397,7 @@ export function requestOption2(
         actorType: 'system',
         action: 'rules.option2',
         caseId,
-        detail: `${reason === 'attempts_used' ? 'IDVT-08' : 'OPT-02'}: ${why} Option 2 person check offered. Needs the reviewer’s agreement.`,
+        detail: `${reason === 'attempts_used' ? 'IDVT-08' : 'OPT-02'}: ${why} Option 2 person check offered. Needs the reviewer’s agreement.${reason === 'no_smartphone' ? ' Pending the client’s decision.' : ''}`,
       },
       {
         at: iso(1000),
@@ -597,6 +440,13 @@ export function submitForReview(
   const ref = `IDV-7F31-${String(now).slice(-4)}`
   const acsp = data.acsps.find((a) => a.id === vc.acspId)
   const pepOn = !!acsp?.profile.pepScreening
+  const ukResident =
+    person.addressHistory.find((a) => !a.to)?.address.country ===
+    'United Kingdom'
+  const addressOn = !!acsp?.profile.addressCheck && ukResident
+  const chipResult = hasChipStep(document, input.documentType)
+    ? (vc.journey?.chipResult ?? 'read')
+    : 'not_applicable'
   const differences = computeRegisterDifferences(person, document, entry)
   const flagged = differences.length > 0
 
@@ -613,7 +463,7 @@ export function submitForReview(
       kind: 'selfie',
       label: 'Liveness capture',
       uploadedAt: iso(-4 * 60000),
-      note: 'Raw sample held until completion, then deleted.',
+      note: 'Liveness media kept with the record for seven years.',
     },
     ...vc.evidence.filter(
       (e) => e.kind === 'address_evidence' || e.kind === 'option2_document',
@@ -656,9 +506,16 @@ export function submitForReview(
       providerReference: ref,
       attempts: (vc.journey?.checkAttempts ?? 0) + 1,
       registerComparison: flagged ? 'refer' : 'pass',
+      chipResult,
+      addressCheck: addressOn ? 'pass' : 'not_applicable',
     },
     evidence,
   }))
+  const withFeatures = draft.cases.find((c) => c.id === vc.id)!
+  const securityFeatures = securityFeaturesFor(withFeatures, document)
+  draft.cases = draft.cases.map((c) =>
+    c.id === vc.id ? { ...c, idvt: { ...c.idvt, securityFeatures } } : c,
+  )
 
   // Rules run deterministically; the Mandatory decision comes from the rules engine.
   const updated = draft.cases.find((c) => c.id === vc.id)!
@@ -724,7 +581,7 @@ export function submitForReview(
       actorType: 'system',
       action: 'idvt.result.received',
       caseId: vc.id,
-      detail: `Document authenticity, liveness and face match ${Math.round(score * 10) / 10}% passed in the browser. PEP and sanctions ${pepOn ? 'passed' : 'not switched on for this ACSP'}.`,
+      detail: `Document authenticity and security features, liveness and face match ${Math.round(score * 10) / 10}% passed. ${chipResult === 'read' ? 'Chip read in the identity provider’s chip reader.' : chipResult === 'not_read' ? 'No chip read.' : 'The document has no chip.'} PEP and sanctions ${pepOn ? 'passed' : 'not switched on for this ACSP'}.${addressOn ? ' Electronic address check passed.' : ''}`,
     },
     {
       at: iso(500),
@@ -922,7 +779,7 @@ export function decideCase(
     caseId,
     detail: `${verb}. Reason ${reasonCode}.${outcome === 'request_info' ? ` Requested: ${note}` : ` Decided under Route A rule set ${version}.`}${outcome === 'approve' ? ' Retention of 7 years starts from this decision.' : outcome === 'decline' ? ' The individual is shown the client’s rejection message. Record retained for 7 years.' : ''}`,
   })
-  return {
+  const decided: ActionResult = {
     data: patchCase(data, caseId, (c) => ({
       ...c,
       status,
@@ -940,6 +797,14 @@ export function decideCase(
     })),
     audit,
   }
+  // P10: the payment is taken on approval and released on a decline.
+  if (outcome === 'approve')
+    return then(decided, (d) => takePayment(d, caseId, iso(2000)))
+  if (outcome === 'decline')
+    return then(decided, (d) =>
+      releasePayment(d, caseId, 'Verification declined', iso(2000)),
+    )
+  return decided
 }
 
 export function recordRuleDecision(
@@ -1419,7 +1284,7 @@ export function recordExport(
         actorType: 'person',
         action: 'record.exported',
         caseId,
-        detail: `Verification record exported as PDF. Step-up ${stepUpRef} confirmed.`,
+        detail: `Verification record exported as PDF. Step-up ${stepUpRef} confirmed. Code messages are never included.`,
       },
     ],
   }
@@ -1655,7 +1520,7 @@ export function logCopilotExchange(
         actorType: 'ai',
         action: 'copilot.exchange',
         caseId: input.caseId,
-        detail: `Asked by ${input.reviewer}: "${input.question}" Answer: ${answer} Sources: ${input.sources.length ? input.sources.join(', ') : 'none'}. Model: ${MODEL_LABEL}. Advisory only.`,
+        detail: `Asked by ${input.reviewer}: ${looksLikeCode(input.question) ? '[question not kept: it looked like a code]' : `"${input.question}"`} Answer: ${answer} Sources: ${input.sources.length ? input.sources.join(', ') : 'none'}. Model: ${MODEL_LABEL}. Advisory only.`,
       },
     ],
   }

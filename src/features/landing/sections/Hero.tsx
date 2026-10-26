@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   Building2,
+  Compass,
   Handshake,
   LifeBuoy,
   MonitorSmartphone,
@@ -11,6 +12,8 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router'
 import { EyeHero } from '@/components/visual/EyeHero'
+import { heroCopy } from '@/data/copy'
+import { guidedSteps } from '@/features/guided/steps'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import type { PersonaId } from '@/types/domain'
@@ -40,9 +43,9 @@ export function RuleKicker({
 }
 
 const facts: { icon: LucideIcon; label: string }[] = [
-  { icon: MonitorSmartphone, label: 'One document, in your browser' },
-  { icon: UserCheck, label: 'Decided by a named, regulated ACSP' },
-  { icon: ReceiptText, label: "Your ACSP's fee is shown before you pay" },
+  { icon: MonitorSmartphone, label: heroCopy.facts[0] },
+  { icon: UserCheck, label: heroCopy.facts[1] },
+  { icon: ReceiptText, label: heroCopy.facts[2] },
 ]
 
 /** The four entry points. "Had trouble with the GOV.UK app?" opens the B2C start page with a query flag. */
@@ -56,30 +59,26 @@ const entries: {
 }[] = [
   {
     icon: ScanFace,
-    title: 'Verify my identity',
-    hint: 'Choose an ACSP and verify in your browser.',
+    ...heroCopy.entries.verify,
     to: '/verify',
     persona: 'b2c',
     primary: true,
   },
   {
     icon: LifeBuoy,
-    title: 'Had trouble with the GOV.UK app?',
-    hint: 'See how an ACSP can help you finish.',
+    ...heroCopy.entries.govuk,
     to: '/verify?from=govuk',
     persona: 'b2c',
   },
   {
     icon: Handshake,
-    title: 'For Referral Partners',
-    hint: 'Bring your clients and track every case.',
+    ...heroCopy.entries.partners,
     to: '/join/partner',
     persona: 'partner',
   },
   {
     icon: Building2,
-    title: 'For ACSPs',
-    hint: 'Verify, submit and file on one platform.',
+    ...heroCopy.entries.acsps,
     to: '/join/acsp',
     persona: 'reviewer',
   },
@@ -89,7 +88,7 @@ const focusEye = (on: boolean) => () =>
   window.dispatchEvent(new CustomEvent('eye:focus', { detail: on }))
 
 export function Hero() {
-  const { setPersona } = useDemoStore()
+  const { setPersona, setGuided } = useDemoStore()
 
   return (
     <section
@@ -113,31 +112,21 @@ export function Hero() {
         className={`${container} relative pt-10 pb-16 lg:min-h-[46rem] lg:pt-20 lg:pb-20`}
       >
         <div className="max-w-[40rem]">
-          <RuleKicker className="animate-rise">
-            Alongside the free GOV.UK ID Check app
-          </RuleKicker>
+          <RuleKicker className="animate-rise">{heroCopy.kicker}</RuleKicker>
           <h1
             id="hero-title"
             className="mt-6 text-[2.5rem] leading-[1.02] font-[450] tracking-[-0.045em] text-ink sm:text-[3.25rem] lg:text-[3.5rem]"
           >
-            <span className="reveal-line">
-              <span className="[animation-delay:90ms]">
-                Verify with an ACSP,
+            {heroCopy.titleLines.map((line, i) => (
+              <span key={line} className="reveal-line">
+                <span style={{ animationDelay: `${90 * (i + 1)}ms` }}>
+                  {line}
+                </span>
               </span>
-            </span>
-            <span className="reveal-line">
-              <span className="[animation-delay:180ms]">in your browser,</span>
-            </span>
-            <span className="reveal-line">
-              <span className="[animation-delay:270ms]">
-                with help in your language.
-              </span>
-            </span>
+            ))}
           </h1>
           <p className="animate-rise mt-6 max-w-[36rem] text-[1.1875rem] leading-[1.4] text-[#4a4e54] [animation-delay:320ms] sm:text-[1.3125rem]">
-            You choose a named ACSP, a regulated professional, who carries out
-            your identity verification for Companies House. Evidence One is
-            their technology provider.
+            {heroCopy.lead}
           </p>
 
           <ul className="animate-rise mt-8 grid gap-3 [animation-delay:380ms] sm:grid-cols-2">
@@ -183,6 +172,15 @@ export function Hero() {
               </li>
             ))}
           </ul>
+
+          <button
+            type="button"
+            onClick={() => setGuided({ on: true, step: 0 })}
+            className="animate-rise mt-5 inline-flex min-h-12 items-center gap-2.5 rounded-full border border-ink/25 bg-white/85 px-5 text-[1.0625rem] font-medium text-ink backdrop-blur [animation-delay:400ms] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          >
+            <Compass className="size-5" strokeWidth={1.5} aria-hidden="true" />
+            Guided demo, {guidedSteps.length} steps
+          </button>
 
           <ul className="animate-rise mt-10 grid gap-x-8 gap-y-4 border-t border-ink/15 pt-6 [animation-delay:440ms] sm:grid-cols-3">
             {facts.map((f) => (

@@ -3,35 +3,16 @@ import { ArrowRight, CirclePause, Lock, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CompletionTick } from '@/components/brand/CompletionTick'
 import { formatDate, retentionExpiry, shortHash } from '@/lib/format'
+import { platformCopy as copy } from '@/data/copy'
 import { cn } from '@/lib/utils'
 import { useDemoStore } from '@/store/DemoStore'
 import { getCase } from '@/store/selectors'
 import { Kicker, container } from '../parts'
 
-const products = [
-  {
-    id: 'verify',
-    name: 'Verify',
-    line: 'Identity verification in the browser. One document, a liveness check and a face match, on desktop and mobile.',
-  },
-  {
-    id: 'compliance',
-    name: 'Compliance',
-    line: 'Review queues, register comparison that flags differences for the reviewer, and Route B correction tasks.',
-  },
-  {
-    id: 'intelligence',
-    name: 'Intelligence',
-    line: 'Advisory AI that checks documents and flags differences. It cannot approve or decline.',
-  },
-  {
-    id: 'file',
-    name: 'File',
-    line: 'An audit-ready record for seven years, with a hash-chained trail that shows any tampering.',
-  },
-] as const
+const productIds = ['verify', 'compliance', 'intelligence', 'file'] as const
+const products = productIds.map((id) => ({ id, ...copy.products[id] }))
 
-type ProductId = (typeof products)[number]['id']
+type ProductId = (typeof productIds)[number]
 
 export function Platform() {
   const [active, setActive] = useState<ProductId>('verify')
@@ -71,12 +52,12 @@ export function Platform() {
               id="platform-title"
               className="text-[2.25rem] leading-[1.1] font-normal tracking-[-0.03em] text-paper"
             >
-              One platform, four parts
+              {copy.title}
             </h2>
             <p className="mt-4 text-lg leading-relaxed text-paper/70">
-              Each part does one job, and every job leaves evidence.
+              {copy.lead}
             </p>
-            <nav aria-label="Platform parts" className="mt-10 hidden lg:block">
+            <nav aria-label={copy.navLabel} className="mt-10 hidden lg:block">
               <ol className="space-y-3">
                 {products.map((p, i) => (
                   <li key={p.id}>
@@ -117,7 +98,7 @@ export function Platform() {
             >
               <Kicker tone="dark">0{i + 1}</Kicker>
               <h3 className="mt-3 text-[2.75rem] leading-[1.02] font-normal tracking-[-0.04em] sm:text-[4rem]">
-                <span className="text-paper/45">Evidence One </span>
+                <span className="text-paper/45">{copy.namePrefix} </span>
                 <span className="text-metal">{p.name}</span>
               </h3>
               <p className="mt-5 max-w-xl text-lg leading-relaxed text-paper/75 sm:text-xl">
@@ -239,10 +220,7 @@ function CompliancePanel() {
           ))}
         </ol>
       </div>
-      <p className="mt-4 text-base text-paper/70">
-        A difference is flagged, never halted. The reviewer records a decision
-        and a reason, and the prompt to report it to Companies House is logged.
-      </p>
+      <p className="mt-4 text-base text-paper/70">{copy.complianceCaption}</p>
     </Glass>
   )
 }
@@ -283,7 +261,7 @@ function IntelligencePanel() {
       </div>
       <p className="mt-4 flex items-center gap-2 text-base text-paper/75">
         <Lock className="size-4" aria-hidden="true" />
-        AI cannot approve or decline. Only an ACSP reviewer can.
+        {copy.intelligenceCaption}
       </p>
     </Glass>
   )

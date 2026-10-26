@@ -2,10 +2,14 @@ import { useRef, useState } from 'react'
 import { Check, FileUp, Lock, RefreshCw, Users } from 'lucide-react'
 import { MonoLabel, Page, Panel, PanelHeader } from '@/components/app/Page'
 import { useToast } from '@/components/app/Toaster'
-import { PendingDecision } from '@/components/PendingDecision'
 import { AcspStatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
-import { parseAcspCsv, sameName, sampleAcspCsv } from '@/lib/acspList'
+import {
+  parseAcspCsv,
+  registerCountdownText,
+  sameName,
+  sampleAcspCsv,
+} from '@/lib/acspList'
 import { formatDate, formatDateTime, fullName } from '@/lib/format'
 import { useDemoStore } from '@/store/DemoStore'
 import {
@@ -123,7 +127,7 @@ export function MonitoringPage() {
             value={
               data.acsps.filter((a) => a.status === 'not_yet_listed').length
             }
-            detail="Time to register: to be set"
+            detail="Time to register: 3 months"
           />
         </dl>
       </Panel>
@@ -175,6 +179,11 @@ export function MonitoringPage() {
                       {a.statusNote && (
                         <p className="mt-1.5 max-w-[16rem] text-[0.8125rem] text-slate">
                           {a.statusNote}
+                        </p>
+                      )}
+                      {a.status === 'not_yet_listed' && (
+                        <p className="mt-1.5 max-w-[16rem] text-[0.8125rem] font-medium text-ink">
+                          {registerCountdownText(a, now)}
                         </p>
                       )}
                     </td>
@@ -230,8 +239,8 @@ export function MonitoringPage() {
           </table>
         </div>
         <p className="flex flex-wrap items-center gap-2 border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
-          Not yet listed ACSPs are not blocked. Time to register: to be set{' '}
-          <PendingDecision code="M4" />
+          Not yet listed ACSPs are not blocked. Each has 3 months to register
+          and becomes Active when the listing arrives.
         </p>
       </Panel>
 
@@ -488,10 +497,10 @@ export function MonitoringPage() {
                 </div>
               </div>
             </div>
-            <p className="flex flex-wrap items-center gap-2 border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
-              Referral Partners do not see this list. Whether a Referral Partner
-              may see which of its own clients are affected is open{' '}
-              <PendingDecision code="M3" />
+            <p className="border-t border-line/70 bg-mist/40 px-5 py-3.5 text-[0.9375rem] text-graphite sm:px-6">
+              This full list is for an administrator and {a.name} only. Each
+              Referral Partner is notified of its own affected clients and sees
+              only those, with status and which ACSP lapsed, never documents.
             </p>
           </Panel>
         )
@@ -502,14 +511,12 @@ export function MonitoringPage() {
           id="yearly-title"
           title="Yearly list upload"
           description="Upload the Companies House ACSP list. The platform cross-checks every name against its own register."
-          actions={<PendingDecision code="M4" />}
         />
         <div className="space-y-4 p-5 sm:p-6">
           <p className="text-[0.9375rem] text-graphite">
-            Whether the yearly upload replaces or sits beside the two-weekly
-            check is open (setting{' '}
-            <span className="font-mono">yearly_upload_role</span> on the Rules
-            page). Use a synthetic file only.
+            Every 12 months an administrator uploads the fresh list. The yearly
+            upload sits beside the two-weekly check of both published files; it
+            does not replace it. Use a synthetic file only.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <input
@@ -569,7 +576,9 @@ export function MonitoringPage() {
                             data.acsps.find((a) => a.id === id)?.name ?? id,
                         )
                         .join(', ')}`}
-                    . Time to register: to be set.
+                    {u.notFoundAcspIds.length > 0 &&
+                      '. Each has 3 months to register'}
+                    .
                   </p>
                 </li>
               ))}

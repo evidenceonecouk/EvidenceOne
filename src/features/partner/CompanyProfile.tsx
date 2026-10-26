@@ -241,7 +241,7 @@ export function CompanyProfile() {
                 }
               >
                 <Send aria-hidden="true" />
-                Invite people
+                Refer to an ACSP
               </Button>
             </>
           ) : lodgedElsewhere ? (

@@ -12,6 +12,7 @@ import {
 } from './steps/FinishSteps'
 import {
   ChecksStep,
+  ChipStep,
   DocumentStep,
   OptionTwoStep,
   ScanStep,
@@ -38,6 +39,7 @@ const screens: Record<StepId, (p: StepProps) => React.ReactNode> = {
   payment: PaymentStep,
   document: DocumentStep,
   scan: ScanStep,
+  chip: ChipStep,
   selfie: SelfieStep,
   checks: ChecksStep,
   address: AddressStep,

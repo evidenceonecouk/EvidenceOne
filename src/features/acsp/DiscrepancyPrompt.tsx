@@ -2,6 +2,7 @@ import { CircleCheck, FileWarning, Flag, Waypoints } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useToast } from '@/components/app/Toaster'
+import { HeldOptionBadge } from '@/components/HeldOption'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -18,6 +19,7 @@ import {
   recordDiscrepancyChoice,
 } from '@/store/reviewActions'
 import type { DiscrepancyReport, VerificationCase } from '@/types/domain'
+import { SubscriptionOnlyNote, useRouteB } from './RouteBGate'
 
 const choiceLabel: Record<NonNullable<DiscrepancyReport['choice']>, string> = {
   will_report: 'I will report it',
@@ -55,6 +57,8 @@ export function DiscrepancyPrompt({
   const task = vc.correctionTaskId
     ? data.corrections.find((t) => t.id === vc.correctionTaskId)
     : undefined
+
+  const routeB = useRouteB()
 
   const choose = (choice: NonNullable<DiscrepancyReport['choice']>) => {
     apply((d) =>
@@ -168,33 +172,38 @@ export function DiscrepancyPrompt({
             </p>
           )}
 
-          <div className="mt-5 border-t border-line/70 pt-4">
-            <p className="text-[0.9375rem] text-graphite">
-              If the register itself is wrong, a correction can also be raised
-              in Route B. This is separate, and the case is not halted.
-            </p>
-            {task ? (
-              <Button asChild size="sm" variant="outline" className="mt-2">
-                <Link to="/acsp/filings">
-                  <Waypoints aria-hidden="true" />
-                  Route B task {task.id}
-                </Link>
-              </Button>
-            ) : (
-              decidable &&
-              fields.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() => setCorrecting(true)}
-                >
-                  <Waypoints aria-hidden="true" />
-                  Raise a register correction in Route B
+          {routeB.shown && (
+            <div className="mt-5 border-t border-line/70 pt-4">
+              <p className="flex flex-wrap items-center gap-2 text-[0.9375rem] text-graphite">
+                If the register itself is wrong, a correction can also be raised
+                in Route B. This is separate, and the case is not halted.
+                <HeldOptionBadge code="O2" />
+              </p>
+              {!task && !routeB.available ? (
+                <SubscriptionOnlyNote className="mt-3" />
+              ) : task ? (
+                <Button asChild size="sm" variant="outline" className="mt-2">
+                  <Link to="/acsp/filings">
+                    <Waypoints aria-hidden="true" />
+                    Route B task {task.id}
+                  </Link>
                 </Button>
-              )
-            )}
-          </div>
+              ) : (
+                decidable &&
+                fields.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2"
+                    onClick={() => setCorrecting(true)}
+                  >
+                    <Waypoints aria-hidden="true" />
+                    Raise a register correction in Route B
+                  </Button>
+                )
+              )}
+            </div>
+          )}
         </div>
       </div>
 

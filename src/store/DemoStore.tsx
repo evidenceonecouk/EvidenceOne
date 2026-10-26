@@ -25,7 +25,7 @@ import type { ActionResult } from './actions'
 */
 
 const STORAGE_KEY = 'evidenceone.demo'
-const SCHEMA = 7
+const SCHEMA = 8
 /** A saved demo older than this is reseeded so SLA timers look live again. */
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000
 
@@ -43,6 +43,12 @@ export interface DemoState {
   language: LanguageCode
   /** Guided demo mode: short captions that step through the story. */
   guided: { on: boolean; step: number }
+  /**
+    Presenter setting: show the options held until after go-live (O1 language
+    help, O2 Route B filings, O3 bank statement redaction), each badged
+    "Option. Available after go-live." Off hides them without breaking a journey.
+  */
+  showHeldOptions: boolean
   data: DemoData
 }
 
@@ -55,6 +61,7 @@ type Action =
   | { type: 'setSeat'; seat: 1 | 2 }
   | { type: 'setLanguage'; language: LanguageCode }
   | { type: 'setGuided'; guided: { on: boolean; step: number } }
+  | { type: 'setShowHeldOptions'; show: boolean }
   | {
       type: 'update'
       recipe: (data: DemoData) => DemoData
@@ -73,6 +80,7 @@ function freshState(persona: PersonaId = 'partner'): DemoState {
     superAdminSeat: 1,
     language: 'en',
     guided: { on: false, step: 0 },
+    showHeldOptions: true,
     data: createSeed(now),
   }
 }
@@ -108,6 +116,13 @@ function reducer(state: DemoState, action: Action): DemoState {
       return { ...state, language: action.language }
     case 'setGuided':
       return { ...state, guided: action.guided }
+    case 'setShowHeldOptions':
+      // Language help is a held option: hiding it returns guidance to English.
+      return {
+        ...state,
+        showHeldOptions: action.show,
+        language: action.show ? state.language : 'en',
+      }
     case 'update': {
       let data = action.recipe(state.data)
       if (action.audit?.length) {
@@ -141,6 +156,7 @@ interface DemoStoreValue {
   setSeat: (seat: 1 | 2) => void
   setLanguage: (language: LanguageCode) => void
   setGuided: (guided: { on: boolean; step: number }) => void
+  setShowHeldOptions: (show: boolean) => void
   /** Apply an immutable change to the data and append any audit events to the chain. */
   update: (recipe: (data: DemoData) => DemoData, audit?: AuditInput[]) => void
   /** Run a store action from src/store/actions.ts; its audit events are chained automatically. */
@@ -201,6 +217,10 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'setGuided', guided }),
     [],
   )
+  const setShowHeldOptions = useCallback(
+    (show: boolean) => dispatch({ type: 'setShowHeldOptions', show }),
+    [],
+  )
   const update = useCallback(
     (recipe: (data: DemoData) => DemoData, audit?: AuditInput[]) =>
       dispatch({ type: 'update', recipe, audit }),
@@ -223,6 +243,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setSeat,
       setLanguage,
       setGuided,
+      setShowHeldOptions,
       update,
       apply,
       reset,
@@ -235,6 +256,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setSeat,
       setLanguage,
       setGuided,
+      setShowHeldOptions,
       update,
       apply,
       reset,
@@ -280,3 +302,8 @@ export const SUPER_ADMINS = [
     role: 'Super Administrator, second approver',
   },
 ]
+
+/** Whether the options held until after go-live are shown. On by default. */
+export function useShowHeldOptions(): boolean {
+  return useDemoStore().state.showHeldOptions !== false
+}

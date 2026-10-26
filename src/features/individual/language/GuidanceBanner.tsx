@@ -1,12 +1,12 @@
 import { Languages } from 'lucide-react'
 import { useState } from 'react'
-import { PendingDecision } from '@/components/PendingDecision'
+import { HeldOptionBadge } from '@/components/HeldOption'
 import { ModelTag } from '@/components/visual/AiObservationCard'
 import { fill, getStrings, languageByCode } from '@/data/i18n'
 import type { GuidanceStepId } from '@/data/i18n'
 import type { StepId } from '@/features/individual/journey'
 import { currentRuleSet } from '@/lib/rules'
-import { useDemoStore } from '@/store/DemoStore'
+import { useDemoStore, useShowHeldOptions } from '@/store/DemoStore'
 
 export const AI_TRANSLATION_LABEL =
   'AI translation. Advisory only. The English text is the version of record.'
@@ -18,7 +18,9 @@ export const AI_TRANSLATION_LABEL =
 export function GuidanceBanner({ step }: { step: StepId }) {
   const { state, data } = useDemoStore()
   const [english, setEnglish] = useState(false)
-  if (state.language === 'en') return null
+  const held = useShowHeldOptions()
+  // Language help is option O1, held until after go-live.
+  if (state.language === 'en' || !held) return null
   const s = getStrings(state.language)
   const en = getStrings('en')
   const text = s.guidance[step as GuidanceStepId]
@@ -57,12 +59,7 @@ export function GuidanceBanner({ step }: { step: StepId }) {
         </p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <ModelTag />
-          {state.guided.on && (
-            <span className="inline-flex flex-wrap items-center gap-2">
-              Translation reviewer: to be named
-              <PendingDecision code="P9" />
-            </span>
-          )}
+          <HeldOptionBadge code="O1" />
         </div>
       </div>
       <button
