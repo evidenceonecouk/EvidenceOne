@@ -55,6 +55,11 @@ const VerifyStart = lazy(() =>
     default: m.VerifyStart,
   })),
 )
+const ProviderSessions = lazy(() =>
+  import('@/features/acsp/provider/ProviderSessions').then((m) => ({
+    default: m.ProviderSessions,
+  })),
+)
 const ReviewQueue = lazy(() =>
   import('@/features/acsp/ReviewQueue').then((m) => ({
     default: m.ReviewQueue,
@@ -294,6 +299,10 @@ export default function App() {
                 {/* ACSP reviewer */}
                 <Route path="acsp">
                   <Route path="queue" element={<ReviewQueue />} />
+                  <Route
+                    path="identity-checks/:sessionId?"
+                    element={<ProviderSessions />}
+                  />
                   <Route path="cases/:caseId" element={<CaseReview />} />
                   <Route path="cases/:caseId/submit" element={<Submission />} />
                   <Route

@@ -17,6 +17,7 @@ import {
   Palette,
   Radar,
   Receipt,
+  ScanFace,
   Search,
   Send,
   ShieldCheck,
@@ -96,6 +97,11 @@ function useNav(persona: PersonaId): { section: string; items: NavItem[] } {
           label: 'Review queue',
           icon: Inbox,
           count: awaiting,
+        },
+        {
+          to: '/acsp/identity-checks',
+          label: 'Identity checks',
+          icon: ScanFace,
         },
         // Route B filings are a held option (O2): hidden with the held options.
         ...(showHeldOptions
